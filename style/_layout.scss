@@ -1,0 +1,19 @@
+@include penciltest {
+  width: 100%;
+  height: 100%;
+  background-color: $gray;
+
+  .field {
+    $fieldAspect: 16 9;
+    $fieldWidth: 720px;
+    $fieldHeight: $fieldWidth / nth($fieldAspect, 1) * nth($fieldAspect, 2);
+    width: $fieldWidth;
+    height: $fieldHeight;
+    background-color: $white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin: (-$fieldHeight/2) 0 0 (-$fieldWidth/2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+}

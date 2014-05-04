@@ -1,0 +1,13 @@
+{
+  "name": "Tunewich",
+  "version": "0.1.1",
+  "repository": "git@git.lovejoy.io:services/tunewich.git",
+  "devDependencies": {
+    "grunt-contrib-compass": "^0.7.2",
+    "grunt-contrib-coffee": "^0.10.1",
+    "grunt": "^0.4.4",
+    "grunt-contrib-watch": "^0.6.0",
+    "matchdep": "^0.3.0",
+    "grunt-contrib-concat": "^0.3.0"
+  }
+}

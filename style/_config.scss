@@ -1,0 +1,7 @@
+$containerSelector: '.penciltest-app';
+
+@mixin penciltest {
+  #{$containerSelector} {
+    @content;
+  }
+}
