@@ -2,4 +2,14 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  background-color: #666;
+  font-family: 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+body:before {
+  display: table;
+  content: ' ';
+}
+.welcome {
+  color: white;
+  text-align: center;
 }
