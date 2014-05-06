@@ -31,6 +31,7 @@ module.exports = (grunt) ->
         files:
           'public/js/penciltest.js':[
             'src/vendor/*.js',
+            'src/utils.js',
             'src/penciltest.js',
           ]
           'public/js/app.js':[
