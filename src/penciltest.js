@@ -6,14 +6,15 @@ var PencilTest;
 
 PencilTest = (function() {
   function PencilTest(options) {
-    var key, value, _i, _len, _ref;
+    var key, value, _ref;
     this.options = options;
     _ref = {
       container: document.body,
-      containerSelector: 'body'
+      containerSelector: 'body',
+      frameRate: 12
     };
-    for (value = _i = 0, _len = _ref.length; _i < _len; value = ++_i) {
-      key = _ref[value];
+    for (key in _ref) {
+      value = _ref[key];
       if (typeof this.options[key] === 'undefined') {
         this.options[key] = value;
       }
@@ -39,8 +40,20 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addInputHandlers = function() {
-    var contextMenuHandler, mouseDownHandler, mouseMoveHandler, mouseUpHandler, self;
+    var contextMenuHandler, markFromEvent, mouseDownHandler, mouseMoveHandler, mouseUpHandler, self;
     self = this;
+    markFromEvent = function(event) {
+      var eventLocation;
+      if (/^touch/.test(event.type)) {
+        if (event.touches.length > 1) {
+          return true;
+        }
+        eventLocation = event.touches[0];
+      } else {
+        eventLocation = event;
+      }
+      return self.mark(eventLocation.pageX - self.fieldElement.offsetLeft, eventLocation.pageY - self.fieldElement.offsetTop);
+    };
     mouseDownHandler = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
@@ -52,7 +65,7 @@ PencilTest = (function() {
         if (event.button === 2) {
           return true;
         }
-        mouseMoveHandler(event);
+        markFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveHandler);
         document.body.addEventListener('touchmove', mouseMoveHandler);
         document.body.addEventListener('mouseup', mouseUpHandler);
@@ -60,17 +73,8 @@ PencilTest = (function() {
       }
     };
     mouseMoveHandler = function(event) {
-      var eventLocation;
       event.preventDefault();
-      if (event.type === 'touchmove') {
-        if (event.touches.length > 1) {
-          return true;
-        }
-        eventLocation = event.touches[0];
-      } else {
-        eventLocation = event;
-      }
-      return self.mark(eventLocation.pageX - self.fieldElement.offsetLeft, eventLocation.pageY - self.fieldElement.offsetTop);
+      return markFromEvent(event);
     };
     mouseUpHandler = function(event) {
       if (event.button === 2) {
@@ -101,14 +105,31 @@ PencilTest = (function() {
     var self;
     self = this;
     return document.body.addEventListener('keydown', function(event) {
+      var matchedKey;
+      matchedKey = true;
       switch (event.keyCode) {
         case 37:
           self.goToFrame(self.currentFrameIndex - 1);
           break;
         case 39:
           self.goToFrame(self.currentFrameIndex + 1);
+          break;
+        case 38:
+          self.goToFrame(self.frames.length - 1);
+          break;
+        case 40:
+          self.goToFrame(0);
+          break;
+        case 32:
+          self.togglePlay();
+          break;
+        default:
+          matchedKey = false;
       }
-      return console.log(event.keyCode);
+      window.location.hash = event.keyCode;
+      if (matchedKey) {
+        return event.preventDefault();
+      }
     });
   };
 
@@ -158,15 +179,46 @@ PencilTest = (function() {
     return this.drawCurrentFrame();
   };
 
-  PencilTest.prototype.goToFrame = function(newIndex) {
+  PencilTest.prototype.goToFrame = function(newIndex, noNewFrame) {
+    if (noNewFrame == null) {
+      noNewFrame = false;
+    }
     if (newIndex < 0) {
-      this.newFrame('prepend');
+      if (noNewFrame === false) {
+        this.newFrame('prepend');
+      }
     } else if (newIndex >= this.frames.length) {
-      this.newFrame();
+      if (noNewFrame === false) {
+        this.newFrame();
+      }
     } else {
       this.currentFrameIndex = newIndex;
     }
     return this.drawCurrentFrame();
+  };
+
+  PencilTest.prototype.play = function() {
+    var self, stepHandler;
+    self = this;
+    stepHandler = function() {
+      return self.goToFrame(self.currentFrameIndex + 1, 'no new frames');
+    };
+    this.stop();
+    this.playInterval = setInterval(stepHandler, 1000 / this.options.frameRate);
+    return this.isPlaying = true;
+  };
+
+  PencilTest.prototype.stop = function() {
+    clearInterval(this.playInterval);
+    return this.isPlaying = false;
+  };
+
+  PencilTest.prototype.togglePlay = function() {
+    if (this.isPlaying) {
+      return this.stop();
+    } else {
+      return this.play();
+    }
   };
 
   PencilTest.prototype.drawCurrentFrame = function() {
