@@ -8123,13 +8123,16 @@ global: document, window
 var Utils;
 
 Utils = {
-  toggleClass: function(element, className) {
+  toggleClass: function(element, className, presence) {
     var classIndex, classes;
+    if (presence == null) {
+      presence = null;
+    }
     classes = element.className.split(/\s+/);
     classIndex = classes.indexOf(className);
-    if (classIndex > -1) {
+    if (classIndex > -1 && presence !== true) {
       classes.splice(classIndex, 1);
-    } else {
+    } else if (presence !== false) {
       classes.push(className);
     }
     return element.className = classes.join(' ');
@@ -8143,13 +8146,47 @@ global: document, window
 var PencilTest;
 
 PencilTest = (function() {
+  PencilTest.prototype.optionListeners = {
+    hideCursor: {
+      label: "Hide Cursor",
+      listener: function() {
+        return this.options.hideCursor = !this.options.hideCursor;
+      },
+      action: function() {
+        return Utils.toggleClass(this.container, 'hide-cursor', this.options.hideCursor);
+      }
+    },
+    onionSkin: {
+      label: "Onion Skin",
+      listener: function() {
+        return this.options.onionSkin = !this.options.onionSkin;
+      },
+      action: function() {
+        return console.log("onion skinning: " + this.options.onionSkin);
+      }
+    },
+    frameRate: {
+      label: "Frame Rate",
+      listener: function() {
+        return null;
+      },
+      action: function() {
+        return console.log("frame rate: " + this.options.frameRate);
+      }
+    }
+  };
+
+  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'frameRate'];
+
   function PencilTest(options) {
-    var key, value, _ref;
+    var key, optionName, value, _ref, _ref1;
     this.options = options;
     _ref = {
       container: document.body,
       containerSelector: 'body',
-      frameRate: 12
+      hideCursor: false,
+      frameRate: 12,
+      onionSkin: false
     };
     for (key in _ref) {
       value = _ref[key];
@@ -8162,23 +8199,34 @@ PencilTest = (function() {
     this.frames = [];
     this.lift();
     this.buildContainer();
-    this.addInputHandlers();
-    this.addMenuHandlers();
-    this.addKeyboardHandlers();
+    this.addInputListeners();
+    this.addMenuListeners();
+    this.addKeyboardListeners();
+    for (optionName in this.options) {
+      if ((_ref1 = this.optionListeners[optionName]) != null) {
+        _ref1.action.call(this);
+      }
+    }
     this.newFrame();
     window.penciltest = this;
   }
 
   PencilTest.prototype.buildContainer = function() {
-    var markup;
-    markup = '<div class="field"></div>' + '<ul class="menu">' + '<li rel="tablet-mode">Tablet Mode</li>' + '</ul>';
+    var key, markup, _i, _len, _ref;
+    markup = '<div class="field"></div>' + '<ul class="menu">';
+    _ref = this.menuOptions;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      key = _ref[_i];
+      markup += "<li rel=\"" + key + "\">" + this.optionListeners[key].label + "</li>";
+    }
+    markup += '</ul>';
     this.container.innerHTML = markup;
     this.fieldElement = this.container.querySelector('.field');
     return this.field = new Raphael(this.fieldElement);
   };
 
-  PencilTest.prototype.addInputHandlers = function() {
-    var contextMenuHandler, markFromEvent, mouseDownHandler, mouseMoveHandler, mouseUpHandler, self;
+  PencilTest.prototype.addInputListeners = function() {
+    var contextMenuListener, markFromEvent, mouseDownListener, mouseMoveListener, mouseUpListener, self;
     self = this;
     markFromEvent = function(event) {
       var eventLocation;
@@ -8192,10 +8240,10 @@ PencilTest = (function() {
       }
       return self.mark(eventLocation.pageX - self.fieldElement.offsetLeft, eventLocation.pageY - self.fieldElement.offsetTop);
     };
-    mouseDownHandler = function(event) {
+    mouseDownListener = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
-        mouseUpHandler();
+        mouseUpListener();
         if (event.touches.length === 3) {
           return self.toggleMenu();
         }
@@ -8204,42 +8252,67 @@ PencilTest = (function() {
           return true;
         }
         markFromEvent(event);
-        document.body.addEventListener('mousemove', mouseMoveHandler);
-        document.body.addEventListener('touchmove', mouseMoveHandler);
-        document.body.addEventListener('mouseup', mouseUpHandler);
-        return document.body.addEventListener('touchend', mouseUpHandler);
+        document.body.addEventListener('mousemove', mouseMoveListener);
+        document.body.addEventListener('touchmove', mouseMoveListener);
+        document.body.addEventListener('mouseup', mouseUpListener);
+        return document.body.addEventListener('touchend', mouseUpListener);
       }
     };
-    mouseMoveHandler = function(event) {
+    mouseMoveListener = function(event) {
       event.preventDefault();
       return markFromEvent(event);
     };
-    mouseUpHandler = function(event) {
+    mouseUpListener = function(event) {
       if (event.button === 2) {
         return true;
       } else {
-        document.body.removeEventListener('mousemove', mouseMoveHandler);
-        document.body.removeEventListener('touchmove', mouseMoveHandler);
-        document.body.removeEventListener('mouseup', mouseUpHandler);
-        document.body.removeEventListener('touchend', mouseUpHandler);
+        document.body.removeEventListener('mousemove', mouseMoveListener);
+        document.body.removeEventListener('touchmove', mouseMoveListener);
+        document.body.removeEventListener('mouseup', mouseUpListener);
+        document.body.removeEventListener('touchend', mouseUpListener);
         return self.lift();
       }
     };
-    contextMenuHandler = function(event) {
+    contextMenuListener = function(event) {
       event.preventDefault();
       return self.toggleMenu();
     };
-    this.fieldElement.addEventListener('mousedown', mouseDownHandler);
-    this.fieldElement.addEventListener('touchstart', mouseDownHandler);
-    return this.fieldElement.addEventListener('contextmenu', contextMenuHandler);
+    this.fieldElement.addEventListener('mousedown', mouseDownListener);
+    this.fieldElement.addEventListener('touchstart', mouseDownListener);
+    return this.fieldElement.addEventListener('contextmenu', contextMenuListener);
   };
 
-  PencilTest.prototype.addMenuHandlers = function() {
+  PencilTest.prototype.updateMenuOption = function(optionElement) {
+    var optionName;
+    optionName = optionElement.attributes.rel.value;
+    if (typeof this.options[optionName] === 'boolean') {
+      return Utils.toggleClass(optionElement, 'enabled', this.options[optionName]);
+    }
+  };
+
+  PencilTest.prototype.addMenuListeners = function() {
+    var menuOptionListener, option, self, _i, _len, _ref, _results;
+    self = this;
     this.menuElement = this.container.querySelector('.menu');
-    return this.menuItems = this.menuElement.getElementsByTagName('li');
+    this.menuItems = this.menuElement.getElementsByTagName('li');
+    menuOptionListener = function(event) {
+      var optionName;
+      optionName = this.attributes.rel.value;
+      self.optionListeners[optionName].listener.call(self);
+      self.optionListeners[optionName].action.call(self);
+      return self.updateMenuOption(this);
+    };
+    _ref = this.menuItems;
+    _results = [];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      option = _ref[_i];
+      option.addEventListener('click', menuOptionListener);
+      _results.push(this.updateMenuOption(option));
+    }
+    return _results;
   };
 
-  PencilTest.prototype.addKeyboardHandlers = function() {
+  PencilTest.prototype.addKeyboardListeners = function() {
     var self;
     self = this;
     return document.body.addEventListener('keydown', function(event) {
@@ -8336,13 +8409,13 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.play = function() {
-    var self, stepHandler;
+    var self, stepListener;
     self = this;
-    stepHandler = function() {
+    stepListener = function() {
       return self.goToFrame(self.currentFrameIndex + 1, 'no new frames');
     };
     this.stop();
-    this.playInterval = setInterval(stepHandler, 1000 / this.options.frameRate);
+    this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     return this.isPlaying = true;
   };
 

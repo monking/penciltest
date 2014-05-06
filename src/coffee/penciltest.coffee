@@ -3,11 +3,36 @@ global: document, window
 ###
 
 class PencilTest
+
+  optionListeners:
+    hideCursor:
+      label: "Hide Cursor"
+      listener: ->
+        @options.hideCursor = not @options.hideCursor
+      action: ->
+        Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
+    onionSkin:
+      label: "Onion Skin"
+      listener: -> @options.onionSkin = not @options.onionSkin
+      action: -> console.log "onion skinning: #{@options.onionSkin}"
+    frameRate:
+      label: "Frame Rate"
+      listener: -> null
+      action: -> console.log "frame rate: #{@options.frameRate}"
+
+  menuOptions: [
+    'hideCursor'
+    'onionSkin'
+    'frameRate'
+  ]
+
   constructor: (@options) ->
     for key, value of {
       container: document.body
       containerSelector: 'body'
+      hideCursor: false
       frameRate: 12
+      onionSkin: false
     }
       @options[key] = value if typeof @options[key] is 'undefined'
 
@@ -19,9 +44,11 @@ class PencilTest
 
     @buildContainer()
 
-    @addInputHandlers()
-    @addMenuHandlers()
-    @addKeyboardHandlers()
+    @addInputListeners()
+    @addMenuListeners()
+    @addKeyboardListeners()
+
+    @optionListeners[optionName]?.action.call @ for optionName of @options
 
     @newFrame()
 
@@ -29,16 +56,16 @@ class PencilTest
 
   buildContainer: ->
     markup = '<div class="field"></div>' +
-    '<ul class="menu">' +
-      '<li rel="tablet-mode">Tablet Mode</li>' +
-    '</ul>'
+    '<ul class="menu">'
+    markup += "<li rel=\"#{key}\">#{@optionListeners[key].label}</li>" for key in @menuOptions
+    markup += '</ul>'
 
     @container.innerHTML = markup
 
     @fieldElement = @container.querySelector '.field'
     @field = new Raphael @fieldElement
 
-  addInputHandlers: ->
+  addInputListeners: ->
     self = @
 
     markFromEvent = (event) ->
@@ -53,47 +80,63 @@ class PencilTest
         eventLocation.pageY - self.fieldElement.offsetTop
       )
 
-    mouseDownHandler = (event) ->
+    mouseDownListener = (event) ->
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        mouseUpHandler()
+        mouseUpListener()
         if event.touches.length is 3
           self.toggleMenu()
       else
         if event.button is 2 then return true # allow context menu
         markFromEvent event
-        document.body.addEventListener 'mousemove', mouseMoveHandler
-        document.body.addEventListener 'touchmove', mouseMoveHandler
-        document.body.addEventListener 'mouseup', mouseUpHandler
-        document.body.addEventListener 'touchend', mouseUpHandler
+        document.body.addEventListener 'mousemove', mouseMoveListener
+        document.body.addEventListener 'touchmove', mouseMoveListener
+        document.body.addEventListener 'mouseup', mouseUpListener
+        document.body.addEventListener 'touchend', mouseUpListener
 
-    mouseMoveHandler = (event) ->
+    mouseMoveListener = (event) ->
       event.preventDefault()
       markFromEvent event
 
-    mouseUpHandler = (event) ->
+    mouseUpListener = (event) ->
       if event.button is 2 
         return true # allow context menu
       else
-        document.body.removeEventListener 'mousemove', mouseMoveHandler
-        document.body.removeEventListener 'touchmove', mouseMoveHandler
-        document.body.removeEventListener 'mouseup', mouseUpHandler
-        document.body.removeEventListener 'touchend', mouseUpHandler
+        document.body.removeEventListener 'mousemove', mouseMoveListener
+        document.body.removeEventListener 'touchmove', mouseMoveListener
+        document.body.removeEventListener 'mouseup', mouseUpListener
+        document.body.removeEventListener 'touchend', mouseUpListener
         self.lift()
 
-    contextMenuHandler = (event) ->
+    contextMenuListener = (event) ->
       event.preventDefault()
       self.toggleMenu()
 
-    @fieldElement.addEventListener 'mousedown', mouseDownHandler
-    @fieldElement.addEventListener 'touchstart', mouseDownHandler
-    @fieldElement.addEventListener 'contextmenu', contextMenuHandler
+    @fieldElement.addEventListener 'mousedown', mouseDownListener
+    @fieldElement.addEventListener 'touchstart', mouseDownListener
+    @fieldElement.addEventListener 'contextmenu', contextMenuListener
 
-  addMenuHandlers: ->
+  updateMenuOption: (optionElement) ->
+    optionName = optionElement.attributes.rel.value
+    if typeof @options[optionName] is 'boolean'
+      Utils.toggleClass optionElement, 'enabled', @options[optionName]
+
+  addMenuListeners: ->
+    self = @
     @menuElement = @container.querySelector '.menu'
     @menuItems = @menuElement.getElementsByTagName 'li'
 
-  addKeyboardHandlers: ->
+    menuOptionListener = (event) ->
+      optionName = this.attributes.rel.value
+      self.optionListeners[optionName].listener.call self
+      self.optionListeners[optionName].action.call self
+      self.updateMenuOption this
+
+    for option in @menuItems
+      option.addEventListener 'click', menuOptionListener
+      @updateMenuOption option
+
+  addKeyboardListeners: ->
     self = @
     document.body.addEventListener 'keydown', (event) ->
       matchedKey = true
@@ -161,11 +204,11 @@ class PencilTest
 
   play: ->
     self = @
-    stepHandler = ->
+    stepListener = ->
       self.goToFrame self.currentFrameIndex + 1, 'no new frames'
 
     @stop()
-    @playInterval = setInterval stepHandler, 1000 / @options.frameRate
+    @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @isPlaying = true
 
   stop: ->
