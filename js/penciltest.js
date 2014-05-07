@@ -8138,7 +8138,6 @@ Utils = {
     return element.className = classes.join(' ');
   },
   log: function() {
-    window.location.hash = arguments[0].toString();
     return console.log(arguments[0]);
   },
   alert: function() {
@@ -8160,7 +8159,7 @@ var PencilTest;
 
 PencilTest = (function() {
   function PencilTest(options) {
-    var key, optionName, value, _ref, _ref1;
+    var key, optionName, value, _ref, _ref1, _ref2;
     this.options = options;
     _ref = {
       container: document.body,
@@ -8185,7 +8184,9 @@ PencilTest = (function() {
     this.addKeyboardListeners();
     for (optionName in this.options) {
       if ((_ref1 = this.optionListeners[optionName]) != null) {
-        _ref1.action.call(this);
+        if ((_ref2 = _ref1.action) != null) {
+          _ref2.call(this);
+        }
       }
     }
     this.newFilm();
@@ -8213,27 +8214,18 @@ PencilTest = (function() {
       listener: function() {
         this.options.onionSkin = !this.options.onionSkin;
         return this.drawCurrentFrame();
-      },
-      action: function() {
-        return Utils.log("onionSkin--" + this.options.onionSkin);
       }
     },
     frameRate: {
       label: "Frame Rate",
       listener: function() {
         return null;
-      },
-      action: function() {
-        return Utils.log("frameRate--" + this.options.frameRate);
       }
     },
     loop: {
       label: "Loop",
       listener: function() {
         return this.options.loop = !this.options.loop;
-      },
-      action: function() {
-        return Utils.log("loop--" + this.options.loop);
       }
     },
     saveFilm: {
@@ -8422,10 +8414,7 @@ PencilTest = (function() {
     keyboardListener = function(event) {
       if ((keyboardHandlers[event.type] != null) && (keyboardHandlers[event.type][event.keyCode] != null)) {
         event.preventDefault();
-        keyboardHandlers[event.type][event.keyCode].apply(self, [event]);
-      }
-      if (event.keyCode !== 0) {
-        return Utils.log("" + event.type + "-" + event.keyCode);
+        return keyboardHandlers[event.type][event.keyCode].apply(self, [event]);
       }
     };
     document.body.addEventListener('keydown', keyboardListener);
@@ -8638,7 +8627,8 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.undo = function() {
-    return this.getCurrentFrame().strokes.pop();
+    this.getCurrentFrame().strokes.pop();
+    return this.drawCurrentFrame();
   };
 
   PencilTest.prototype.getSavedFilms = function() {
