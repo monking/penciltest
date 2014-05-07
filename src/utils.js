@@ -18,5 +18,9 @@ Utils = {
       classes.push(className);
     }
     return element.className = classes.join(' ');
+  },
+  log: function() {
+    window.location.hash = arguments[0].toString();
+    return console.log.apply(null, arguments);
   }
 };

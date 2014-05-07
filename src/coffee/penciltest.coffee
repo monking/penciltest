@@ -14,11 +14,11 @@ class PencilTest
     onionSkin:
       label: "Onion Skin"
       listener: -> @options.onionSkin = not @options.onionSkin
-      action: -> console.log "onion skinning: #{@options.onionSkin}"
+      action: -> Utils.log "onionSkin--#{@options.onionSkin}"
     frameRate:
       label: "Frame Rate"
       listener: -> null
-      action: -> console.log "frame rate: #{@options.frameRate}"
+      action: -> Utils.log "frameRate--#{@options.frameRate}"
 
   menuOptions: [
     'hideCursor'
@@ -33,6 +33,7 @@ class PencilTest
       hideCursor: false
       frameRate: 12
       onionSkin: false
+      onionSkinOpacity: 0.5
     }
       @options[key] = value if typeof @options[key] is 'undefined'
 
@@ -138,23 +139,41 @@ class PencilTest
 
   addKeyboardListeners: ->
     self = @
-    document.body.addEventListener 'keydown', (event) ->
-      matchedKey = true
-      switch event.keyCode
-        when 37 then self.goToFrame self.currentFrameIndex - 1 # LEFT
-        when 39 then self.goToFrame self.currentFrameIndex + 1 # RIGHT
-        when 38 then self.goToFrame self.frames.length - 1 # UP
-        when 40 then self.goToFrame 0 # DOWN
-        when 32 then self.togglePlay() # SPACE
-        else matchedKey = false
+    
+    keyboardHandlers =
+      keydown:
+        32: -> @togglePlay() # SPACE
+        37: -> @goToFrame @currentFrameIndex - 1 # LEFT
+        38: -> @goToFrame @frames.length - 1 # UP
+        39: -> @goToFrame @currentFrameIndex + 1 # RIGHT
+        40: -> @goToFrame 0 # DOWN
+      keyup:
+        48: -> # 0
+        49: -> # 1
+        50: -> # 2
+        51: -> # 3
+        52: -> # 4
+        53: -> # 5
+        54: -> # 6
+        55: -> # 7
+        56: -> # 8
+        57: -> # 9
+        189: -> @getCurrentFrame().hold++ # -
+        187: -> @getCurrentFrame().hold-- # =
 
-      window.location.hash = event.keyCode
+    keyboardListener = (event) ->
+      if keyboardHandlers[event.type]? and  keyboardHandlers[event.type][event.keyCode]?
+        event.preventDefault()
+        keyboardHandlers[event.type][event.keyCode].apply self, [event]
 
-      if matchedKey then event.preventDefault()
+      Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
+
+    document.body.addEventListener 'keydown', keyboardListener
+    document.body.addEventListener 'keyup', keyboardListener
 
   newFrame: (prepend = false) ->
     newFrame =
-      hold: 1
+      hold: 3
       strokes: []
 
     if prepend isnt false
@@ -204,8 +223,14 @@ class PencilTest
 
   play: ->
     self = @
+    @framesHeld = 0
+
     stepListener = ->
-      self.goToFrame self.currentFrameIndex + 1, 'no new frames'
+      self.framesHeld++
+      currentFrame = self.getCurrentFrame()
+      if self.framesHeld >= currentFrame.hold
+        self.framesHeld = 0
+        self.goToFrame self.currentFrameIndex + 1, 'no new frames'
 
     @stop()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate

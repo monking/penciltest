@@ -21,7 +21,7 @@ PencilTest = (function() {
         return this.options.onionSkin = !this.options.onionSkin;
       },
       action: function() {
-        return console.log("onion skinning: " + this.options.onionSkin);
+        return Utils.log("onionSkin--" + this.options.onionSkin);
       }
     },
     frameRate: {
@@ -30,7 +30,7 @@ PencilTest = (function() {
         return null;
       },
       action: function() {
-        return console.log("frame rate: " + this.options.frameRate);
+        return Utils.log("frameRate--" + this.options.frameRate);
       }
     }
   };
@@ -45,7 +45,8 @@ PencilTest = (function() {
       containerSelector: 'body',
       hideCursor: false,
       frameRate: 12,
-      onionSkin: false
+      onionSkin: false,
+      onionSkinOpacity: 0.5
     };
     for (key in _ref) {
       value = _ref[key];
@@ -172,35 +173,56 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addKeyboardListeners = function() {
-    var self;
+    var keyboardHandlers, keyboardListener, self;
     self = this;
-    return document.body.addEventListener('keydown', function(event) {
-      var matchedKey;
-      matchedKey = true;
-      switch (event.keyCode) {
-        case 37:
-          self.goToFrame(self.currentFrameIndex - 1);
-          break;
-        case 39:
-          self.goToFrame(self.currentFrameIndex + 1);
-          break;
-        case 38:
-          self.goToFrame(self.frames.length - 1);
-          break;
-        case 40:
-          self.goToFrame(0);
-          break;
-        case 32:
-          self.togglePlay();
-          break;
-        default:
-          matchedKey = false;
+    keyboardHandlers = {
+      keydown: {
+        32: function() {
+          return this.togglePlay();
+        },
+        37: function() {
+          return this.goToFrame(this.currentFrameIndex - 1);
+        },
+        38: function() {
+          return this.goToFrame(this.frames.length - 1);
+        },
+        39: function() {
+          return this.goToFrame(this.currentFrameIndex + 1);
+        },
+        40: function() {
+          return this.goToFrame(0);
+        }
+      },
+      keyup: {
+        48: function() {},
+        49: function() {},
+        50: function() {},
+        51: function() {},
+        52: function() {},
+        53: function() {},
+        54: function() {},
+        55: function() {},
+        56: function() {},
+        57: function() {},
+        189: function() {
+          return this.getCurrentFrame().hold++;
+        },
+        187: function() {
+          return this.getCurrentFrame().hold--;
+        }
       }
-      window.location.hash = event.keyCode;
-      if (matchedKey) {
-        return event.preventDefault();
+    };
+    keyboardListener = function(event) {
+      if ((keyboardHandlers[event.type] != null) && (keyboardHandlers[event.type][event.keyCode] != null)) {
+        event.preventDefault();
+        keyboardHandlers[event.type][event.keyCode].apply(self, [event]);
       }
-    });
+      if (event.keyCode !== 0) {
+        return Utils.log("" + event.type + "-" + event.keyCode);
+      }
+    };
+    document.body.addEventListener('keydown', keyboardListener);
+    return document.body.addEventListener('keyup', keyboardListener);
   };
 
   PencilTest.prototype.newFrame = function(prepend) {
@@ -209,7 +231,7 @@ PencilTest = (function() {
       prepend = false;
     }
     newFrame = {
-      hold: 1,
+      hold: 3,
       strokes: []
     };
     if (prepend !== false) {
@@ -270,8 +292,15 @@ PencilTest = (function() {
   PencilTest.prototype.play = function() {
     var self, stepListener;
     self = this;
+    this.framesHeld = 0;
     stepListener = function() {
-      return self.goToFrame(self.currentFrameIndex + 1, 'no new frames');
+      var currentFrame;
+      self.framesHeld++;
+      currentFrame = self.getCurrentFrame();
+      if (self.framesHeld >= currentFrame.hold) {
+        self.framesHeld = 0;
+        return self.goToFrame(self.currentFrameIndex + 1, 'no new frames');
+      }
     };
     this.stop();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);

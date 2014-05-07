@@ -12,3 +12,7 @@ Utils =
     else if presence isnt false
       classes.push className
     element.className = classes.join ' '
+
+  log: ->
+    window.location.hash = arguments[0].toString()
+    console.log.apply null, arguments
