@@ -13,6 +13,7 @@ PencilTest = (function() {
       containerSelector: 'body',
       hideCursor: false,
       loop: true,
+      showStatus: true,
       frameRate: 12,
       onionSkin: true,
       onionSkinOpacity: 0.5
@@ -63,10 +64,13 @@ PencilTest = (function() {
         return this.drawCurrentFrame();
       }
     },
-    frameRate: {
-      label: "Frame Rate",
+    showStatus: {
+      label: "Show Status",
       listener: function() {
-        return null;
+        return this.options.showStatus = !this.options.showStatus;
+      },
+      action: function() {
+        return Utils.toggleClass(this.statusElement, 'hidden', !this.options.showStatus);
       }
     },
     loop: {
@@ -94,14 +98,20 @@ PencilTest = (function() {
           return this.newFilm();
         }
       }
+    },
+    help: {
+      label: "Help",
+      listener: function() {
+        return this.showHelp();
+      }
     }
   };
 
-  PencilTest.prototype.menuOptions = ['undo', 'hideCursor', 'onionSkin', 'frameRate', 'loop', 'saveFilm', 'loadFilm', 'newFilm'];
+  PencilTest.prototype.menuOptions = ['undo', 'hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm', 'help', 'showStatus'];
 
   PencilTest.prototype.buildContainer = function() {
     var key, markup, _i, _len, _ref;
-    markup = '<div class="field"></div>' + '<ul class="menu">';
+    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<ul class="menu">';
     _ref = this.menuOptions;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       key = _ref[_i];
@@ -110,7 +120,8 @@ PencilTest = (function() {
     markup += '</ul>';
     this.container.innerHTML = markup;
     this.fieldElement = this.container.querySelector('.field');
-    return this.field = new Raphael(this.fieldElement);
+    this.field = new Raphael(this.fieldElement);
+    return this.statusElement = this.container.querySelector('.status');
   };
 
   PencilTest.prototype.addInputListeners = function() {
@@ -187,21 +198,23 @@ PencilTest = (function() {
     }
   };
 
+  PencilTest.prototype.selectMenuOption = function(optionName) {
+    var _ref, _ref1;
+    if ((_ref = this.optionListeners[optionName].listener) != null) {
+      _ref.call(this);
+    }
+    return (_ref1 = this.optionListeners[optionName].action) != null ? _ref1.call(this) : void 0;
+  };
+
   PencilTest.prototype.addMenuListeners = function() {
     var menuOptionListener, option, self, _i, _len, _ref, _results;
     self = this;
     this.menuElement = this.container.querySelector('.menu');
     this.menuItems = this.menuElement.getElementsByTagName('li');
     menuOptionListener = function(event) {
-      var optionName, _ref, _ref1;
+      var optionName;
       optionName = this.attributes.rel.value;
-      if ((_ref = self.optionListeners[optionName].listener) != null) {
-        _ref.call(self);
-      }
-      if ((_ref1 = self.optionListeners[optionName].action) != null) {
-        _ref1.call(self);
-      }
-      self.updateMenuOption(this);
+      self.selectMenuOption(optionName);
       return self.hideMenu();
     };
     _ref = this.menuItems;
@@ -209,14 +222,13 @@ PencilTest = (function() {
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       option = _ref[_i];
       option.addEventListener('mouseup', menuOptionListener);
-      option.addEventListener('touchend', menuOptionListener);
-      _results.push(this.updateMenuOption(option));
+      _results.push(option.addEventListener('touchend', menuOptionListener));
     }
     return _results;
   };
 
   PencilTest.prototype.addKeyboardListeners = function() {
-    var keyboardHandlers, keyboardListener, self;
+    var documentBindings, keyboardHandlers, keyboardListener, self;
     self = this;
     keyboardHandlers = {
       keydown: {
@@ -226,46 +238,106 @@ PencilTest = (function() {
         37: function() {
           return this.prevFrame('stop');
         },
-        38: function() {
-          return this.lastFrame('stop');
-        },
         39: function() {
           return this.nextFrame('stop');
         },
         40: function() {
           return this.firstFrame('stop');
+        },
+        38: function() {
+          return this.lastFrame('stop');
         }
       },
       keyup: {
-        8: function() {
-          return this.dropFrame();
+        79: function() {
+          return this.selectMenuOption('onionSkin');
         },
-        48: function() {},
-        49: function() {},
-        50: function() {},
-        51: function() {},
-        52: function() {},
-        53: function() {},
-        54: function() {},
-        55: function() {},
-        56: function() {},
-        57: function() {},
         189: function() {
-          return this.getCurrentFrame().hold++;
+          return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
         },
         187: function() {
-          return this.getCurrentFrame().hold--;
+          return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
+        },
+        8: function() {
+          return this.dropFrame();
+        }
+      },
+      modifiers: {
+        ctrl: {
+          keydown: {
+            83: function() {
+              return this.saveFilm();
+            },
+            79: function() {
+              return this.loadFilm();
+            },
+            78: function() {
+              return this.newFilm();
+            },
+            8: function() {
+              return this.deleteFilm();
+            }
+          }
+        },
+        shift: {
+          keydown: {
+            191: function() {
+              return this.showHelp();
+            }
+          }
         }
       }
     };
     keyboardListener = function(event) {
-      if ((keyboardHandlers[event.type] != null) && (keyboardHandlers[event.type][event.keyCode] != null)) {
+      var keySet;
+      if (event.ctrlKey) {
+        keySet = keyboardHandlers.modifiers.ctrl;
+      } else if (event.shiftKey) {
+        keySet = keyboardHandlers.modifiers.shift;
+      } else {
+        keySet = keyboardHandlers;
+      }
+      Utils.log(keySet[event.type]);
+      if ((keySet[event.type] != null) && (keySet[event.type][event.keyCode] != null)) {
         event.preventDefault();
-        return keyboardHandlers[event.type][event.keyCode].apply(self, [event]);
+        keySet[event.type][event.keyCode].apply(self, [event]);
+      }
+      if (event.keyCode !== 0) {
+        return Utils.log("" + event.type + "-" + event.keyCode);
       }
     };
     document.body.addEventListener('keydown', keyboardListener);
-    return document.body.addEventListener('keyup', keyboardListener);
+    document.body.addEventListener('keyup', keyboardListener);
+    documentBindings = function(keySet, markup, combo) {
+      var action, eventType, handlers, keyCode, lookupList, modifier, subset;
+      if (markup == null) {
+        markup = '';
+      }
+      if (combo == null) {
+        combo = [];
+      }
+      for (eventType in keySet) {
+        handlers = keySet[eventType];
+        if (eventType === 'modifiers') {
+          for (modifier in handlers) {
+            subset = handlers[modifier];
+            markup = documentBindings(subset, markup, combo.concat([modifier]));
+          }
+        } else {
+          for (keyCode in handlers) {
+            action = handlers[keyCode];
+            if (combo.indexOf('shift') > -1) {
+              lookupList = Utils.shiftKeyCodeNames;
+            } else {
+              lookupList = Utils.keyCodeNames;
+            }
+            markup += ("" + (combo.concat(lookupList[keyCode]).join(' + ')) + ":") + (" " + (action.toString().replace(/function \(\) {\n\s*return |\n\s*}/g, '')) + "\n");
+          }
+        }
+      }
+      return markup;
+    };
+    return this.keyBindingsDoc = documentBindings(keyboardHandlers);
   };
 
   PencilTest.prototype.newFrame = function(prepend) {
@@ -303,25 +375,41 @@ PencilTest = (function() {
     } else {
       this.getCurrentStroke().push("L" + x + " " + y);
       return this.drawCurrentFrame();
+
+      /* FIXME: find a faster way to draw each segment of the line than to redraw the whole frame */
     }
   };
 
   PencilTest.prototype.showMenu = function(coords) {
+    var option, _i, _len, _ref, _results;
     if (coords == null) {
       coords = {
         x: 10,
         y: 10
       };
     }
-    Utils.toggleClass(this.container, 'menu-visible', true);
-    coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
-    coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
-    this.menuElement.style.left = "" + coords.x + "px";
-    return this.menuElement.style.top = "" + coords.y + "px";
+    if (!this.menuIsVisible) {
+      this.menuIsVisible = true;
+      Utils.toggleClass(this.container, 'menu-visible', true);
+      coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
+      coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
+      this.menuElement.style.left = "" + coords.x + "px";
+      this.menuElement.style.top = "" + coords.y + "px";
+      _ref = this.menuItems;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        option = _ref[_i];
+        _results.push(this.updateMenuOption(option));
+      }
+      return _results;
+    }
   };
 
   PencilTest.prototype.hideMenu = function() {
-    return Utils.toggleClass(this.container, 'menu-visible', false);
+    if (this.menuIsVisible) {
+      this.menuIsVisible = false;
+      return Utils.toggleClass(this.container, 'menu-visible', false);
+    }
   };
 
   PencilTest.prototype.updateCurrentFrame = function(segment) {
@@ -399,7 +487,8 @@ PencilTest = (function() {
         this.drawFrame(this.currentFrameIndex + 1, "rgba(255,0,0," + (this.options.onionSkinOpacity / 2) + ")");
       }
     }
-    return this.drawFrame(this.currentFrameIndex);
+    this.drawFrame(this.currentFrameIndex);
+    return this.updateStatus();
   };
 
   PencilTest.prototype.drawFrame = function(frameIndex, color) {
@@ -478,6 +567,21 @@ PencilTest = (function() {
     return this.drawCurrentFrame();
   };
 
+  PencilTest.prototype.setCurrentFrameHold = function(newHold) {
+    this.getCurrentFrame().hold = Math.max(1, newHold);
+    return this.updateStatus();
+  };
+
+  PencilTest.prototype.updateStatus = function() {
+    var markup;
+    if (this.options.showStatus) {
+      markup = "" + this.options.frameRate + " FPS";
+      markup += " | (hold " + (this.getCurrentFrame().hold) + ")";
+      markup += " | " + (this.currentFrameIndex + 1) + "/" + this.frames.length;
+      return this.statusElement.innerHTML = markup;
+    }
+  };
+
   PencilTest.prototype.getSavedFilms = function() {
     var error, filmData, films;
     films = {};
@@ -502,7 +606,7 @@ PencilTest = (function() {
     var films, name;
     films = this.getSavedFilms();
     name = window.prompt("what will you name your film?");
-    if ((films[name] == null) || Utils.confirm("Overwrite existing film \"" + name + "\"?")) {
+    if (name && ((films[name] == null) || Utils.confirm("Overwrite existing film \"" + name + "\"?"))) {
       films[name] = this.frames;
       return window.localStorage.setItem('films', JSON.stringify(films));
     }
@@ -520,11 +624,33 @@ PencilTest = (function() {
       loadFilmName = window.prompt("Choose a film to load:\n\n" + (filmNames.join('\n')));
       if (films[loadFilmName]) {
         this.frames = films[loadFilmName];
-        return this.goToFrame(0);
+        this.goToFrame(0);
+        return this.updateStatus();
       }
     } else {
       return Utils.alert("You don't have any saved films yet.");
     }
+  };
+
+  PencilTest.prototype.deleteFilm = function() {
+    var deleteFilmName, film, filmNames, films, name;
+    films = this.getSavedFilms();
+    filmNames = [];
+    for (name in films) {
+      film = films[name];
+      filmNames.push(name);
+    }
+    if (filmNames.length) {
+      deleteFilmName = window.prompt("Choose a film to DELETE...FOREVER:\n\n" + (filmNames.join('\n')));
+      if (films[deleteFilmName]) {
+        delete films[deleteFilmName];
+        return window.localStorage.setItem('films', JSON.stringify(films));
+      }
+    }
+  };
+
+  PencilTest.prototype.showHelp = function() {
+    return Utils.alert(this.keyBindingsDoc);
   };
 
   return PencilTest;

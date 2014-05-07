@@ -16,6 +16,21 @@
     display: block;
     margin: 0 auto;
     box-shadow: 0 1em 4em rgba(0, 0, 0, 0.5);
+    position: relative;
+
+    .status {
+      position: absolute;
+      bottom: -2em;
+      right: 0;
+      width: 100%;
+      text-align: right;
+      font-family: monospace;
+      color: $white;
+
+      &.hidden {
+        display: none;
+      }
+    }
   }
 
   .menu {

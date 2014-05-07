@@ -10,6 +10,7 @@ class PencilTest
       containerSelector: 'body'
       hideCursor: false
       loop: true
+      showStatus: true
       frameRate: 12
       onionSkin: true
       onionSkinOpacity: 0.5
@@ -44,9 +45,10 @@ class PencilTest
       listener: ->
         @options.onionSkin = not @options.onionSkin
         @drawCurrentFrame()
-    frameRate:
-      label: "Frame Rate"
-      listener: -> null
+    showStatus:
+      label: "Show Status"
+      listener: -> @options.showStatus = not @options.showStatus
+      action: -> Utils.toggleClass @statusElement, 'hidden', not @options.showStatus
     loop:
       label: "Loop"
       listener: -> @options.loop = not @options.loop
@@ -59,20 +61,26 @@ class PencilTest
     newFilm:
       label: "New"
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+    help:
+      label: "Help"
+      listener: -> @showHelp()
 
   menuOptions: [
     'undo'
     'hideCursor'
     'onionSkin'
-    'frameRate'
     'loop'
     'saveFilm'
     'loadFilm'
     'newFilm'
+    'help'
+    'showStatus'
   ]
 
   buildContainer: ->
-    markup = '<div class="field"></div>' +
+    markup = '<div class="field">' +
+      '<div class="status"></div>' +
+    '</div>' +
     '<ul class="menu">'
     markup += "<li rel=\"#{key}\">#{@optionListeners[key].label}</li>" for key in @menuOptions
     markup += '</ul>'
@@ -81,6 +89,8 @@ class PencilTest
 
     @fieldElement = @container.querySelector '.field'
     @field = new Raphael @fieldElement
+
+    @statusElement = @container.querySelector '.status'
 
   addInputListeners: ->
     self = @
@@ -147,6 +157,10 @@ class PencilTest
     if typeof @options[optionName] is 'boolean'
       Utils.toggleClass optionElement, 'enabled', @options[optionName]
 
+  selectMenuOption: (optionName) ->
+    @optionListeners[optionName].listener?.call @
+    @optionListeners[optionName].action?.call @
+
   addMenuListeners: ->
     self = @
     @menuElement = @container.querySelector '.menu'
@@ -154,15 +168,12 @@ class PencilTest
 
     menuOptionListener = (event) ->
       optionName = this.attributes.rel.value
-      self.optionListeners[optionName].listener?.call self
-      self.optionListeners[optionName].action?.call self
-      self.updateMenuOption this
+      self.selectMenuOption optionName
       self.hideMenu()
 
     for option in @menuItems
       option.addEventListener 'mouseup', menuOptionListener
       option.addEventListener 'touchend', menuOptionListener
-      @updateMenuOption option
 
   addKeyboardListeners: ->
     self = @
@@ -171,33 +182,59 @@ class PencilTest
       keydown:
         32: -> @togglePlay() # SPACE
         37: -> @prevFrame 'stop' # LEFT
-        38: -> @lastFrame 'stop' # UP
         39: -> @nextFrame 'stop' # RIGHT
         40: -> @firstFrame 'stop' # DOWN
+        38: -> @lastFrame 'stop' # UP
       keyup:
+        79: -> @selectMenuOption 'onionSkin' # o
+        189: -> @setCurrentFrameHold @getCurrentFrame().hold - 1 # -
+        187: -> @setCurrentFrameHold @getCurrentFrame().hold + 1 # =
         8: -> @dropFrame() # BACKSPACE
-        48: -> # 0
-        49: -> # 1
-        50: -> # 2
-        51: -> # 3
-        52: -> # 4
-        53: -> # 5
-        54: -> # 6
-        55: -> # 7
-        56: -> # 8
-        57: -> # 9
-        189: -> @getCurrentFrame().hold++ # -
-        187: -> @getCurrentFrame().hold-- # =
+      modifiers:
+        ctrl:
+          keydown:
+            83: -> @saveFilm() # s
+            79: -> @loadFilm() # o
+            78: -> @newFilm() # n # FIXME: shortcut not working
+            8: -> @deleteFilm() # BACKSPACE
+        shift:
+          keydown:
+            191: -> @showHelp() # ?
 
     keyboardListener = (event) ->
-      if keyboardHandlers[event.type]? and  keyboardHandlers[event.type][event.keyCode]?
-        event.preventDefault()
-        keyboardHandlers[event.type][event.keyCode].apply self, [event]
+      if event.ctrlKey
+        keySet = keyboardHandlers.modifiers.ctrl
+      else if event.shiftKey
+        keySet = keyboardHandlers.modifiers.shift
+      else
+        keySet = keyboardHandlers
 
-      # Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
+      Utils.log keySet[event.type]
+      if keySet[event.type]? and keySet[event.type][event.keyCode]?
+        event.preventDefault()
+        keySet[event.type][event.keyCode].apply self, [event]
+
+      Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
 
     document.body.addEventListener 'keydown', keyboardListener
     document.body.addEventListener 'keyup', keyboardListener
+
+    documentBindings = (keySet, markup = '', combo = []) ->
+      for eventType, handlers of keySet
+        if eventType is 'modifiers'
+          for modifier, subset of handlers
+            markup = documentBindings subset, markup, combo.concat [modifier]
+        else
+          for keyCode, action of handlers
+            if combo.indexOf('shift') > -1
+              lookupList = Utils.shiftKeyCodeNames
+            else
+              lookupList = Utils.keyCodeNames
+            markup += "#{combo.concat(lookupList[keyCode]).join ' + '}:" +
+              " #{action.toString().replace(/function \(\) {\n\s*return |\n\s*}/g, '')}\n"
+      markup
+
+    @keyBindingsDoc =  documentBindings keyboardHandlers
 
   newFrame: (prepend = false) ->
     newFrame =
@@ -228,19 +265,25 @@ class PencilTest
     else
       @getCurrentStroke().push "L#{x} #{y}"
       @drawCurrentFrame()
-      # @field.path
+      ### FIXME: find a faster way to draw each segment of the line than to redraw the whole frame ###
+      # @field.path 
       #   @getCurrentFrame().strokes[@currentStrokeIndex - 1].replace('L', 'M'),
       #   @getCurrentFrame().strokes[@currentStrokeIndex]
 
   showMenu: (coords = {x: 10, y: 10}) ->
-    Utils.toggleClass @container, 'menu-visible', true
-    coords.x = Math.min document.body.offsetWidth - @menuElement.offsetWidth, coords.x
-    coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
-    @menuElement.style.left = "#{coords.x}px"
-    @menuElement.style.top = "#{coords.y}px"
+    if not @menuIsVisible
+      @menuIsVisible = true
+      Utils.toggleClass @container, 'menu-visible', true
+      coords.x = Math.min document.body.offsetWidth - @menuElement.offsetWidth, coords.x
+      coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
+      @menuElement.style.left = "#{coords.x}px"
+      @menuElement.style.top = "#{coords.y}px"
+      @updateMenuOption option for option in @menuItems
 
   hideMenu: ->
-    Utils.toggleClass @container, 'menu-visible', false
+    if @menuIsVisible
+      @menuIsVisible = false
+      Utils.toggleClass @container, 'menu-visible', false
 
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()
@@ -297,6 +340,7 @@ class PencilTest
       if @currentFrameIndex < @frames.length - 1
         @drawFrame @currentFrameIndex + 1, "rgba(255,0,0,#{@options.onionSkinOpacity / 2})"
     @drawFrame @currentFrameIndex
+    @updateStatus()
 
   drawFrame: (frameIndex, color = null) ->
     for stroke in @frames[frameIndex].strokes
@@ -332,6 +376,17 @@ class PencilTest
     @getCurrentFrame().strokes.pop()
     @drawCurrentFrame()
 
+  setCurrentFrameHold: (newHold) ->
+    @getCurrentFrame().hold = Math.max 1, newHold
+    @updateStatus()
+
+  updateStatus: ->
+    if @options.showStatus
+      markup = "#{@options.frameRate} FPS"
+      markup += " | (hold #{@getCurrentFrame().hold})"
+      markup += " | #{@currentFrameIndex + 1}/#{@frames.length}"
+      @statusElement.innerHTML = markup
+
   getSavedFilms: ->
     films = {}
     filmData = window.localStorage.getItem 'films'
@@ -350,7 +405,7 @@ class PencilTest
   saveFilm: ->
     films = @getSavedFilms()
     name = window.prompt "what will you name your film?"
-    if not films[name]? or Utils.confirm "Overwrite existing film \"#{name}\"?"
+    if name and (not films[name]? or Utils.confirm "Overwrite existing film \"#{name}\"?")
       films[name] = @frames
       window.localStorage.setItem 'films', JSON.stringify films
 
@@ -363,5 +418,19 @@ class PencilTest
       if films[loadFilmName]
         @frames = films[loadFilmName]
         @goToFrame 0
+        @updateStatus()
     else
       Utils.alert "You don't have any saved films yet."
+
+  deleteFilm: ->
+    films = @getSavedFilms()
+    filmNames = []
+    filmNames.push name for name, film of films
+    if filmNames.length
+      deleteFilmName = window.prompt "Choose a film to DELETE...FOREVER:\n\n#{filmNames.join '\n'}"
+      if films[deleteFilmName]
+        delete films[deleteFilmName]
+        window.localStorage.setItem 'films', JSON.stringify films
+
+  showHelp: ->
+    Utils.alert @keyBindingsDoc
