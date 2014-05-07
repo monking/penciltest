@@ -25,7 +25,7 @@ class PencilTest
     @addMenuListeners()
     @addKeyboardListeners()
 
-    @optionListeners[optionName]?.action.call @ for optionName of @options
+    @optionListeners[optionName]?.action?.call @ for optionName of @options
 
     @newFilm()
 
@@ -44,15 +44,12 @@ class PencilTest
       listener: ->
         @options.onionSkin = not @options.onionSkin
         @drawCurrentFrame()
-      action: -> Utils.log "onionSkin--#{@options.onionSkin}"
     frameRate:
       label: "Frame Rate"
       listener: -> null
-      action: -> Utils.log "frameRate--#{@options.frameRate}"
     loop:
       label: "Loop"
       listener: -> @options.loop = not @options.loop
-      action: -> Utils.log "loop--#{@options.loop}"
     saveFilm:
       label: "Save"
       listener: -> @saveFilm()
@@ -197,7 +194,7 @@ class PencilTest
         event.preventDefault()
         keyboardHandlers[event.type][event.keyCode].apply self, [event]
 
-      Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
+      # Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
 
     document.body.addEventListener 'keydown', keyboardListener
     document.body.addEventListener 'keyup', keyboardListener
@@ -333,6 +330,7 @@ class PencilTest
 
   undo: ->
     @getCurrentFrame().strokes.pop()
+    @drawCurrentFrame()
 
   getSavedFilms: ->
     films = {}

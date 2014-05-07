@@ -20,7 +20,6 @@ Utils = {
     return element.className = classes.join(' ');
   },
   log: function() {
-    window.location.hash = arguments[0].toString();
     return console.log(arguments[0]);
   },
   alert: function() {

@@ -14,7 +14,7 @@ Utils =
     element.className = classes.join ' '
 
   log: ->
-    window.location.hash = arguments[0].toString()
+    # window.location.hash = arguments[0].toString()
     console.log arguments[0]
 
   alert: ->
