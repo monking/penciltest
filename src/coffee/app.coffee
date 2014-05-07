@@ -2,9 +2,10 @@
 global: window, document
 ###
 
-window.onload = ->
+# document.addEventListener 'DOMContentLoaded', -> # the SVG is not the correct size yet
+window.addEventListener 'load', ->
 
   window.penciltest = new PencilTest
     container: document.getElementById 'penciltest'
 
-  console.log window.penciltest
+  Utils.log window.penciltest

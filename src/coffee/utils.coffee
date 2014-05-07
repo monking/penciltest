@@ -15,4 +15,13 @@ Utils =
 
   log: ->
     window.location.hash = arguments[0].toString()
-    console.log.apply null, arguments
+    console.log arguments[0]
+
+  alert: ->
+    window.alert arguments[0]
+
+  confirm: ->
+    window.confirm arguments[0]
+
+  prompt: ->
+    window.prompt arguments[0], arguments[1]

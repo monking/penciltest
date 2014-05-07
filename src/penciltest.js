@@ -5,7 +5,46 @@ global: document, window
 var PencilTest;
 
 PencilTest = (function() {
+  function PencilTest(options) {
+    var key, optionName, value, _ref, _ref1;
+    this.options = options;
+    _ref = {
+      container: document.body,
+      containerSelector: 'body',
+      hideCursor: false,
+      loop: true,
+      frameRate: 12,
+      onionSkin: true,
+      onionSkinOpacity: 0.5
+    };
+    for (key in _ref) {
+      value = _ref[key];
+      if (typeof this.options[key] === 'undefined') {
+        this.options[key] = value;
+      }
+    }
+    this.container = this.options.container || document.querySelector(this.options.containerSelector);
+    this.container.className = 'penciltest-app';
+    this.buildContainer();
+    this.addInputListeners();
+    this.addMenuListeners();
+    this.addKeyboardListeners();
+    for (optionName in this.options) {
+      if ((_ref1 = this.optionListeners[optionName]) != null) {
+        _ref1.action.call(this);
+      }
+    }
+    this.newFilm();
+    window.penciltest = this;
+  }
+
   PencilTest.prototype.optionListeners = {
+    undo: {
+      label: "Undo",
+      action: function() {
+        return this.undo();
+      }
+    },
     hideCursor: {
       label: "Hide Cursor",
       listener: function() {
@@ -18,7 +57,8 @@ PencilTest = (function() {
     onionSkin: {
       label: "Onion Skin",
       listener: function() {
-        return this.options.onionSkin = !this.options.onionSkin;
+        this.options.onionSkin = !this.options.onionSkin;
+        return this.drawCurrentFrame();
       },
       action: function() {
         return Utils.log("onionSkin--" + this.options.onionSkin);
@@ -32,44 +72,39 @@ PencilTest = (function() {
       action: function() {
         return Utils.log("frameRate--" + this.options.frameRate);
       }
+    },
+    loop: {
+      label: "Loop",
+      listener: function() {
+        return this.options.loop = !this.options.loop;
+      },
+      action: function() {
+        return Utils.log("loop--" + this.options.loop);
+      }
+    },
+    saveFilm: {
+      label: "Save",
+      listener: function() {
+        return this.saveFilm();
+      }
+    },
+    loadFilm: {
+      label: "Load",
+      listener: function() {
+        return this.loadFilm();
+      }
+    },
+    newFilm: {
+      label: "New",
+      listener: function() {
+        if (Utils.confirm("This will BURN your current animation.")) {
+          return this.newFilm();
+        }
+      }
     }
   };
 
-  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'frameRate'];
-
-  function PencilTest(options) {
-    var key, optionName, value, _ref, _ref1;
-    this.options = options;
-    _ref = {
-      container: document.body,
-      containerSelector: 'body',
-      hideCursor: false,
-      frameRate: 12,
-      onionSkin: false,
-      onionSkinOpacity: 0.5
-    };
-    for (key in _ref) {
-      value = _ref[key];
-      if (typeof this.options[key] === 'undefined') {
-        this.options[key] = value;
-      }
-    }
-    this.container = this.options.container || document.querySelector(this.options.containerSelector);
-    this.container.className = 'penciltest-app';
-    this.frames = [];
-    this.lift();
-    this.buildContainer();
-    this.addInputListeners();
-    this.addMenuListeners();
-    this.addKeyboardListeners();
-    for (optionName in this.options) {
-      if ((_ref1 = this.optionListeners[optionName]) != null) {
-        _ref1.action.call(this);
-      }
-    }
-    this.newFrame();
-    window.penciltest = this;
-  }
+  PencilTest.prototype.menuOptions = ['undo', 'hideCursor', 'onionSkin', 'frameRate', 'loop', 'saveFilm', 'loadFilm', 'newFilm'];
 
   PencilTest.prototype.buildContainer = function() {
     var key, markup, _i, _len, _ref;
@@ -86,30 +121,39 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addInputListeners = function() {
-    var contextMenuListener, markFromEvent, mouseDownListener, mouseMoveListener, mouseUpListener, self;
+    var contextMenuListener, getEventPageXY, markFromEvent, mouseDownListener, mouseMoveListener, mouseUpListener, self;
     self = this;
-    markFromEvent = function(event) {
+    getEventPageXY = function(event) {
       var eventLocation;
       if (/^touch/.test(event.type)) {
-        if (event.touches.length > 1) {
-          return true;
-        }
         eventLocation = event.touches[0];
       } else {
         eventLocation = event;
       }
-      return self.mark(eventLocation.pageX - self.fieldElement.offsetLeft, eventLocation.pageY - self.fieldElement.offsetTop);
+      return {
+        x: eventLocation.pageX,
+        y: eventLocation.pageY
+      };
+    };
+    markFromEvent = function(event) {
+      var coords;
+      coords = getEventPageXY(event);
+      return self.mark(coords.x - self.fieldElement.offsetLeft, coords.y - self.fieldElement.offsetTop);
     };
     mouseDownListener = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
         mouseUpListener();
         if (event.touches.length === 3) {
-          return self.toggleMenu();
+          return self.showMenu();
+        } else {
+          return self.hideMenu();
         }
       } else {
         if (event.button === 2) {
           return true;
+        } else {
+          self.hideMenu();
         }
         markFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
@@ -135,7 +179,7 @@ PencilTest = (function() {
     };
     contextMenuListener = function(event) {
       event.preventDefault();
-      return self.toggleMenu();
+      return self.showMenu(getEventPageXY(event));
     };
     this.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.fieldElement.addEventListener('touchstart', mouseDownListener);
@@ -156,17 +200,23 @@ PencilTest = (function() {
     this.menuElement = this.container.querySelector('.menu');
     this.menuItems = this.menuElement.getElementsByTagName('li');
     menuOptionListener = function(event) {
-      var optionName;
+      var optionName, _ref, _ref1;
       optionName = this.attributes.rel.value;
-      self.optionListeners[optionName].listener.call(self);
-      self.optionListeners[optionName].action.call(self);
-      return self.updateMenuOption(this);
+      if ((_ref = self.optionListeners[optionName].listener) != null) {
+        _ref.call(self);
+      }
+      if ((_ref1 = self.optionListeners[optionName].action) != null) {
+        _ref1.call(self);
+      }
+      self.updateMenuOption(this);
+      return self.hideMenu();
     };
     _ref = this.menuItems;
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       option = _ref[_i];
-      option.addEventListener('click', menuOptionListener);
+      option.addEventListener('mouseup', menuOptionListener);
+      option.addEventListener('touchend', menuOptionListener);
       _results.push(this.updateMenuOption(option));
     }
     return _results;
@@ -181,19 +231,22 @@ PencilTest = (function() {
           return this.togglePlay();
         },
         37: function() {
-          return this.goToFrame(this.currentFrameIndex - 1);
+          return this.prevFrame('stop');
         },
         38: function() {
-          return this.goToFrame(this.frames.length - 1);
+          return this.lastFrame('stop');
         },
         39: function() {
-          return this.goToFrame(this.currentFrameIndex + 1);
+          return this.nextFrame('stop');
         },
         40: function() {
-          return this.goToFrame(0);
+          return this.firstFrame('stop');
         }
       },
       keyup: {
+        8: function() {
+          return this.dropFrame();
+        },
         48: function() {},
         49: function() {},
         50: function() {},
@@ -231,7 +284,7 @@ PencilTest = (function() {
       prepend = false;
     }
     newFrame = {
-      hold: 3,
+      hold: 1,
       strokes: []
     };
     if (prepend !== false) {
@@ -263,43 +316,69 @@ PencilTest = (function() {
     }
   };
 
-  PencilTest.prototype.toggleMenu = function() {
-    return Utils.toggleClass(this.container, 'menu-visible');
+  PencilTest.prototype.showMenu = function(coords) {
+    if (coords == null) {
+      coords = {
+        x: 10,
+        y: 10
+      };
+    }
+    Utils.toggleClass(this.container, 'menu-visible', true);
+    coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
+    coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
+    this.menuElement.style.left = "" + coords.x + "px";
+    return this.menuElement.style.top = "" + coords.y + "px";
+  };
+
+  PencilTest.prototype.hideMenu = function() {
+    return Utils.toggleClass(this.container, 'menu-visible', false);
   };
 
   PencilTest.prototype.updateCurrentFrame = function(segment) {
     return this.drawCurrentFrame();
   };
 
-  PencilTest.prototype.goToFrame = function(newIndex, noNewFrame) {
-    if (noNewFrame == null) {
-      noNewFrame = false;
+  PencilTest.prototype.goToFrame = function(newIndex, stop) {
+    if (stop == null) {
+      stop = false;
     }
     if (newIndex < 0) {
-      if (noNewFrame === false) {
-        this.newFrame('prepend');
-      }
+      this.newFrame('prepend');
     } else if (newIndex >= this.frames.length) {
-      if (noNewFrame === false) {
-        this.newFrame();
-      }
+      this.newFrame();
     } else {
       this.currentFrameIndex = newIndex;
     }
-    return this.drawCurrentFrame();
+    this.drawCurrentFrame();
+    if (stop !== false) {
+      return this.stop();
+    }
   };
 
   PencilTest.prototype.play = function() {
     var self, stepListener;
     self = this;
-    this.framesHeld = 0;
+    if (this.currentFrameIndex < this.frames.length - 1) {
+      this.framesHeld = 0;
+    } else {
+      this.framesHeld = -1;
+      this.goToFrame(0);
+    }
     stepListener = function() {
       var currentFrame;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
         self.framesHeld = 0;
-        return self.goToFrame(self.currentFrameIndex + 1, 'no new frames');
+        if (self.currentFrameIndex >= self.frames.length - 1) {
+          if (self.options.loop) {
+            return self.goToFrame(0);
+          } else {
+            return self.stop();
+          }
+        } else {
+          return self.goToFrame(self.currentFrameIndex + 1);
+        }
       }
     };
     this.stop();
@@ -321,19 +400,140 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.drawCurrentFrame = function() {
-    var stroke, _i, _len, _ref, _results;
     this.field.clear();
-    _ref = this.getCurrentFrame().strokes;
+    if (this.options.onionSkin) {
+      if (this.currentFrameIndex > 0) {
+        this.drawFrame(this.currentFrameIndex - 1, "rgba(0,0,255," + this.options.onionSkinOpacity + ")");
+      }
+      if (this.currentFrameIndex < this.frames.length - 1) {
+        this.drawFrame(this.currentFrameIndex + 1, "rgba(255,0,0," + (this.options.onionSkinOpacity / 2) + ")");
+      }
+    }
+    return this.drawFrame(this.currentFrameIndex);
+  };
+
+  PencilTest.prototype.drawFrame = function(frameIndex, color) {
+    var path, stroke, _i, _len, _ref, _results;
+    if (color == null) {
+      color = null;
+    }
+    _ref = this.frames[frameIndex].strokes;
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      _results.push(this.field.path(stroke.join('')));
+      path = this.field.path(stroke.join(''));
+      if (color) {
+        _results.push(path[0].style.stroke = color);
+      } else {
+        _results.push(void 0);
+      }
     }
     return _results;
   };
 
   PencilTest.prototype.lift = function() {
     return this.currentStrokeIndex = null;
+  };
+
+  PencilTest.prototype.nextFrame = function(stop) {
+    if (stop == null) {
+      stop = false;
+    }
+    this.goToFrame(this.currentFrameIndex + 1);
+    if (stop) {
+      return this.stop();
+    }
+  };
+
+  PencilTest.prototype.prevFrame = function(stop) {
+    if (stop == null) {
+      stop = false;
+    }
+    this.goToFrame(this.currentFrameIndex - 1);
+    if (stop) {
+      return this.stop();
+    }
+  };
+
+  PencilTest.prototype.firstFrame = function(stop) {
+    if (stop == null) {
+      stop = false;
+    }
+    this.goToFrame(0);
+    if (stop) {
+      return this.stop();
+    }
+  };
+
+  PencilTest.prototype.lastFrame = function(stop) {
+    if (stop == null) {
+      stop = false;
+    }
+    this.goToFrame(this.frames.length - 1);
+    if (stop) {
+      return this.stop();
+    }
+  };
+
+  PencilTest.prototype.dropFrame = function() {
+    this.frames.splice(this.currentFrameIndex, 1);
+    if (this.currentFrameIndex >= this.frames.length) {
+      this.currentFrameIndex--;
+    }
+    return this.drawCurrentFrame();
+  };
+
+  PencilTest.prototype.undo = function() {
+    return this.getCurrentFrame().strokes.pop();
+  };
+
+  PencilTest.prototype.getSavedFilms = function() {
+    var error, filmData, films;
+    films = {};
+    filmData = window.localStorage.getItem('films');
+    if (filmData) {
+      try {
+        films = JSON.parse(filmData);
+      } catch (_error) {
+        error = _error;
+        Utils.log(error);
+      }
+    }
+    return films;
+  };
+
+  PencilTest.prototype.newFilm = function() {
+    this.frames = [];
+    return this.newFrame();
+  };
+
+  PencilTest.prototype.saveFilm = function() {
+    var films, name;
+    films = this.getSavedFilms();
+    name = window.prompt("what will you name your film?");
+    if ((films[name] == null) || Utils.confirm("Overwrite existing film \"" + name + "\"?")) {
+      films[name] = this.frames;
+      return window.localStorage.setItem('films', JSON.stringify(films));
+    }
+  };
+
+  PencilTest.prototype.loadFilm = function() {
+    var film, filmNames, films, loadFilmName, name;
+    films = this.getSavedFilms();
+    filmNames = [];
+    for (name in films) {
+      film = films[name];
+      filmNames.push(name);
+    }
+    if (filmNames.length) {
+      loadFilmName = window.prompt("Choose a film to load:\n\n" + (filmNames.join('\n')));
+      if (films[loadFilmName]) {
+        this.frames = films[loadFilmName];
+        return this.goToFrame(0);
+      }
+    } else {
+      return Utils.alert("You don't have any saved films yet.");
+    }
   };
 
   return PencilTest;
