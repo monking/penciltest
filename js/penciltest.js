@@ -8763,10 +8763,14 @@ PencilTest = (function() {
 
   PencilTest.prototype.dropFrame = function() {
     this.frames.splice(this.currentFrameIndex, 1);
-    if (this.currentFrameIndex >= this.frames.length) {
+    if (this.currentFrameIndex >= this.frames.length && this.currentFrameIndex > 0) {
       this.currentFrameIndex--;
     }
-    return this.drawCurrentFrame();
+    if (this.frames.length > 0) {
+      return this.drawCurrentFrame();
+    } else {
+      return this.newFrame();
+    }
   };
 
   PencilTest.prototype.undo = function() {
