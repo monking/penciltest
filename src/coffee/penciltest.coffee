@@ -368,9 +368,11 @@ class PencilTest
 
   dropFrame: ->
     @frames.splice @currentFrameIndex, 1
-    if @currentFrameIndex >= @frames.length
-      @currentFrameIndex--
-    @drawCurrentFrame()
+    @currentFrameIndex-- if @currentFrameIndex >= @frames.length and @currentFrameIndex > 0
+    if @frames.length > 0
+      @drawCurrentFrame()
+    else
+      @newFrame()
 
   undo: ->
     @getCurrentFrame().strokes.pop()
