@@ -481,10 +481,10 @@ PencilTest = (function() {
     this.field.clear();
     if (this.options.onionSkin) {
       if (this.currentFrameIndex > 0) {
-        this.drawFrame(this.currentFrameIndex - 1, "rgba(0,0,255," + this.options.onionSkinOpacity + ")");
+        this.drawFrame(this.currentFrameIndex - 1, "rgba(255,0,0," + this.options.onionSkinOpacity + ")");
       }
       if (this.currentFrameIndex < this.frames.length - 1) {
-        this.drawFrame(this.currentFrameIndex + 1, "rgba(255,0,0," + (this.options.onionSkinOpacity / 2) + ")");
+        this.drawFrame(this.currentFrameIndex + 1, "rgba(0,0,255," + (this.options.onionSkinOpacity / 2) + ")");
       }
     }
     this.drawFrame(this.currentFrameIndex);

@@ -336,9 +336,9 @@ class PencilTest
     @field.clear()
     if @options.onionSkin
       if @currentFrameIndex > 0
-        @drawFrame @currentFrameIndex - 1, "rgba(0,0,255,#{@options.onionSkinOpacity})"
+        @drawFrame @currentFrameIndex - 1, "rgba(255,0,0,#{@options.onionSkinOpacity})"
       if @currentFrameIndex < @frames.length - 1
-        @drawFrame @currentFrameIndex + 1, "rgba(255,0,0,#{@options.onionSkinOpacity / 2})"
+        @drawFrame @currentFrameIndex + 1, "rgba(0,0,255,#{@options.onionSkinOpacity / 2})"
     @drawFrame @currentFrameIndex
     @updateStatus()
 
