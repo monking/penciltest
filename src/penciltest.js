@@ -43,13 +43,14 @@ PencilTest = (function() {
 
   PencilTest.prototype.optionListeners = {
     undo: {
-      label: "Undo",
+      label: "Undo [u]",
+      title: "Remove the last line drawn",
       action: function() {
         return this.undo();
       }
     },
     hideCursor: {
-      label: "Hide Cursor",
+      label: "Hide Cursor [c]",
       listener: function() {
         return this.options.hideCursor = !this.options.hideCursor;
       },
@@ -58,14 +59,16 @@ PencilTest = (function() {
       }
     },
     onionSkin: {
-      label: "Onion Skin",
+      label: "Onion Skin [o]",
+      title: "show previous and next frames in red and blue",
       listener: function() {
         this.options.onionSkin = !this.options.onionSkin;
         return this.drawCurrentFrame();
       }
     },
     showStatus: {
-      label: "Show Status",
+      label: "Show Status [s]",
+      title: "hide the status to [slightly] improve performance",
       listener: function() {
         return this.options.showStatus = !this.options.showStatus;
       },
@@ -74,25 +77,25 @@ PencilTest = (function() {
       }
     },
     loop: {
-      label: "Loop",
+      label: "Loop [l]",
       listener: function() {
         return this.options.loop = !this.options.loop;
       }
     },
     saveFilm: {
-      label: "Save",
+      label: "Save [ctrl+s]",
       listener: function() {
         return this.saveFilm();
       }
     },
     loadFilm: {
-      label: "Load",
+      label: "Load [ctrl+o]",
       listener: function() {
         return this.loadFilm();
       }
     },
     newFilm: {
-      label: "New",
+      label: "New [ctrl+n]",
       listener: function() {
         if (Utils.confirm("This will BURN your current animation.")) {
           return this.newFilm();
@@ -100,7 +103,7 @@ PencilTest = (function() {
       }
     },
     help: {
-      label: "Help",
+      label: "Help [?]",
       listener: function() {
         return this.showHelp();
       }
@@ -110,12 +113,14 @@ PencilTest = (function() {
   PencilTest.prototype.menuOptions = ['undo', 'hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm', 'help', 'showStatus'];
 
   PencilTest.prototype.buildContainer = function() {
-    var key, markup, _i, _len, _ref;
+    var key, label, markup, title, _i, _len, _ref;
     markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<ul class="menu">';
     _ref = this.menuOptions;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       key = _ref[_i];
-      markup += "<li rel=\"" + key + "\">" + this.optionListeners[key].label + "</li>";
+      label = this.optionListeners[key].label;
+      title = this.optionListeners[key].title;
+      markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + label + "</li>";
     }
     markup += '</ul>';
     this.container.innerHTML = markup;
@@ -183,7 +188,7 @@ PencilTest = (function() {
     };
     contextMenuListener = function(event) {
       event.preventDefault();
-      return self.showMenu(getEventPageXY(event));
+      return self.toggleMenu(getEventPageXY(event));
     };
     this.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.fieldElement.addEventListener('touchstart', mouseDownListener);
@@ -213,6 +218,7 @@ PencilTest = (function() {
     this.menuItems = this.menuElement.getElementsByTagName('li');
     menuOptionListener = function(event) {
       var optionName;
+      event.preventDefault();
       optionName = this.attributes.rel.value;
       self.selectMenuOption(optionName);
       return self.hideMenu();
@@ -222,7 +228,8 @@ PencilTest = (function() {
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       option = _ref[_i];
       option.addEventListener('mouseup', menuOptionListener);
-      _results.push(option.addEventListener('touchend', menuOptionListener));
+      option.addEventListener('touchend', menuOptionListener);
+      _results.push(option.addEventListener('contextmenu', menuOptionListener));
     }
     return _results;
   };
@@ -246,6 +253,12 @@ PencilTest = (function() {
         },
         38: function() {
           return this.lastFrame('stop');
+        },
+        67: function() {
+          return this.selectMenuOption('hideCursor');
+        },
+        76: function() {
+          return this.selectMenuOption('loop');
         }
       },
       keyup: {
@@ -297,7 +310,6 @@ PencilTest = (function() {
       } else {
         keySet = keyboardHandlers;
       }
-      Utils.log(keySet[event.type]);
       if ((keySet[event.type] != null) && (keySet[event.type][event.keyCode] != null)) {
         event.preventDefault();
         keySet[event.type][event.keyCode].apply(self, [event]);
@@ -393,7 +405,7 @@ PencilTest = (function() {
       Utils.toggleClass(this.container, 'menu-visible', true);
       coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
       coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
-      this.menuElement.style.left = "" + coords.x + "px";
+      this.menuElement.style.left = "" + (coords.x + 1) + "px";
       this.menuElement.style.top = "" + coords.y + "px";
       _ref = this.menuItems;
       _results = [];
@@ -409,6 +421,14 @@ PencilTest = (function() {
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
       return Utils.toggleClass(this.container, 'menu-visible', false);
+    }
+  };
+
+  PencilTest.prototype.toggleMenu = function(coords) {
+    if (this.menuIsVisible) {
+      return this.hideMenu();
+    } else {
+      return this.showMenu(coords);
     }
   };
 

@@ -34,35 +34,38 @@ class PencilTest
 
   optionListeners:
     undo:
-      label: "Undo"
+      label: "Undo [u]"
+      title: "Remove the last line drawn"
       action: -> @undo()
     hideCursor:
-      label: "Hide Cursor"
+      label: "Hide Cursor [c]"
       listener: -> @options.hideCursor = not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
-      label: "Onion Skin"
+      label: "Onion Skin [o]"
+      title: "show previous and next frames in red and blue"
       listener: ->
         @options.onionSkin = not @options.onionSkin
         @drawCurrentFrame()
     showStatus:
-      label: "Show Status"
+      label: "Show Status [s]"
+      title: "hide the status to [slightly] improve performance"
       listener: -> @options.showStatus = not @options.showStatus
       action: -> Utils.toggleClass @statusElement, 'hidden', not @options.showStatus
     loop:
-      label: "Loop"
+      label: "Loop [l]"
       listener: -> @options.loop = not @options.loop
     saveFilm:
-      label: "Save"
+      label: "Save [ctrl+s]"
       listener: -> @saveFilm()
     loadFilm:
-      label: "Load"
+      label: "Load [ctrl+o]"
       listener: -> @loadFilm()
     newFilm:
-      label: "New"
+      label: "New [ctrl+n]"
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
     help:
-      label: "Help"
+      label: "Help [?]"
       listener: -> @showHelp()
 
   menuOptions: [
@@ -82,7 +85,10 @@ class PencilTest
       '<div class="status"></div>' +
     '</div>' +
     '<ul class="menu">'
-    markup += "<li rel=\"#{key}\">#{@optionListeners[key].label}</li>" for key in @menuOptions
+    for key in @menuOptions
+      label = @optionListeners[key].label
+      title = @optionListeners[key].title
+      markup += "<li rel=\"#{key}\" title=\"#{title}\">#{label}</li>"
     markup += '</ul>'
 
     @container.innerHTML = markup
@@ -146,7 +152,7 @@ class PencilTest
 
     contextMenuListener = (event) ->
       event.preventDefault()
-      self.showMenu getEventPageXY event
+      self.toggleMenu getEventPageXY event
 
     @fieldElement.addEventListener 'mousedown', mouseDownListener
     @fieldElement.addEventListener 'touchstart', mouseDownListener
@@ -167,6 +173,7 @@ class PencilTest
     @menuItems = @menuElement.getElementsByTagName 'li'
 
     menuOptionListener = (event) ->
+      event.preventDefault()
       optionName = this.attributes.rel.value
       self.selectMenuOption optionName
       self.hideMenu()
@@ -174,6 +181,7 @@ class PencilTest
     for option in @menuItems
       option.addEventListener 'mouseup', menuOptionListener
       option.addEventListener 'touchend', menuOptionListener
+      option.addEventListener 'contextmenu', menuOptionListener
 
   addKeyboardListeners: ->
     self = @
@@ -185,6 +193,8 @@ class PencilTest
         39: -> @nextFrame 'stop' # RIGHT
         40: -> @firstFrame 'stop' # DOWN
         38: -> @lastFrame 'stop' # UP
+        67: -> @selectMenuOption 'hideCursor' # c
+        76: -> @selectMenuOption 'loop' # l
       keyup:
         79: -> @selectMenuOption 'onionSkin' # o
         189: -> @setCurrentFrameHold @getCurrentFrame().hold - 1 # -
@@ -209,7 +219,6 @@ class PencilTest
       else
         keySet = keyboardHandlers
 
-      Utils.log keySet[event.type]
       if keySet[event.type]? and keySet[event.type][event.keyCode]?
         event.preventDefault()
         keySet[event.type][event.keyCode].apply self, [event]
@@ -276,7 +285,7 @@ class PencilTest
       Utils.toggleClass @container, 'menu-visible', true
       coords.x = Math.min document.body.offsetWidth - @menuElement.offsetWidth, coords.x
       coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
-      @menuElement.style.left = "#{coords.x}px"
+      @menuElement.style.left = "#{coords.x + 1}px"
       @menuElement.style.top = "#{coords.y}px"
       @updateMenuOption option for option in @menuItems
 
@@ -284,6 +293,9 @@ class PencilTest
     if @menuIsVisible
       @menuIsVisible = false
       Utils.toggleClass @container, 'menu-visible', false
+
+  toggleMenu: (coords) ->
+    if @menuIsVisible then @hideMenu() else @showMenu coords
 
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()

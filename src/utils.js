@@ -12,8 +12,10 @@ Utils = {
     }
     classes = element.className.split(/\s+/);
     classIndex = classes.indexOf(className);
-    if (classIndex > -1 && presence !== true) {
-      classes.splice(classIndex, 1);
+    if (classIndex > -1) {
+      if (presence !== true) {
+        classes.splice(classIndex, 1);
+      }
     } else if (presence !== false) {
       classes.push(className);
     }
