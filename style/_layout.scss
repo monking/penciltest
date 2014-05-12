@@ -1,6 +1,5 @@
 @include penciltest {
   width: 100%;
-  background-color: $gray;
 
   &.hide-cursor {
     cursor: none;
@@ -15,7 +14,7 @@
     background-color: $white;
     display: block;
     margin: 0 auto;
-    box-shadow: 0 1em 4em rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1em 4em rgba(0, 0, 0, 0.8);
     position: relative;
 
     .status {

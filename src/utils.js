@@ -2,7 +2,7 @@
 /*
 global: document, window
  */
-var Utils, code, name, _ref, _ref1;
+var Utils, code, name, _base, _i, _ref;
 
 Utils = {
   toggleClass: function(element, className, presence) {
@@ -34,27 +34,19 @@ Utils = {
     return window.prompt(arguments[0], arguments[1]);
   },
   keyCodeNames: {
-    8: 'BACKSPACE',
-    32: 'SPACE',
-    37: 'LEFT',
-    38: 'UP',
-    39: 'RIGHT',
-    40: 'DOWN',
-    48: '0',
-    49: '1',
-    50: '2',
-    51: '3',
-    52: '4',
-    53: '5',
-    54: '6',
-    55: '7',
-    56: '8',
-    57: '9',
-    78: 'n',
-    79: 'o',
-    83: 's',
+    8: 'Backspace',
+    32: 'Space',
+    37: 'Left',
+    38: 'Up',
+    39: 'Right',
+    40: 'Down',
+    188: ',',
+    190: '.',
+    186: ';',
     187: '=',
-    189: '-'
+    189: '-',
+    191: '/',
+    222: '\''
   },
   shiftKeyCodeNames: {
     48: ')',
@@ -69,22 +61,58 @@ Utils = {
     57: '(',
     79: ')',
     187: '+',
-    189: '_'
+    189: '_',
+    191: '?'
+  },
+  getKeyCodeName: function(keyCode, shiftKey) {
+    var name;
+    if (shiftKey && this.shiftKeyCodeNames.hasOwnProperty(keyCode)) {
+      name = this.shiftKeyCodeNames[keyCode];
+    } else if (this.keyCodeNames.hasOwnProperty(keyCode)) {
+      name = this.keyCodeNames[keyCode];
+    } else {
+      name = String.fromCharCode(keyCode);
+    }
+    return name;
+  },
+  describeKeyCombo: function(event) {
+    var combo, keyName;
+    combo = [];
+    if (event.ctrlKey) {
+      combo.push('Ctrl');
+    }
+    if (event.altKey) {
+      combo.push('Alt');
+    }
+    if (!this.shiftKeyCodeNames.hasOwnProperty(event.keyCode)) {
+      if (event.shiftKey) {
+        combo.push('Shift');
+      }
+    }
+    keyName = this.getKeyCodeName(event.keyCode, event.shiftKey);
+    if (!/^Control|Alt|Shift$/.test(keyName)) {
+      combo.push(keyName);
+    }
+    return combo.join('+');
   }
 };
 
 Utils.keyCodes = {};
 
-_ref = Utils.keyCodeNames;
-for (name in _ref) {
-  code = _ref[name];
-  Utils.keyCodes[code] = name;
+for (code = _i = 0; _i < 256; code = ++_i) {
+  name = Utils.keyCodeNames[code] || String.fromCharCode(code);
+  if (name) {
+    Utils.keyCodes[name] = code;
+    if ((_base = Utils.keyCodeNames)[code] == null) {
+      _base[code] = name;
+    }
+  }
 }
 
 Utils.shiftKeyCodes = {};
 
-_ref1 = Utils.shiftKeyCodeNames;
-for (name in _ref1) {
-  code = _ref1[name];
+_ref = Utils.shiftKeyCodeNames;
+for (name in _ref) {
+  code = _ref[name];
   Utils.shiftKeyCodes[code] = name;
 }

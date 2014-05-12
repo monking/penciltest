@@ -26,58 +26,100 @@ class PencilTest
     @addMenuListeners()
     @addKeyboardListeners()
 
-    @optionListeners[optionName]?.action?.call @ for optionName of @options
+    @appActions[optionName]?.action?.call @ for optionName of @options
 
     @newFilm()
 
     window.penciltest = @
 
-  optionListeners:
+  appActions:
+    playPause:
+      label: "Play/Pause"
+      hotkey: ['Space']
+      action: -> @togglePlay()
+    nextFrame:
+      label: "Next Frame"
+      hotkey: ['Right','.']
+      action: -> @nextFrame 'stop'
+    prevFrame:
+      label: "Previous Frame"
+      hotkey: ['Left',',']
+      action: -> @prevFrame 'stop'
+    firstFrame:
+      label: "First Frame"
+      hotkey: ['Down']
+      action: -> @firstFrame 'stop'
+    lastFrame:
+      label: "Last Frame"
+      hotkey: ['Up']
+      action: -> @lastFrame 'stop'
     undo:
-      label: "Undo [u]"
+      label: "Undo"
       title: "Remove the last line drawn"
+      hotkey: ['U']
       action: -> @undo()
     hideCursor:
-      label: "Hide Cursor [c]"
+      label: "Hide Cursor"
+      hotkey: ['C']
       listener: -> @options.hideCursor = not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
-      label: "Onion Skin [o]"
+      label: "Onion Skin"
+      hotkey: ['O']
       title: "show previous and next frames in red and blue"
       listener: ->
         @options.onionSkin = not @options.onionSkin
         @drawCurrentFrame()
+    dropFrame:
+      label: "Drop Frame"
+      hotkey: ['Backspace']
+      listener: -> @dropFrame()
+    lessHold:
+      label: "Shorter Frame Hold"
+      hotkey: ['-']
+      listener: -> @setCurrentFrameHold @getCurrentFrame().hold - 1
+    omreHold:
+      label: "Longer Frame Hold"
+      hotkey: ['+', '=']
+      listener: -> @setCurrentFrameHold @getCurrentFrame().hold + 1
     showStatus:
-      label: "Show Status [s]"
-      title: "hide the status to [slightly] improve performance"
+      label: "Show Status"
+      title: "hide the film status bar"
+      hotkey: ['S']
       listener: -> @options.showStatus = not @options.showStatus
       action: -> Utils.toggleClass @statusElement, 'hidden', not @options.showStatus
     loop:
-      label: "Loop [l]"
+      label: "Loop"
+      hotkey: ['L']
       listener: -> @options.loop = not @options.loop
     saveFilm:
-      label: "Save [ctrl+s]"
+      label: "Save"
+      hotkey: ['Ctrl+S']
+      repeat: true
       listener: -> @saveFilm()
     loadFilm:
-      label: "Load [ctrl+o]"
+      label: "Load"
+      hotkey: ['Ctrl+O']
+      repeat: true
       listener: -> @loadFilm()
     newFilm:
-      label: "New [ctrl+n]"
+      label: "New"
+      hotkey: ['Ctrl+N']
+      repeat: true
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
-    help:
-      label: "Help [?]"
+    showHelp:
+      label: "Help"
+      title: "Show Keyboard Shortcuts"
+      hotkey: ['?']
       listener: -> @showHelp()
 
   menuOptions: [
-    'undo'
     'hideCursor'
     'onionSkin'
     'loop'
     'saveFilm'
     'loadFilm'
     'newFilm'
-    'help'
-    'showStatus'
   ]
 
   buildContainer: ->
@@ -86,8 +128,8 @@ class PencilTest
     '</div>' +
     '<ul class="menu">'
     for key in @menuOptions
-      label = @optionListeners[key].label
-      title = @optionListeners[key].title
+      label = @appActions[key].label
+      title = @appActions[key].title
       markup += "<li rel=\"#{key}\" title=\"#{title}\">#{label}</li>"
     markup += '</ul>'
 
@@ -95,6 +137,10 @@ class PencilTest
 
     @fieldElement = @container.querySelector '.field'
     @field = new Raphael @fieldElement
+      # container: @fieldElement
+      # width: 1280
+      # height: 720
+      # # TODO: pipe the callback parameter into a promise
 
     @statusElement = @container.querySelector '.status'
 
@@ -163,9 +209,9 @@ class PencilTest
     if typeof @options[optionName] is 'boolean'
       Utils.toggleClass optionElement, 'enabled', @options[optionName]
 
-  selectMenuOption: (optionName) ->
-    @optionListeners[optionName].listener?.call @
-    @optionListeners[optionName].action?.call @
+  doAppAction: (optionName) ->
+    @appActions[optionName].listener?.call @
+    @appActions[optionName].action?.call @
 
   addMenuListeners: ->
     self = @
@@ -175,7 +221,7 @@ class PencilTest
     menuOptionListener = (event) ->
       event.preventDefault()
       optionName = this.attributes.rel.value
-      self.selectMenuOption optionName
+      self.doAppAction optionName
       self.hideMenu()
 
     for option in @menuItems
@@ -186,64 +232,28 @@ class PencilTest
   addKeyboardListeners: ->
     self = @
 
-    keyboardHandlers =
-      keydown:
-        32: -> @togglePlay() # SPACE
-        37: -> @prevFrame 'stop' # LEFT
-        39: -> @nextFrame 'stop' # RIGHT
-        40: -> @firstFrame 'stop' # DOWN
-        38: -> @lastFrame 'stop' # UP
-        67: -> @selectMenuOption 'hideCursor' # c
-        76: -> @selectMenuOption 'loop' # l
-      keyup:
-        79: -> @selectMenuOption 'onionSkin' # o
-        189: -> @setCurrentFrameHold @getCurrentFrame().hold - 1 # -
-        187: -> @setCurrentFrameHold @getCurrentFrame().hold + 1 # =
-        8: -> @dropFrame() # BACKSPACE
-      modifiers:
-        ctrl:
-          keydown:
-            83: -> @saveFilm() # s
-            79: -> @loadFilm() # o
-            78: -> @newFilm() # n # FIXME: shortcut not working
-            8: -> @deleteFilm() # BACKSPACE
-        shift:
-          keydown:
-            191: -> @showHelp() # ?
+    @keyBindings =
+      keydown: {}
+      keyup: {}
+
+    for name, action of @appActions
+      if action.hotkey
+        for hotkey in action.hotkey
+          if action.repeat
+            @keyBindings.keydown[hotkey] = name
+          else
+            @keyBindings.keyup[hotkey] = name
 
     keyboardListener = (event) ->
-      if event.ctrlKey
-        keySet = keyboardHandlers.modifiers.ctrl
-      else if event.shiftKey
-        keySet = keyboardHandlers.modifiers.shift
-      else
-        keySet = keyboardHandlers
-
-      if keySet[event.type]? and keySet[event.type][event.keyCode]?
+      combo = Utils.describeKeyCombo event
+      actionName = self.keyBindings[event.type][combo]
+      if actionName
         event.preventDefault()
-        keySet[event.type][event.keyCode].apply self, [event]
-
-      Utils.log "#{event.type}-#{event.keyCode}" if event.keyCode isnt 0
+        self.doAppAction actionName
+      Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
     document.body.addEventListener 'keydown', keyboardListener
     document.body.addEventListener 'keyup', keyboardListener
-
-    documentBindings = (keySet, markup = '', combo = []) ->
-      for eventType, handlers of keySet
-        if eventType is 'modifiers'
-          for modifier, subset of handlers
-            markup = documentBindings subset, markup, combo.concat [modifier]
-        else
-          for keyCode, action of handlers
-            if combo.indexOf('shift') > -1
-              lookupList = Utils.shiftKeyCodeNames
-            else
-              lookupList = Utils.keyCodeNames
-            markup += "#{combo.concat(lookupList[keyCode]).join ' + '}:" +
-              " #{action.toString().replace(/function \(\) {\n\s*return |\n\s*}/g, '')}\n"
-      markup
-
-    @keyBindingsDoc =  documentBindings keyboardHandlers
 
   newFrame: (prepend = false) ->
     newFrame =
@@ -429,10 +439,17 @@ class PencilTest
     filmNames.push name for name, film of films
     if filmNames.length
       loadFilmName = window.prompt "Choose a film to load:\n\n#{filmNames.join '\n'}"
-      if films[loadFilmName]
+
+      if loadFilmName and not films[loadFilmName]
+        for filmName in filmNames
+          loadFilmName = filmName if RegExp(loadFilmName).test filmName
+
+      if loadFilmName
         @frames = films[loadFilmName]
         @goToFrame 0
         @updateStatus()
+      else
+        Utils.alert "No film by that name."
     else
       Utils.alert "You don't have any saved films yet."
 
@@ -447,4 +464,13 @@ class PencilTest
         window.localStorage.setItem 'films', JSON.stringify films
 
   showHelp: ->
-    Utils.alert @keyBindingsDoc
+    helpDoc = 'Keyboard Shortcuts:\n'
+    for name, action of @appActions
+      helpDoc += action.label or name
+      if action.hotkey
+        helpDoc += " [#{action.hotkey.join ' or '}]"
+      if action.title
+        helpDoc += " - #{action.title}"
+      helpDoc += '\n'
+
+    alert helpDoc

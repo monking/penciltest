@@ -27,27 +27,19 @@ Utils =
     window.prompt arguments[0], arguments[1]
 
   keyCodeNames:
-    8   : 'BACKSPACE'
-    32  : 'SPACE'
-    37  : 'LEFT'
-    38  : 'UP'
-    39  : 'RIGHT'
-    40  : 'DOWN'
-    48  : '0'
-    49  : '1'
-    50  : '2'
-    51  : '3'
-    52  : '4'
-    53  : '5'
-    54  : '6'
-    55  : '7'
-    56  : '8'
-    57  : '9'
-    78  : 'n'
-    79  : 'o'
-    83  : 's'
+    8   : 'Backspace'
+    32  : 'Space'
+    37  : 'Left'
+    38  : 'Up'
+    39  : 'Right'
+    40  : 'Down'
+    188 : ','
+    190 : '.'
+    186 : ';'
     187 : '='
     189 : '-'
+    191 : '/'
+    222 : '\''
 
   shiftKeyCodeNames:
     48  : ')'
@@ -63,9 +55,36 @@ Utils =
     79  : ')'
     187 : '+'
     189 : '_'
+    191 : '?'
+
+  getKeyCodeName: (keyCode, shiftKey) ->
+    if shiftKey and @shiftKeyCodeNames.hasOwnProperty keyCode
+      name = @shiftKeyCodeNames[keyCode]
+    else if @keyCodeNames.hasOwnProperty keyCode
+      name = @keyCodeNames[keyCode]
+    else
+      name = String.fromCharCode keyCode
+
+    name
+
+  describeKeyCombo: (event) ->
+    combo = []
+    combo.push 'Ctrl' if event.ctrlKey
+    combo.push 'Alt' if event.altKey
+    if not @shiftKeyCodeNames.hasOwnProperty event.keyCode
+      combo.push 'Shift' if event.shiftKey
+
+    keyName = @getKeyCodeName event.keyCode, event.shiftKey
+    combo.push keyName if not /^Control|Alt|Shift$/.test keyName
+
+    combo.join '+'
 
 Utils.keyCodes = {}
-Utils.keyCodes[code] = name for name, code of Utils.keyCodeNames
+for code in [0...256]
+  name = Utils.keyCodeNames[code] or String.fromCharCode code
+  if name
+    Utils.keyCodes[name] = code
+    Utils.keyCodeNames[code] ?= name
 
 Utils.shiftKeyCodes = {}
 Utils.shiftKeyCodes[code] = name for name, code of Utils.shiftKeyCodeNames
