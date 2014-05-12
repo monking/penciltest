@@ -56,7 +56,7 @@ class PencilTest
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
-      hotkey: ['U']
+      hotkey: ['Ctrl+Z','U']
       action: -> @undo()
     hideCursor:
       label: "Hide Cursor"
@@ -120,6 +120,7 @@ class PencilTest
     'saveFilm'
     'loadFilm'
     'newFilm'
+    'showHelp'
   ]
 
   buildContainer: ->

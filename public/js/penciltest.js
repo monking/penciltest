@@ -8317,7 +8317,7 @@ PencilTest = (function() {
     undo: {
       label: "Undo",
       title: "Remove the last line drawn",
-      hotkey: ['U'],
+      hotkey: ['Ctrl+Z', 'U'],
       action: function() {
         return this.undo();
       }
@@ -8416,7 +8416,7 @@ PencilTest = (function() {
     }
   };
 
-  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm'];
+  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm', 'showHelp'];
 
   PencilTest.prototype.buildContainer = function() {
     var key, label, markup, title, _i, _len, _ref;
