@@ -8267,6 +8267,7 @@ PencilTest = (function() {
     this.addInputListeners();
     this.addMenuListeners();
     this.addKeyboardListeners();
+    this.addOtherListeners();
     for (optionName in this.options) {
       if ((_ref1 = this.appActions[optionName]) != null) {
         if ((_ref2 = _ref1.action) != null) {
@@ -8317,9 +8318,19 @@ PencilTest = (function() {
     undo: {
       label: "Undo",
       title: "Remove the last line drawn",
-      hotkey: ['Ctrl+Z', 'U'],
+      hotkey: ['U', 'Ctrl+Z'],
+      repeat: true,
       action: function() {
         return this.undo();
+      }
+    },
+    redo: {
+      label: "Redo",
+      title: "Put back a line removed by 'Undo'",
+      hotkey: ['R', 'Ctrl+Shift+Z', 'Ctrl+Y'],
+      repeat: true,
+      action: function() {
+        return this.redo();
       }
     },
     hideCursor: {
@@ -8580,6 +8591,16 @@ PencilTest = (function() {
     return document.body.addEventListener('keyup', keyboardListener);
   };
 
+  PencilTest.prototype.addOtherListeners = function() {
+    var self;
+    self = this;
+    return window.addEventListener('beforeunload', function() {
+      if (self.unsavedChanges) {
+        return event.returnValue = "You have unsaved changes. Ctrl+S to save.";
+      }
+    });
+  };
+
   PencilTest.prototype.newFrame = function(prepend) {
     var newFrame;
     if (prepend == null) {
@@ -8611,13 +8632,15 @@ PencilTest = (function() {
   PencilTest.prototype.mark = function(x, y) {
     if (this.currentStrokeIndex === null) {
       this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
-      return this.getCurrentFrame().strokes.push(["M" + x + " " + y]);
+      this.getCurrentFrame().strokes.push(["M" + x + " " + y]);
     } else {
       this.getCurrentStroke().push("L" + x + " " + y);
-      return this.drawCurrentFrame();
+      this.drawCurrentFrame();
 
       /* FIXME: find a faster way to draw each segment of the line than to redraw the whole frame */
     }
+    this.clearRedo();
+    return this.unsavedChanges = true;
   };
 
   PencilTest.prototype.showMenu = function(coords) {
@@ -8816,8 +8839,26 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.undo = function() {
-    this.getCurrentFrame().strokes.pop();
-    return this.drawCurrentFrame();
+    if (this.getCurrentFrame().strokes && this.getCurrentFrame().strokes.length) {
+      if (this.redoQueue == null) {
+        this.redoQueue = [];
+      }
+      this.redoQueue.push(this.getCurrentFrame().strokes.pop());
+      this.unsavedChanges = true;
+      return this.drawCurrentFrame();
+    }
+  };
+
+  PencilTest.prototype.redo = function() {
+    if (this.redoQueue && this.redoQueue.length) {
+      this.getCurrentFrame().strokes.push(this.redoQueue.pop());
+      this.unsavedChanges = true;
+      return this.drawCurrentFrame();
+    }
+  };
+
+  PencilTest.prototype.clearRedo = function() {
+    return this.redoQueue = [];
   };
 
   PencilTest.prototype.setCurrentFrameHold = function(newHold) {
@@ -8861,7 +8902,8 @@ PencilTest = (function() {
     name = window.prompt("what will you name your film?");
     if (name && ((films[name] == null) || Utils.confirm("Overwrite existing film \"" + name + "\"?"))) {
       films[name] = this.frames;
-      return window.localStorage.setItem('films', JSON.stringify(films));
+      window.localStorage.setItem('films', JSON.stringify(films));
+      return this.unsavedChanges = false;
     }
   };
 
@@ -8886,7 +8928,8 @@ PencilTest = (function() {
       if (loadFilmName) {
         this.frames = films[loadFilmName];
         this.goToFrame(0);
-        return this.updateStatus();
+        this.updateStatus();
+        return this.unsavedChanges = false;
       } else {
         return Utils.alert("No film by that name.");
       }

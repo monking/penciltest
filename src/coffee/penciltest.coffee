@@ -25,6 +25,7 @@ class PencilTest
     @addInputListeners()
     @addMenuListeners()
     @addKeyboardListeners()
+    @addOtherListeners()
 
     @appActions[optionName]?.action?.call @ for optionName of @options
 
@@ -56,8 +57,15 @@ class PencilTest
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
-      hotkey: ['Ctrl+Z','U']
+      hotkey: ['U','Ctrl+Z']
+      repeat: true
       action: -> @undo()
+    redo:
+      label: "Redo"
+      title: "Put back a line removed by 'Undo'"
+      hotkey: ['R','Ctrl+Shift+Z','Ctrl+Y']
+      repeat: true
+      action: -> @redo()
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['C']
@@ -256,6 +264,11 @@ class PencilTest
     document.body.addEventListener 'keydown', keyboardListener
     document.body.addEventListener 'keyup', keyboardListener
 
+  addOtherListeners: ->
+    self = @
+    window.addEventListener 'beforeunload', ->
+      event.returnValue = "You have unsaved changes. Ctrl+S to save." if self.unsavedChanges
+
   newFrame: (prepend = false) ->
     newFrame =
       hold: 1
@@ -289,6 +302,9 @@ class PencilTest
       # @field.path 
       #   @getCurrentFrame().strokes[@currentStrokeIndex - 1].replace('L', 'M'),
       #   @getCurrentFrame().strokes[@currentStrokeIndex]
+
+    @clearRedo()
+    @unsavedChanges = true
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
@@ -399,8 +415,20 @@ class PencilTest
       @newFrame()
 
   undo: ->
-    @getCurrentFrame().strokes.pop()
-    @drawCurrentFrame()
+    if @getCurrentFrame().strokes and @getCurrentFrame().strokes.length
+      @redoQueue ?= []
+      @redoQueue.push @getCurrentFrame().strokes.pop()
+      @unsavedChanges = true
+      @drawCurrentFrame()
+
+  redo: ->
+    if @redoQueue and @redoQueue.length
+      @getCurrentFrame().strokes.push @redoQueue.pop()
+      @unsavedChanges = true
+      @drawCurrentFrame()
+
+  clearRedo: ->
+    @redoQueue = []
 
   setCurrentFrameHold: (newHold) ->
     @getCurrentFrame().hold = Math.max 1, newHold
@@ -434,6 +462,7 @@ class PencilTest
     if name and (not films[name]? or Utils.confirm "Overwrite existing film \"#{name}\"?")
       films[name] = @frames
       window.localStorage.setItem 'films', JSON.stringify films
+      @unsavedChanges = false
 
   loadFilm: ->
     films = @getSavedFilms()
@@ -450,6 +479,7 @@ class PencilTest
         @frames = films[loadFilmName]
         @goToFrame 0
         @updateStatus()
+        @unsavedChanges = false
       else
         Utils.alert "No film by that name."
     else
