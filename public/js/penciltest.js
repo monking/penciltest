@@ -8253,6 +8253,7 @@ PencilTest = (function() {
       showStatus: true,
       frameRate: 12,
       onionSkin: true,
+      onionSkinRange: 4,
       onionSkinOpacity: 0.5
     };
     for (key in _ref) {
@@ -8754,13 +8755,16 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.drawCurrentFrame = function() {
+    var i, _i, _ref;
     this.field.clear();
     if (this.options.onionSkin) {
-      if (this.currentFrameIndex > 0) {
-        this.drawFrame(this.currentFrameIndex - 1, "rgba(255,0,0," + this.options.onionSkinOpacity + ")");
-      }
-      if (this.currentFrameIndex < this.frames.length - 1) {
-        this.drawFrame(this.currentFrameIndex + 1, "rgba(0,0,255," + (this.options.onionSkinOpacity / 2) + ")");
+      for (i = _i = 0, _ref = this.options.onionSkinRange; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+        if (this.currentFrameIndex > i) {
+          this.drawFrame(this.currentFrameIndex - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+        }
+        if (this.currentFrameIndex < this.frames.length - i) {
+          this.drawFrame(this.currentFrameIndex + i, "rgba(0,0,255," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+        }
       }
     }
     this.drawFrame(this.currentFrameIndex);

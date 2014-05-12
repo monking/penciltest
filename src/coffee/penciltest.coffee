@@ -13,6 +13,7 @@ class PencilTest
       showStatus: true
       frameRate: 12
       onionSkin: true
+      onionSkinRange: 4
       onionSkinOpacity: 0.5
     }
       @options[key] = value if typeof @options[key] is 'undefined'
@@ -375,10 +376,11 @@ class PencilTest
   drawCurrentFrame: ->
     @field.clear()
     if @options.onionSkin
-      if @currentFrameIndex > 0
-        @drawFrame @currentFrameIndex - 1, "rgba(255,0,0,#{@options.onionSkinOpacity})"
-      if @currentFrameIndex < @frames.length - 1
-        @drawFrame @currentFrameIndex + 1, "rgba(0,0,255,#{@options.onionSkinOpacity / 2})"
+      for i in [0...@options.onionSkinRange]
+        if @currentFrameIndex > i
+          @drawFrame @currentFrameIndex - i, "rgba(255,0,0,#{Math.pow(@options.onionSkinOpacity, i)})"
+        if @currentFrameIndex < @frames.length - i
+          @drawFrame @currentFrameIndex + i, "rgba(0,0,255,#{Math.pow(@options.onionSkinOpacity, i)})"
     @drawFrame @currentFrameIndex
     @updateStatus()
 

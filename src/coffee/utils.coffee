@@ -63,7 +63,7 @@ Utils =
     else if @keyCodeNames.hasOwnProperty keyCode
       name = @keyCodeNames[keyCode]
     else
-      name = String.fromCharCode keyCode
+      name = String.fromCharCode keyCode # sometimes correct; use keyCodeNames
 
     name
 
