@@ -8120,7 +8120,7 @@
 /*
 global: document, window
  */
-var Utils, code, name, _ref, _ref1;
+var Utils, code, name, _base, _i, _ref;
 
 Utils = {
   toggleClass: function(element, className, presence) {
@@ -8152,27 +8152,19 @@ Utils = {
     return window.prompt(arguments[0], arguments[1]);
   },
   keyCodeNames: {
-    8: 'BACKSPACE',
-    32: 'SPACE',
-    37: 'LEFT',
-    38: 'UP',
-    39: 'RIGHT',
-    40: 'DOWN',
-    48: '0',
-    49: '1',
-    50: '2',
-    51: '3',
-    52: '4',
-    53: '5',
-    54: '6',
-    55: '7',
-    56: '8',
-    57: '9',
-    78: 'n',
-    79: 'o',
-    83: 's',
+    8: 'Backspace',
+    32: 'Space',
+    37: 'Left',
+    38: 'Up',
+    39: 'Right',
+    40: 'Down',
+    188: ',',
+    190: '.',
+    186: ';',
     187: '=',
-    189: '-'
+    189: '-',
+    191: '/',
+    222: '\''
   },
   shiftKeyCodeNames: {
     48: ')',
@@ -8187,23 +8179,59 @@ Utils = {
     57: '(',
     79: ')',
     187: '+',
-    189: '_'
+    189: '_',
+    191: '?'
+  },
+  getKeyCodeName: function(keyCode, shiftKey) {
+    var name;
+    if (shiftKey && this.shiftKeyCodeNames.hasOwnProperty(keyCode)) {
+      name = this.shiftKeyCodeNames[keyCode];
+    } else if (this.keyCodeNames.hasOwnProperty(keyCode)) {
+      name = this.keyCodeNames[keyCode];
+    } else {
+      name = String.fromCharCode(keyCode);
+    }
+    return name;
+  },
+  describeKeyCombo: function(event) {
+    var combo, keyName;
+    combo = [];
+    if (event.ctrlKey) {
+      combo.push('Ctrl');
+    }
+    if (event.altKey) {
+      combo.push('Alt');
+    }
+    if (!this.shiftKeyCodeNames.hasOwnProperty(event.keyCode)) {
+      if (event.shiftKey) {
+        combo.push('Shift');
+      }
+    }
+    keyName = this.getKeyCodeName(event.keyCode, event.shiftKey);
+    if (!/^Control|Alt|Shift$/.test(keyName)) {
+      combo.push(keyName);
+    }
+    return combo.join('+');
   }
 };
 
 Utils.keyCodes = {};
 
-_ref = Utils.keyCodeNames;
-for (name in _ref) {
-  code = _ref[name];
-  Utils.keyCodes[code] = name;
+for (code = _i = 0; _i < 256; code = ++_i) {
+  name = Utils.keyCodeNames[code] || String.fromCharCode(code);
+  if (name) {
+    Utils.keyCodes[name] = code;
+    if ((_base = Utils.keyCodeNames)[code] == null) {
+      _base[code] = name;
+    }
+  }
 }
 
 Utils.shiftKeyCodes = {};
 
-_ref1 = Utils.shiftKeyCodeNames;
-for (name in _ref1) {
-  code = _ref1[name];
+_ref = Utils.shiftKeyCodeNames;
+for (name in _ref) {
+  code = _ref[name];
   Utils.shiftKeyCodes[code] = name;
 }
 
@@ -8240,7 +8268,7 @@ PencilTest = (function() {
     this.addMenuListeners();
     this.addKeyboardListeners();
     for (optionName in this.options) {
-      if ((_ref1 = this.optionListeners[optionName]) != null) {
+      if ((_ref1 = this.appActions[optionName]) != null) {
         if ((_ref2 = _ref1.action) != null) {
           _ref2.call(this);
         }
@@ -8250,16 +8278,53 @@ PencilTest = (function() {
     window.penciltest = this;
   }
 
-  PencilTest.prototype.optionListeners = {
+  PencilTest.prototype.appActions = {
+    playPause: {
+      label: "Play/Pause",
+      hotkey: ['Space'],
+      action: function() {
+        return this.togglePlay();
+      }
+    },
+    nextFrame: {
+      label: "Next Frame",
+      hotkey: ['Right', '.'],
+      action: function() {
+        return this.nextFrame('stop');
+      }
+    },
+    prevFrame: {
+      label: "Previous Frame",
+      hotkey: ['Left', ','],
+      action: function() {
+        return this.prevFrame('stop');
+      }
+    },
+    firstFrame: {
+      label: "First Frame",
+      hotkey: ['Down'],
+      action: function() {
+        return this.firstFrame('stop');
+      }
+    },
+    lastFrame: {
+      label: "Last Frame",
+      hotkey: ['Up'],
+      action: function() {
+        return this.lastFrame('stop');
+      }
+    },
     undo: {
-      label: "Undo [u]",
+      label: "Undo",
       title: "Remove the last line drawn",
+      hotkey: ['U'],
       action: function() {
         return this.undo();
       }
     },
     hideCursor: {
-      label: "Hide Cursor [c]",
+      label: "Hide Cursor",
+      hotkey: ['C'],
       listener: function() {
         return this.options.hideCursor = !this.options.hideCursor;
       },
@@ -8268,16 +8333,39 @@ PencilTest = (function() {
       }
     },
     onionSkin: {
-      label: "Onion Skin [o]",
+      label: "Onion Skin",
+      hotkey: ['O'],
       title: "show previous and next frames in red and blue",
       listener: function() {
         this.options.onionSkin = !this.options.onionSkin;
         return this.drawCurrentFrame();
       }
     },
+    dropFrame: {
+      label: "Drop Frame",
+      hotkey: ['Backspace'],
+      listener: function() {
+        return this.dropFrame();
+      }
+    },
+    lessHold: {
+      label: "Shorter Frame Hold",
+      hotkey: ['-'],
+      listener: function() {
+        return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
+      }
+    },
+    omreHold: {
+      label: "Longer Frame Hold",
+      hotkey: ['+', '='],
+      listener: function() {
+        return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
+      }
+    },
     showStatus: {
-      label: "Show Status [s]",
-      title: "hide the status to [slightly] improve performance",
+      label: "Show Status",
+      title: "hide the film status bar",
+      hotkey: ['S'],
       listener: function() {
         return this.options.showStatus = !this.options.showStatus;
       },
@@ -8286,40 +8374,49 @@ PencilTest = (function() {
       }
     },
     loop: {
-      label: "Loop [l]",
+      label: "Loop",
+      hotkey: ['L'],
       listener: function() {
         return this.options.loop = !this.options.loop;
       }
     },
     saveFilm: {
-      label: "Save [ctrl+s]",
+      label: "Save",
+      hotkey: ['Ctrl+S'],
+      repeat: true,
       listener: function() {
         return this.saveFilm();
       }
     },
     loadFilm: {
-      label: "Load [ctrl+o]",
+      label: "Load",
+      hotkey: ['Ctrl+O'],
+      repeat: true,
       listener: function() {
         return this.loadFilm();
       }
     },
     newFilm: {
-      label: "New [ctrl+n]",
+      label: "New",
+      hotkey: ['Ctrl+N'],
+      repeat: true,
       listener: function() {
         if (Utils.confirm("This will BURN your current animation.")) {
           return this.newFilm();
         }
       }
     },
-    help: {
-      label: "Help [?]",
+    showHelp: {
+      label: "Help",
+      title: "Show Keyboard Shortcuts",
+      hotkey: ['?'],
       listener: function() {
         return this.showHelp();
       }
     }
   };
 
-  PencilTest.prototype.menuOptions = ['undo', 'hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm', 'help', 'showStatus'];
+  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm'];
 
   PencilTest.prototype.buildContainer = function() {
     var key, label, markup, title, _i, _len, _ref;
@@ -8327,8 +8424,8 @@ PencilTest = (function() {
     _ref = this.menuOptions;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       key = _ref[_i];
-      label = this.optionListeners[key].label;
-      title = this.optionListeners[key].title;
+      label = this.appActions[key].label;
+      title = this.appActions[key].title;
       markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + label + "</li>";
     }
     markup += '</ul>';
@@ -8412,12 +8509,12 @@ PencilTest = (function() {
     }
   };
 
-  PencilTest.prototype.selectMenuOption = function(optionName) {
+  PencilTest.prototype.doAppAction = function(optionName) {
     var _ref, _ref1;
-    if ((_ref = this.optionListeners[optionName].listener) != null) {
+    if ((_ref = this.appActions[optionName].listener) != null) {
       _ref.call(this);
     }
-    return (_ref1 = this.optionListeners[optionName].action) != null ? _ref1.call(this) : void 0;
+    return (_ref1 = this.appActions[optionName].action) != null ? _ref1.call(this) : void 0;
   };
 
   PencilTest.prototype.addMenuListeners = function() {
@@ -8429,7 +8526,7 @@ PencilTest = (function() {
       var optionName;
       event.preventDefault();
       optionName = this.attributes.rel.value;
-      self.selectMenuOption(optionName);
+      self.doAppAction(optionName);
       return self.hideMenu();
     };
     _ref = this.menuItems;
@@ -8444,121 +8541,41 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addKeyboardListeners = function() {
-    var documentBindings, keyboardHandlers, keyboardListener, self;
+    var action, hotkey, keyboardListener, name, self, _i, _len, _ref, _ref1;
     self = this;
-    keyboardHandlers = {
-      keydown: {
-        32: function() {
-          return this.togglePlay();
-        },
-        37: function() {
-          return this.prevFrame('stop');
-        },
-        39: function() {
-          return this.nextFrame('stop');
-        },
-        40: function() {
-          return this.firstFrame('stop');
-        },
-        38: function() {
-          return this.lastFrame('stop');
-        },
-        67: function() {
-          return this.selectMenuOption('hideCursor');
-        },
-        76: function() {
-          return this.selectMenuOption('loop');
-        }
-      },
-      keyup: {
-        79: function() {
-          return this.selectMenuOption('onionSkin');
-        },
-        189: function() {
-          return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
-        },
-        187: function() {
-          return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
-        },
-        8: function() {
-          return this.dropFrame();
-        }
-      },
-      modifiers: {
-        ctrl: {
-          keydown: {
-            83: function() {
-              return this.saveFilm();
-            },
-            79: function() {
-              return this.loadFilm();
-            },
-            78: function() {
-              return this.newFilm();
-            },
-            8: function() {
-              return this.deleteFilm();
-            }
-          }
-        },
-        shift: {
-          keydown: {
-            191: function() {
-              return this.showHelp();
-            }
-          }
-        }
-      }
+    this.keyBindings = {
+      keydown: {},
+      keyup: {}
     };
-    keyboardListener = function(event) {
-      var keySet;
-      if (event.ctrlKey) {
-        keySet = keyboardHandlers.modifiers.ctrl;
-      } else if (event.shiftKey) {
-        keySet = keyboardHandlers.modifiers.shift;
-      } else {
-        keySet = keyboardHandlers;
+    _ref = this.appActions;
+    for (name in _ref) {
+      action = _ref[name];
+      if (action.hotkey) {
+        _ref1 = action.hotkey;
+        for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
+          hotkey = _ref1[_i];
+          if (action.repeat) {
+            this.keyBindings.keydown[hotkey] = name;
+          } else {
+            this.keyBindings.keyup[hotkey] = name;
+          }
+        }
       }
-      if ((keySet[event.type] != null) && (keySet[event.type][event.keyCode] != null)) {
+    }
+    keyboardListener = function(event) {
+      var actionName, combo;
+      combo = Utils.describeKeyCombo(event);
+      actionName = self.keyBindings[event.type][combo];
+      if (actionName) {
         event.preventDefault();
-        keySet[event.type][event.keyCode].apply(self, [event]);
+        self.doAppAction(actionName);
       }
       if (event.keyCode !== 0) {
-        return Utils.log("" + event.type + "-" + event.keyCode);
+        return Utils.log("" + event.type + "-" + combo + " (" + event.keyCode + ")");
       }
     };
     document.body.addEventListener('keydown', keyboardListener);
-    document.body.addEventListener('keyup', keyboardListener);
-    documentBindings = function(keySet, markup, combo) {
-      var action, eventType, handlers, keyCode, lookupList, modifier, subset;
-      if (markup == null) {
-        markup = '';
-      }
-      if (combo == null) {
-        combo = [];
-      }
-      for (eventType in keySet) {
-        handlers = keySet[eventType];
-        if (eventType === 'modifiers') {
-          for (modifier in handlers) {
-            subset = handlers[modifier];
-            markup = documentBindings(subset, markup, combo.concat([modifier]));
-          }
-        } else {
-          for (keyCode in handlers) {
-            action = handlers[keyCode];
-            if (combo.indexOf('shift') > -1) {
-              lookupList = Utils.shiftKeyCodeNames;
-            } else {
-              lookupList = Utils.keyCodeNames;
-            }
-            markup += ("" + (combo.concat(lookupList[keyCode]).join(' + ')) + ":") + (" " + (action.toString().replace(/function \(\) {\n\s*return |\n\s*}/g, '')) + "\n");
-          }
-        }
-      }
-      return markup;
-    };
-    return this.keyBindingsDoc = documentBindings(keyboardHandlers);
+    return document.body.addEventListener('keyup', keyboardListener);
   };
 
   PencilTest.prototype.newFrame = function(prepend) {
@@ -8846,7 +8863,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.loadFilm = function() {
-    var film, filmNames, films, loadFilmName, name;
+    var film, filmName, filmNames, films, loadFilmName, name, _i, _len;
     films = this.getSavedFilms();
     filmNames = [];
     for (name in films) {
@@ -8855,10 +8872,20 @@ PencilTest = (function() {
     }
     if (filmNames.length) {
       loadFilmName = window.prompt("Choose a film to load:\n\n" + (filmNames.join('\n')));
-      if (films[loadFilmName]) {
+      if (loadFilmName && !films[loadFilmName]) {
+        for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
+          filmName = filmNames[_i];
+          if (RegExp(loadFilmName).test(filmName)) {
+            loadFilmName = filmName;
+          }
+        }
+      }
+      if (loadFilmName) {
         this.frames = films[loadFilmName];
         this.goToFrame(0);
         return this.updateStatus();
+      } else {
+        return Utils.alert("No film by that name.");
       }
     } else {
       return Utils.alert("You don't have any saved films yet.");
@@ -8883,7 +8910,21 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.showHelp = function() {
-    return Utils.alert(this.keyBindingsDoc);
+    var action, helpDoc, name, _ref;
+    helpDoc = 'Keyboard Shortcuts:\n';
+    _ref = this.appActions;
+    for (name in _ref) {
+      action = _ref[name];
+      helpDoc += action.label || name;
+      if (action.hotkey) {
+        helpDoc += " [" + (action.hotkey.join(' or ')) + "]";
+      }
+      if (action.title) {
+        helpDoc += " - " + action.title;
+      }
+      helpDoc += '\n';
+    }
+    return alert(helpDoc);
   };
 
   return PencilTest;
