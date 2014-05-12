@@ -185,7 +185,7 @@ class PencilTest
 
     mouseMoveListener = (event) ->
       event.preventDefault()
-      markFromEvent event
+      markFromEvent event if not self.isPlaying
 
     mouseUpListener = (event) ->
       if event.button is 2
@@ -346,6 +346,7 @@ class PencilTest
 
     @stop()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
+    @lift()
     @isPlaying = true
 
   stop: ->

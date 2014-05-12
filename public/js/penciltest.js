@@ -8479,7 +8479,9 @@ PencilTest = (function() {
     };
     mouseMoveListener = function(event) {
       event.preventDefault();
-      return markFromEvent(event);
+      if (!self.isPlaying) {
+        return markFromEvent(event);
+      }
     };
     mouseUpListener = function(event) {
       if (event.button === 2) {
@@ -8707,6 +8709,7 @@ PencilTest = (function() {
     };
     this.stop();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
+    this.lift();
     return this.isPlaying = true;
   };
 
