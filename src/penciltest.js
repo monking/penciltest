@@ -522,7 +522,7 @@ PencilTest = (function() {
     this.field.clear();
     if (this.options.onionSkin) {
       for (i = _i = 0, _ref = this.options.onionSkinRange; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        if (this.currentFrameIndex > i) {
+        if (this.currentFrameIndex > i - 1) {
           this.drawFrame(this.currentFrameIndex - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
         }
         if (this.currentFrameIndex < this.frames.length - i) {
