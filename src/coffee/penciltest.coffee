@@ -294,14 +294,14 @@ class PencilTest
   mark: (x,y) ->
     if @currentStrokeIndex is null
       @currentStrokeIndex = @getCurrentFrame().strokes.length
-      @getCurrentFrame().strokes.push ["M#{x} #{y}"]
+      @drawSegmentStart = "M#{x} #{y}"
+      @drawSegmentEnd = null
+      @getCurrentFrame().strokes.push [@drawSegmentStart]
     else
-      @getCurrentStroke().push "L#{x} #{y}"
-      @drawCurrentFrame()
-      ### FIXME: find a faster way to draw each segment of the line than to redraw the whole frame ###
-      # @field.path 
-      #   @getCurrentFrame().strokes[@currentStrokeIndex - 1].replace('L', 'M'),
-      #   @getCurrentFrame().strokes[@currentStrokeIndex]
+      @drawSegmentStart = @drawSegmentEnd.replace(/^L/, 'M') if @drawSegmentEnd
+      @drawSegmentEnd = "L#{x} #{y}"
+      @getCurrentStroke().push @drawSegmentEnd
+      @field.path "#{@drawSegmentStart}#{@drawSegmentEnd}"
 
     @clearRedo()
     @unsavedChanges = true

@@ -8632,12 +8632,16 @@ PencilTest = (function() {
   PencilTest.prototype.mark = function(x, y) {
     if (this.currentStrokeIndex === null) {
       this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
-      this.getCurrentFrame().strokes.push(["M" + x + " " + y]);
+      this.drawSegmentStart = "M" + x + " " + y;
+      this.drawSegmentEnd = null;
+      this.getCurrentFrame().strokes.push([this.drawSegmentStart]);
     } else {
-      this.getCurrentStroke().push("L" + x + " " + y);
-      this.drawCurrentFrame();
-
-      /* FIXME: find a faster way to draw each segment of the line than to redraw the whole frame */
+      if (this.drawSegmentEnd) {
+        this.drawSegmentStart = this.drawSegmentEnd.replace(/^L/, 'M');
+      }
+      this.drawSegmentEnd = "L" + x + " " + y;
+      this.getCurrentStroke().push(this.drawSegmentEnd);
+      this.field.path("" + this.drawSegmentStart + this.drawSegmentEnd);
     }
     this.clearRedo();
     return this.unsavedChanges = true;
