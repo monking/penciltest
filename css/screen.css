@@ -37,24 +37,95 @@
   padding: 0;
   margin: 0;
 }
-.penciltest-app .menu li {
+.penciltest-app .menu ul, .penciltest-app .menu li {
   list-style: inherit;
-  padding: 0.5em 0.5em 0.5em 1.5em;
-  color: #666666;
-  cursor: pointer;
+}
+.penciltest-app .menu li {
   position: relative;
 }
-.penciltest-app .menu li:hover {
+.penciltest-app .menu li label {
+  display: block;
+  padding: 0 0.5em 0 1.5em;
+  line-height: 2.0em;
+  color: #666666;
+  cursor: pointer;
+}
+.penciltest-app .menu li:hover > label {
   color: black;
   background-color: #fff;
 }
-.penciltest-app .menu li.enabled::before {
-  content: "*";
+.penciltest-app .menu li.enabled label::before {
+  content: '\2713';
   position: absolute;
   left: 0;
   display: block;
   width: 1em;
   text-align: center;
+}
+.penciltest-app .menu li.group {
+  position: relative;
+}
+.penciltest-app .menu li.group > ul {
+  padding-left: 1em;
+}
+.penciltest-app .menu li.group > label {
+  padding-right: 2em;
+}
+.penciltest-app .menu li.group > label::after {
+  content: '\25bc';
+  position: absolute;
+  font-size: 0.6em;
+  top: 0;
+  right: 0;
+  width: 1.5rem;
+  height: 2.0rem;
+  line-height: 2.0rem;
+  text-align: center;
+  -webkit-transition-property: all;
+  -moz-transition-property: all;
+  -o-transition-property: all;
+  transition-property: all;
+  -webkit-transition-duration: 0.1s;
+  -moz-transition-duration: 0.1s;
+  -o-transition-duration: 0.1s;
+  transition-duration: 0.1s;
+}
+.penciltest-app .menu li.group.collapsed label::after {
+  -webkit-transform: rotate(-90deg);
+  -moz-transform: rotate(-90deg);
+  -ms-transform: rotate(-90deg);
+  -o-transform: rotate(-90deg);
+  transform: rotate(-90deg);
+}
+.penciltest-app .menu li.group.collapsed > ul {
+  display: none;
+}
+.penciltest-app .menu li.icons ul {
+  padding: 0;
+}
+.penciltest-app .menu li.icons li {
+  display: inline-block;
+  text-align: center;
+  width: 2em;
+  font-family: 'fontawesome';
+}
+.penciltest-app .menu li.icons li label {
+  display: none;
+}
+.penciltest-app .menu li.icons li[rel="playPause"]::before {
+  content: '\f04b';
+}
+.penciltest-app .menu li.icons li[rel="firstFrame"]::before {
+  content: '\f049';
+}
+.penciltest-app .menu li.icons li[rel="lastFrame"]::before {
+  content: '\f050';
+}
+.penciltest-app .menu li.icons li[rel="nextFrame"]::before {
+  content: '\f051';
+}
+.penciltest-app .menu li.icons li[rel="prevFrame"]::before {
+  content: '\f048';
 }
 .penciltest-app.menu-visible .menu {
   display: block;
