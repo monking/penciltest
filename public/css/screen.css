@@ -1,7 +1,7 @@
 .penciltest-app {
   width: 100%;
 }
-.penciltest-app.hide-cursor {
+.penciltest-app.hide-cursor .field {
   cursor: none;
 }
 .penciltest-app .field {
@@ -12,6 +12,7 @@
   margin: 0 auto;
   box-shadow: 0 1em 4em rgba(0, 0, 0, 0.8);
   position: relative;
+  cursor: crosshair;
 }
 .penciltest-app .field .status {
   position: absolute;
