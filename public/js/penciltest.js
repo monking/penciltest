@@ -8153,11 +8153,20 @@ Utils = {
   },
   keyCodeNames: {
     8: 'Backspace',
+    16: 'Shift',
+    17: 'Ctrl',
+    18: 'Alt',
     32: 'Space',
+    33: 'PgUp',
+    34: 'PgDn',
+    35: 'End',
+    36: 'Home',
     37: 'Left',
     38: 'Up',
     39: 'Right',
     40: 'Down',
+    46: 'Delete',
+    91: 'Super',
     188: ',',
     190: '.',
     186: ';',
@@ -8196,6 +8205,9 @@ Utils = {
   describeKeyCombo: function(event) {
     var combo, keyName;
     combo = [];
+    if (event.metaey) {
+      combo.push('Super');
+    }
     if (event.ctrlKey) {
       combo.push('Ctrl');
     }
@@ -8208,7 +8220,7 @@ Utils = {
       }
     }
     keyName = this.getKeyCodeName(event.keyCode, event.shiftKey);
-    if (!/^Control|Alt|Shift$/.test(keyName)) {
+    if (!/^Ctrl|Alt|Shift$/.test(keyName)) {
       combo.push(keyName);
     }
     return combo.join('+');
@@ -8287,14 +8299,14 @@ PencilTest = (function() {
     playPause: {
       label: "Play/Pause",
       hotkey: ['Space'],
-      action: function() {
+      listener: function() {
         return this.togglePlay();
       }
     },
     nextFrame: {
       label: "Next Frame",
       hotkey: ['Right', '.'],
-      action: function() {
+      listener: function() {
         this.goToFrame(this.currentFrameIndex + 1);
         return this.stop();
       }
@@ -8302,23 +8314,23 @@ PencilTest = (function() {
     prevFrame: {
       label: "Previous Frame",
       hotkey: ['Left', ','],
-      action: function() {
+      listener: function() {
         this.goToFrame(this.currentFrameIndex - 1);
         return this.stop();
       }
     },
     firstFrame: {
       label: "First Frame",
-      hotkey: ['Down'],
-      action: function() {
+      hotkey: ['Home', 'PgUp'],
+      listener: function() {
         this.goToFrame(0);
         return this.stop();
       }
     },
     lastFrame: {
       label: "Last Frame",
-      hotkey: ['Up'],
-      action: function() {
+      hotkey: ['End', 'PgDn'],
+      listener: function() {
         this.goToFrame(this.film.frames.length - 1);
         return this.stop();
       }
@@ -8326,7 +8338,7 @@ PencilTest = (function() {
     insertFrame: {
       label: "Insert Frame",
       hotkey: ['I'],
-      action: function() {
+      listener: function() {
         var newIndex;
         newIndex = this.currentFrameIndex + 1;
         this.newFrame(newIndex);
@@ -8336,18 +8348,18 @@ PencilTest = (function() {
     undo: {
       label: "Undo",
       title: "Remove the last line drawn",
-      hotkey: ['U', 'Ctrl+Z'],
+      hotkey: ['U', 'Alt+Z'],
       repeat: true,
-      action: function() {
+      listener: function() {
         return this.undo();
       }
     },
     redo: {
       label: "Redo",
       title: "Put back a line removed by 'Undo'",
-      hotkey: ['R', 'Ctrl+Shift+Z', 'Ctrl+Y'],
+      hotkey: ['R', 'Alt+Shift+Z'],
       repeat: true,
-      action: function() {
+      listener: function() {
         return this.redo();
       }
     },
@@ -8379,14 +8391,16 @@ PencilTest = (function() {
     },
     lessHold: {
       label: "Shorter Frame Hold",
-      hotkey: ['-'],
+      hotkey: ['Down', '-'],
+      repeat: true,
       listener: function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
       }
     },
     omreHold: {
       label: "Longer Frame Hold",
-      hotkey: ['+', '='],
+      hotkey: ['Up', '+', '='],
+      repeat: true,
       listener: function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
       }
@@ -8411,7 +8425,7 @@ PencilTest = (function() {
     },
     saveFilm: {
       label: "Save",
-      hotkey: ['Ctrl+S'],
+      hotkey: ['Alt+S'],
       repeat: true,
       listener: function() {
         return this.saveFilm();
@@ -8419,7 +8433,7 @@ PencilTest = (function() {
     },
     loadFilm: {
       label: "Load",
-      hotkey: ['Ctrl+O'],
+      hotkey: ['Alt+O'],
       repeat: true,
       listener: function() {
         return this.loadFilm();
@@ -8427,7 +8441,7 @@ PencilTest = (function() {
     },
     newFilm: {
       label: "New",
-      hotkey: ['Ctrl+N'],
+      hotkey: ['Alt+N'],
       repeat: true,
       listener: function() {
         if (Utils.confirm("This will BURN your current animation.")) {
@@ -8437,7 +8451,7 @@ PencilTest = (function() {
     },
     deleteFilm: {
       label: "Delete Film",
-      hotkey: ['Ctrl+Backspace'],
+      hotkey: ['Alt+Backspace'],
       listener: function() {
         return this.deleteFilm();
       }
@@ -8606,10 +8620,9 @@ PencilTest = (function() {
       actionName = self.keyBindings[event.type][combo];
       if (actionName) {
         event.preventDefault();
-        self.doAppAction(actionName);
-      }
-      if (event.keyCode !== 0) {
-        return Utils.log("" + event.type + "-" + combo + " (" + event.keyCode + ")");
+        return self.doAppAction(actionName);
+      } else if (self.keyBindings.keydown[combo]) {
+        return event.preventDefault();
       }
     };
     document.body.addEventListener('keydown', keyboardListener);
@@ -8622,7 +8635,7 @@ PencilTest = (function() {
     return window.addEventListener('beforeunload', function() {
       self.putStoredData('app', 'options', self.options);
       if (self.unsavedChanges) {
-        return event.returnValue = "You have unsaved changes. Ctrl+S to save.";
+        return event.returnValue = "You have unsaved changes. Alt+S to save.";
       }
     });
   };

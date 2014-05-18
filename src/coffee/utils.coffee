@@ -28,11 +28,20 @@ Utils =
 
   keyCodeNames:
     8   : 'Backspace'
+    16  : 'Shift'
+    17  : 'Ctrl'
+    18  : 'Alt'
     32  : 'Space'
+    33  : 'PgUp'
+    34  : 'PgDn'
+    35  : 'End'
+    36  : 'Home'
     37  : 'Left'
     38  : 'Up'
     39  : 'Right'
     40  : 'Down'
+    46  : 'Delete'
+    91  : 'Super'
     188 : ','
     190 : '.'
     186 : ';'
@@ -69,13 +78,14 @@ Utils =
 
   describeKeyCombo: (event) ->
     combo = []
+    combo.push 'Super' if event.metaey
     combo.push 'Ctrl' if event.ctrlKey
     combo.push 'Alt' if event.altKey
     if not @shiftKeyCodeNames.hasOwnProperty event.keyCode
       combo.push 'Shift' if event.shiftKey
 
     keyName = @getKeyCodeName event.keyCode, event.shiftKey
-    combo.push keyName if not /^Control|Alt|Shift$/.test keyName
+    combo.push keyName if not /^Ctrl|Alt|Shift$/.test keyName
 
     combo.join '+'
 

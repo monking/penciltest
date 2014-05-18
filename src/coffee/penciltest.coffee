@@ -39,50 +39,50 @@ class PencilTest
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
-      action: -> @togglePlay()
+      listener: -> @togglePlay()
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
-      action: ->
+      listener: ->
         @goToFrame @currentFrameIndex + 1
         @stop()
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
-      action: ->
+      listener: ->
         @goToFrame @currentFrameIndex - 1
         @stop()
     firstFrame:
       label: "First Frame"
-      hotkey: ['Down']
-      action: ->
+      hotkey: ['Home','PgUp']
+      listener: ->
         @goToFrame 0
         @stop()
     lastFrame:
       label: "Last Frame"
-      hotkey: ['Up']
-      action: ->
+      hotkey: ['End','PgDn']
+      listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
     insertFrame:
       label: "Insert Frame"
       hotkey: ['I']
-      action: ->
+      listener: ->
         newIndex = @currentFrameIndex + 1
         @newFrame newIndex
         @goToFrame newIndex
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
-      hotkey: ['U','Ctrl+Z']
+      hotkey: ['U','Alt+Z']
       repeat: true
-      action: -> @undo()
+      listener: -> @undo()
     redo:
       label: "Redo"
       title: "Put back a line removed by 'Undo'"
-      hotkey: ['R','Ctrl+Shift+Z','Ctrl+Y']
+      hotkey: ['R','Alt+Shift+Z']
       repeat: true
-      action: -> @redo()
+      listener: -> @redo()
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['C']
@@ -101,11 +101,13 @@ class PencilTest
       listener: -> @dropFrame()
     lessHold:
       label: "Shorter Frame Hold"
-      hotkey: ['-']
+      hotkey: ['Down', '-']
+      repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold - 1
     omreHold:
       label: "Longer Frame Hold"
-      hotkey: ['+', '=']
+      hotkey: ['Up', '+', '=']
+      repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold + 1
     showStatus:
       label: "Show Status"
@@ -119,22 +121,22 @@ class PencilTest
       listener: -> @options.loop = not @options.loop
     saveFilm:
       label: "Save"
-      hotkey: ['Ctrl+S']
+      hotkey: ['Alt+S']
       repeat: true
       listener: -> @saveFilm()
     loadFilm:
       label: "Load"
-      hotkey: ['Ctrl+O']
+      hotkey: ['Alt+O']
       repeat: true
       listener: -> @loadFilm()
     newFilm:
       label: "New"
-      hotkey: ['Ctrl+N']
+      hotkey: ['Alt+N']
       repeat: true
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
     deleteFilm:
       label: "Delete Film"
-      hotkey: ['Ctrl+Backspace']
+      hotkey: ['Alt+Backspace']
       listener: -> @deleteFilm()
     showHelp:
       label: "Help"
@@ -280,7 +282,10 @@ class PencilTest
       if actionName
         event.preventDefault()
         self.doAppAction actionName
-      Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
+      else if self.keyBindings.keydown[combo]
+        event.preventDefault()
+
+      # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
     document.body.addEventListener 'keydown', keyboardListener
     document.body.addEventListener 'keyup', keyboardListener
@@ -289,7 +294,7 @@ class PencilTest
     self = @
     window.addEventListener 'beforeunload', ->
       self.putStoredData 'app', 'options', self.options
-      event.returnValue = "You have unsaved changes. Ctrl+S to save." if self.unsavedChanges
+      event.returnValue = "You have unsaved changes. Alt+S to save." if self.unsavedChanges
 
   newFrame: (index = null) ->
     frame =

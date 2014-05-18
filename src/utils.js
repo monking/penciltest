@@ -35,11 +35,20 @@ Utils = {
   },
   keyCodeNames: {
     8: 'Backspace',
+    16: 'Shift',
+    17: 'Ctrl',
+    18: 'Alt',
     32: 'Space',
+    33: 'PgUp',
+    34: 'PgDn',
+    35: 'End',
+    36: 'Home',
     37: 'Left',
     38: 'Up',
     39: 'Right',
     40: 'Down',
+    46: 'Delete',
+    91: 'Super',
     188: ',',
     190: '.',
     186: ';',
@@ -78,6 +87,9 @@ Utils = {
   describeKeyCombo: function(event) {
     var combo, keyName;
     combo = [];
+    if (event.metaey) {
+      combo.push('Super');
+    }
     if (event.ctrlKey) {
       combo.push('Ctrl');
     }
@@ -90,7 +102,7 @@ Utils = {
       }
     }
     keyName = this.getKeyCodeName(event.keyCode, event.shiftKey);
-    if (!/^Control|Alt|Shift$/.test(keyName)) {
+    if (!/^Ctrl|Alt|Shift$/.test(keyName)) {
       combo.push(keyName);
     }
     return combo.join('+');
