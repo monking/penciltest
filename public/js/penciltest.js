@@ -8397,7 +8397,7 @@ PencilTest = (function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
       }
     },
-    omreHold: {
+    moreHold: {
       label: "Longer Frame Hold",
       hotkey: ['Up', '+', '='],
       repeat: true,
@@ -8466,23 +8466,48 @@ PencilTest = (function() {
     }
   };
 
-  PencilTest.prototype.menuOptions = ['hideCursor', 'onionSkin', 'loop', 'saveFilm', 'loadFilm', 'newFilm', 'showHelp'];
+  PencilTest.prototype.menuOptions = [
+    {
+      _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
+      Edit: ['undo', 'redo', 'insertFrame', 'dropFrame', 'moreHold', 'lessHold'],
+      Playback: ['loop'],
+      Tools: ['hideCursor', 'onionSkin', 'showStatus'],
+      Film: ['saveFilm', 'loadFilm', 'newFilm']
+    }, 'showHelp'
+  ];
 
   PencilTest.prototype.buildContainer = function() {
-    var key, label, markup, title, _i, _len, _ref;
-    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<ul class="menu">';
-    _ref = this.menuOptions;
-    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-      key = _ref[_i];
-      label = this.appActions[key].label;
-      title = this.appActions[key].title;
-      markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + label + "</li>";
-    }
-    markup += '</ul>';
+    var markup;
+    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
     this.container.innerHTML = markup;
     this.fieldElement = this.container.querySelector('.field');
     this.field = new Raphael(this.fieldElement);
     return this.statusElement = this.container.querySelector('.status');
+  };
+
+  PencilTest.prototype.menuWalker = function(level) {
+    var group, groupName, key, label, markup, title, _i, _len;
+    markup = '';
+    for (_i = 0, _len = level.length; _i < _len; _i++) {
+      key = level[_i];
+      if (typeof key === 'string') {
+        label = this.appActions[key].label;
+        title = this.appActions[key].title;
+        markup += "<li rel=\"" + key + "\" title=\"" + title + "\"><label>" + label + "</label></li>";
+      } else {
+        for (groupName in key) {
+          group = key[groupName];
+          if (groupName === '_icons') {
+            markup += "<li class=\"icons\"><ul>";
+          } else {
+            markup += "<li class=\"group collapsed\"><label>" + groupName + "</label><ul>";
+          }
+          markup += this.menuWalker(group);
+          markup += '</ul></li>';
+        }
+      }
+    }
+    return markup;
   };
 
   PencilTest.prototype.addInputListeners = function() {
@@ -8573,13 +8598,17 @@ PencilTest = (function() {
     var menuOptionListener, option, self, _i, _len, _ref, _results;
     self = this;
     this.menuElement = this.container.querySelector('.menu');
-    this.menuItems = this.menuElement.getElementsByTagName('li');
+    this.menuItems = this.menuElement.querySelectorAll('LI');
     menuOptionListener = function(event) {
       var optionName;
-      event.preventDefault();
-      optionName = this.attributes.rel.value;
-      self.doAppAction(optionName);
-      return self.hideMenu();
+      if (/\bgroup\b/.test(this.className)) {
+        return Utils.toggleClass(this, 'collapsed');
+      } else if (this.attributes.rel) {
+        event.preventDefault();
+        optionName = this.attributes.rel.value;
+        self.doAppAction(optionName);
+        return self.hideMenu();
+      }
     };
     _ref = this.menuItems;
     _results = [];
@@ -8700,7 +8729,11 @@ PencilTest = (function() {
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         option = _ref[_i];
-        _results.push(this.updateMenuOption(option));
+        if (option.attributes.rel) {
+          _results.push(this.updateMenuOption(option));
+        } else {
+          _results.push(void 0);
+        }
       }
       return _results;
     }

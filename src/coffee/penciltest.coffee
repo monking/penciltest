@@ -104,7 +104,7 @@ class PencilTest
       hotkey: ['Down', '-']
       repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold - 1
-    omreHold:
+    moreHold:
       label: "Longer Frame Hold"
       hotkey: ['Up', '+', '=']
       repeat: true
@@ -145,12 +145,34 @@ class PencilTest
       listener: -> @showHelp()
 
   menuOptions: [
-    'hideCursor'
-    'onionSkin'
-    'loop'
-    'saveFilm'
-    'loadFilm'
-    'newFilm'
+    _icons: [
+      'firstFrame'
+      'prevFrame'
+      'playPause'
+      'nextFrame'
+      'lastFrame'
+    ]
+    Edit: [
+      'undo'
+      'redo'
+      'insertFrame'
+      'dropFrame'
+      'moreHold'
+      'lessHold'
+    ]
+    Playback: [
+      'loop'
+    ]
+    Tools: [
+      'hideCursor'
+      'onionSkin'
+      'showStatus'
+    ]
+    Film: [
+      'saveFilm'
+      'loadFilm'
+      'newFilm'
+    ]
     'showHelp'
   ]
 
@@ -158,12 +180,9 @@ class PencilTest
     markup = '<div class="field">' +
       '<div class="status"></div>' +
     '</div>' +
-    '<ul class="menu">'
-    for key in @menuOptions
-      label = @appActions[key].label
-      title = @appActions[key].title
-      markup += "<li rel=\"#{key}\" title=\"#{title}\">#{label}</li>"
-    markup += '</ul>'
+    '<ul class="menu">' +
+    @menuWalker(@menuOptions) +
+    '</ul>'
 
     @container.innerHTML = markup
 
@@ -175,6 +194,24 @@ class PencilTest
       # # TODO: pipe the callback parameter into a promise
 
     @statusElement = @container.querySelector '.status'
+
+  menuWalker: (level) ->
+    markup = ''
+    for key in level
+      if typeof key is 'string'
+        label = @appActions[key].label
+        title = @appActions[key].title
+        markup += "<li rel=\"#{key}\" title=\"#{title}\"><label>#{label}</label></li>"
+      else
+        for groupName, group of key
+          if groupName is '_icons'
+            markup += "<li class=\"icons\"><ul>"
+          else
+            markup += "<li class=\"group collapsed\"><label>#{groupName}</label><ul>"
+          markup += @menuWalker(group)
+          markup += '</ul></li>'
+
+    markup
 
   addInputListeners: ->
     self = @
@@ -248,13 +285,16 @@ class PencilTest
   addMenuListeners: ->
     self = @
     @menuElement = @container.querySelector '.menu'
-    @menuItems = @menuElement.getElementsByTagName 'li'
+    @menuItems = @menuElement.querySelectorAll 'LI'
 
     menuOptionListener = (event) ->
-      event.preventDefault()
-      optionName = this.attributes.rel.value
-      self.doAppAction optionName
-      self.hideMenu()
+      if /\bgroup\b/.test @className
+        Utils.toggleClass this, 'collapsed'
+      else if @attributes.rel
+        event.preventDefault()
+        optionName = @attributes.rel.value
+        self.doAppAction optionName
+        self.hideMenu()
 
     for option in @menuItems
       option.addEventListener 'mouseup', menuOptionListener
@@ -335,7 +375,8 @@ class PencilTest
       coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
       @menuElement.style.left = "#{coords.x + 1}px"
       @menuElement.style.top = "#{coords.y}px"
-      @updateMenuOption option for option in @menuItems
+      for option in @menuItems
+        @updateMenuOption option if option.attributes.rel
 
   hideMenu: ->
     if @menuIsVisible

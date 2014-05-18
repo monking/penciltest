@@ -46,25 +46,105 @@
     padding: 0;
     margin: 0;
 
-    li {
+    ul, li {
       list-style: inherit;
-      padding: 0.5em 0.5em 0.5em 1.5em;
-      color: $gray;
-      cursor: pointer;
+    }
+
+    li {
       position: relative;
 
-      &:hover {
+      label {
+        display: block;
+        padding: 0 0.5em 0 1.5em;
+        line-height: 2.0em;
+        color: $gray;
+        cursor: pointer;
+      }
+
+      &:hover > label {
         color: black;
         background-color: #fff;
       }
 
-      &.enabled::before {
-        content: "*";
+      &.enabled label::before {
+        content: '\2713';
         position: absolute;
         left: 0;
         display: block;
         width: 1em;
         text-align: center;
+      }
+
+      &.group {
+        position: relative;
+
+        > ul {
+          padding-left: 1em;
+        }
+
+        > label {
+          padding-right: 2em;
+
+          &::after {
+            content: '\25bc';
+            position: absolute;
+            font-size: 0.6em;
+            top: 0;
+            right: 0;
+            width: 1.5rem;
+            height: 2.0rem;
+            line-height: 2.0rem;
+            text-align: center;
+            @include transition-property(all);
+            @include transition-duration(0.1s);
+          }
+        }
+
+        &.collapsed {
+          label::after {
+            @include transform(rotate(-90deg));
+          }
+
+          > ul {
+            display: none;
+          }
+        }
+      }
+
+      &.icons {
+        ul {
+          padding: 0;
+        }
+        li {
+          display: inline-block;
+          text-align: center;
+          width: 2em;
+          font-family: 'fontawesome';
+
+          label {
+            display: none;
+          }
+
+          &[rel="playPause"]::before {
+            content: '\f04b';
+          }
+
+          &[rel="firstFrame"]::before {
+            content: '\f049';
+          }
+
+          &[rel="lastFrame"]::before {
+            content: '\f050';
+          }
+
+          &[rel="nextFrame"]::before {
+            content: '\f051';
+          }
+
+          &[rel="prevFrame"]::before {
+            content: '\f048';
+          }
+        }
       }
     }
   }
