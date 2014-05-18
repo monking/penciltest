@@ -8243,11 +8243,11 @@ var PencilTest;
 
 PencilTest = (function() {
   function PencilTest(options) {
-    var key, optionName, value, _ref, _ref1, _ref2;
+    var key, optionName, savedOptions, value, _ref, _ref1, _ref2;
     this.options = options;
+    savedOptions = this.getStoredData('app', 'options');
     _ref = {
-      container: document.body,
-      containerSelector: 'body',
+      container: 'body',
       hideCursor: false,
       loop: true,
       showStatus: true,
@@ -8258,11 +8258,14 @@ PencilTest = (function() {
     };
     for (key in _ref) {
       value = _ref[key];
+      if (savedOptions && typeof savedOptions[key] !== 'undefined') {
+        this.options[key] = savedOptions[key];
+      }
       if (typeof this.options[key] === 'undefined') {
         this.options[key] = value;
       }
     }
-    this.container = this.options.container || document.querySelector(this.options.containerSelector);
+    this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
     this.buildContainer();
     this.addInputListeners();
@@ -8292,28 +8295,42 @@ PencilTest = (function() {
       label: "Next Frame",
       hotkey: ['Right', '.'],
       action: function() {
-        return this.nextFrame('stop');
+        this.goToFrame(this.currentFrameIndex + 1);
+        return this.stop();
       }
     },
     prevFrame: {
       label: "Previous Frame",
       hotkey: ['Left', ','],
       action: function() {
-        return this.prevFrame('stop');
+        this.goToFrame(this.currentFrameIndex - 1);
+        return this.stop();
       }
     },
     firstFrame: {
       label: "First Frame",
       hotkey: ['Down'],
       action: function() {
-        return this.firstFrame('stop');
+        this.goToFrame(0);
+        return this.stop();
       }
     },
     lastFrame: {
       label: "Last Frame",
       hotkey: ['Up'],
       action: function() {
-        return this.lastFrame('stop');
+        this.goToFrame(this.film.frames.length - 1);
+        return this.stop();
+      }
+    },
+    insertFrame: {
+      label: "Insert Frame",
+      hotkey: ['I'],
+      action: function() {
+        var newIndex;
+        newIndex = this.currentFrameIndex + 1;
+        this.newFrame(newIndex);
+        return this.goToFrame(newIndex);
       }
     },
     undo: {
@@ -8416,6 +8433,13 @@ PencilTest = (function() {
         if (Utils.confirm("This will BURN your current animation.")) {
           return this.newFilm();
         }
+      }
+    },
+    deleteFilm: {
+      label: "Delete Film",
+      hotkey: ['Ctrl+Backspace'],
+      listener: function() {
+        return this.deleteFilm();
       }
     },
     showHelp: {
@@ -8596,53 +8620,49 @@ PencilTest = (function() {
     var self;
     self = this;
     return window.addEventListener('beforeunload', function() {
+      self.putStoredData('app', 'options', self.options);
       if (self.unsavedChanges) {
         return event.returnValue = "You have unsaved changes. Ctrl+S to save.";
       }
     });
   };
 
-  PencilTest.prototype.newFrame = function(prepend) {
-    var newFrame;
-    if (prepend == null) {
-      prepend = false;
+  PencilTest.prototype.newFrame = function(index) {
+    var frame;
+    if (index == null) {
+      index = null;
     }
-    newFrame = {
+    frame = {
       hold: 1,
       strokes: []
     };
-    if (prepend !== false) {
-      this.currentFrameIndex = 0;
-      this.frames.unshift(newFrame);
-    } else {
-      this.currentFrameIndex = this.frames.length;
-      this.frames.push(newFrame);
+    if (index === null) {
+      index = this.film.frames.length;
     }
-    this.currentStrokeIndex = null;
-    return this.drawCurrentFrame();
+    return this.film.frames.splice(index, 0, frame);
   };
 
   PencilTest.prototype.getCurrentFrame = function() {
-    return this.frames[this.currentFrameIndex];
+    return this.film.frames[this.currentFrameIndex];
   };
 
   PencilTest.prototype.getCurrentStroke = function() {
-    return this.getCurrentFrame().strokes[this.currentStrokeIndex];
+    return this.getCurrentFrame().strokes[this.currentStrokeIndex || 0];
   };
 
   PencilTest.prototype.mark = function(x, y) {
-    if (this.currentStrokeIndex === null) {
-      this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
-      this.drawSegmentStart = "M" + x + " " + y;
-      this.drawSegmentEnd = null;
-      this.getCurrentFrame().strokes.push([this.drawSegmentStart]);
-    } else {
+    if (this.currentStrokeIndex != null) {
       if (this.drawSegmentEnd) {
         this.drawSegmentStart = this.drawSegmentEnd.replace(/^L/, 'M');
       }
       this.drawSegmentEnd = "L" + x + " " + y;
       this.getCurrentStroke().push(this.drawSegmentEnd);
       this.field.path("" + this.drawSegmentStart + this.drawSegmentEnd);
+    } else {
+      this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
+      this.drawSegmentStart = "M" + x + " " + y;
+      this.drawSegmentEnd = null;
+      this.getCurrentFrame().strokes.push([this.drawSegmentStart]);
     }
     this.clearRedo();
     return this.unsavedChanges = true;
@@ -8696,13 +8716,12 @@ PencilTest = (function() {
     if (stop == null) {
       stop = false;
     }
-    if (newIndex < 0) {
-      this.newFrame('prepend');
-    } else if (newIndex >= this.frames.length) {
-      this.newFrame();
-    } else {
-      this.currentFrameIndex = newIndex;
+    if (newIndex < 0 || newIndex >= this.film.frames.length) {
+      newIndex = Math.max(0, Math.min(this.film.frames.length, newIndex));
+      this.newFrame(newIndex);
+      this.lift();
     }
+    this.currentFrameIndex = newIndex;
     this.drawCurrentFrame();
     if (stop !== false) {
       return this.stop();
@@ -8712,7 +8731,7 @@ PencilTest = (function() {
   PencilTest.prototype.play = function() {
     var self, stepListener;
     self = this;
-    if (this.currentFrameIndex < this.frames.length - 1) {
+    if (this.currentFrameIndex < this.film.frames.length - 1) {
       this.framesHeld = 0;
     } else {
       this.framesHeld = -1;
@@ -8724,7 +8743,7 @@ PencilTest = (function() {
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
         self.framesHeld = 0;
-        if (self.currentFrameIndex >= self.frames.length - 1) {
+        if (self.currentFrameIndex >= self.film.frames.length - 1) {
           if (self.options.loop) {
             return self.goToFrame(0);
           } else {
@@ -8762,7 +8781,7 @@ PencilTest = (function() {
         if (this.currentFrameIndex > i - 1) {
           this.drawFrame(this.currentFrameIndex - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
         }
-        if (this.currentFrameIndex < this.frames.length - i) {
+        if (this.currentFrameIndex < this.film.frames.length - i) {
           this.drawFrame(this.currentFrameIndex + i, "rgba(0,0,255," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
         }
       }
@@ -8776,7 +8795,7 @@ PencilTest = (function() {
     if (color == null) {
       color = null;
     }
-    _ref = this.frames[frameIndex].strokes;
+    _ref = this.film.frames[frameIndex].strokes;
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
@@ -8794,56 +8813,15 @@ PencilTest = (function() {
     return this.currentStrokeIndex = null;
   };
 
-  PencilTest.prototype.nextFrame = function(stop) {
-    if (stop == null) {
-      stop = false;
-    }
-    this.goToFrame(this.currentFrameIndex + 1);
-    if (stop) {
-      return this.stop();
-    }
-  };
-
-  PencilTest.prototype.prevFrame = function(stop) {
-    if (stop == null) {
-      stop = false;
-    }
-    this.goToFrame(this.currentFrameIndex - 1);
-    if (stop) {
-      return this.stop();
-    }
-  };
-
-  PencilTest.prototype.firstFrame = function(stop) {
-    if (stop == null) {
-      stop = false;
-    }
-    this.goToFrame(0);
-    if (stop) {
-      return this.stop();
-    }
-  };
-
-  PencilTest.prototype.lastFrame = function(stop) {
-    if (stop == null) {
-      stop = false;
-    }
-    this.goToFrame(this.frames.length - 1);
-    if (stop) {
-      return this.stop();
-    }
-  };
-
   PencilTest.prototype.dropFrame = function() {
-    this.frames.splice(this.currentFrameIndex, 1);
-    if (this.currentFrameIndex >= this.frames.length && this.currentFrameIndex > 0) {
+    this.film.frames.splice(this.currentFrameIndex, 1);
+    if (this.currentFrameIndex >= this.film.frames.length && this.currentFrameIndex > 0) {
       this.currentFrameIndex--;
     }
-    if (this.frames.length > 0) {
-      return this.drawCurrentFrame();
-    } else {
-      return this.newFrame();
+    if (this.film.frames.length === 0) {
+      this.newFrame();
     }
+    return this.drawCurrentFrame();
   };
 
   PencilTest.prototype.undo = function() {
@@ -8879,87 +8857,112 @@ PencilTest = (function() {
     if (this.options.showStatus) {
       markup = "" + this.options.frameRate + " FPS";
       markup += " | (hold " + (this.getCurrentFrame().hold) + ")";
-      markup += " | " + (this.currentFrameIndex + 1) + "/" + this.frames.length;
+      markup += " | " + (this.currentFrameIndex + 1) + "/" + this.film.frames.length;
       return this.statusElement.innerHTML = markup;
     }
   };
 
-  PencilTest.prototype.getSavedFilms = function() {
-    var error, filmData, films;
-    films = {};
-    filmData = window.localStorage.getItem('films');
-    if (filmData) {
-      try {
-        films = JSON.parse(filmData);
-      } catch (_error) {
-        error = _error;
-        Utils.log(error);
-      }
-    }
-    return films;
+  PencilTest.prototype.newFilm = function() {
+    this.film = {
+      name: '',
+      frames: []
+    };
+    this.newFrame();
+    return this.goToFrame(0);
   };
 
-  PencilTest.prototype.newFilm = function() {
-    this.frames = [];
-    return this.newFrame();
+  PencilTest.prototype.getFilmNames = function() {
+    var filmNamePattern, filmNames, reference, storageName;
+    filmNamePattern = /^film:/;
+    filmNames = [];
+    for (storageName in window.localStorage) {
+      reference = this.decodeStorageReference(storageName);
+      if (reference && reference.namespace === 'film') {
+        filmNames.push(reference.name);
+      }
+    }
+    return filmNames;
+  };
+
+  PencilTest.prototype.encodeStorageReference = function(namespace, name) {
+    return "" + namespace + ":" + name;
+  };
+
+  PencilTest.prototype.decodeStorageReference = function(encoded) {
+    var match;
+    if (match = encoded.match(/^(app|film):(.*)/)) {
+      return {
+        namespace: match[1],
+        name: match[2]
+      };
+    } else {
+      return false;
+    }
+  };
+
+  PencilTest.prototype.getStoredData = function(namespace, name) {
+    var storageName;
+    storageName = this.encodeStorageReference(namespace, name);
+    return JSON.parse(window.localStorage.getItem(storageName));
+  };
+
+  PencilTest.prototype.putStoredData = function(namespace, name, data) {
+    var storageName;
+    storageName = this.encodeStorageReference(namespace, name);
+    return window.localStorage.setItem(storageName, JSON.stringify(data));
   };
 
   PencilTest.prototype.saveFilm = function() {
-    var films, name;
-    films = this.getSavedFilms();
-    name = window.prompt("what will you name your film?");
-    if (name && ((films[name] == null) || Utils.confirm("Overwrite existing film \"" + name + "\"?"))) {
-      films[name] = this.frames;
-      window.localStorage.setItem('films', JSON.stringify(films));
+    var name;
+    name = window.prompt("what will you name your film?", this.film.name);
+    if (name) {
+      this.film.name = name;
+      this.putStoredData('film', name, this.film);
       return this.unsavedChanges = false;
     }
   };
 
-  PencilTest.prototype.loadFilm = function() {
-    var film, filmName, filmNames, films, loadFilmName, name, _i, _len;
-    films = this.getSavedFilms();
-    filmNames = [];
-    for (name in films) {
-      film = films[name];
-      filmNames.push(name);
-    }
+  PencilTest.prototype.selectFilmName = function(message) {
+    var filmName, filmNames, selectedFilmName, _i, _len;
+    filmNames = this.getFilmNames();
     if (filmNames.length) {
-      loadFilmName = window.prompt("Choose a film to load:\n\n" + (filmNames.join('\n')));
-      if (loadFilmName && !films[loadFilmName]) {
+      if (message == null) {
+        message = 'Choose a film';
+      }
+      selectedFilmName = window.prompt("" + message + ":\n\n" + (filmNames.join('\n')));
+      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
         for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
           filmName = filmNames[_i];
-          if (RegExp(loadFilmName).test(filmName)) {
-            loadFilmName = filmName;
+          if (RegExp(selectedFilmName).test(filmName)) {
+            selectedFilmName = filmName;
           }
         }
       }
-      if (loadFilmName) {
-        this.frames = films[loadFilmName];
-        this.goToFrame(0);
-        this.updateStatus();
-        return this.unsavedChanges = false;
+      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
+        return selectedFilmName;
       } else {
-        return Utils.alert("No film by that name.");
+        Utils.alert("No film by that name.");
       }
     } else {
-      return Utils.alert("You don't have any saved films yet.");
+      Utils.alert("You don't have any saved films yet.");
+    }
+    return false;
+  };
+
+  PencilTest.prototype.loadFilm = function() {
+    var name;
+    if (name = this.selectFilmName('Choose a film to load')) {
+      this.film = this.getStoredData('film', name);
+      this.goToFrame(0);
+      this.updateStatus();
+      return this.unsavedChanges = false;
     }
   };
 
   PencilTest.prototype.deleteFilm = function() {
-    var deleteFilmName, film, filmNames, films, name;
-    films = this.getSavedFilms();
-    filmNames = [];
-    for (name in films) {
-      film = films[name];
-      filmNames.push(name);
-    }
-    if (filmNames.length) {
-      deleteFilmName = window.prompt("Choose a film to DELETE...FOREVER:\n\n" + (filmNames.join('\n')));
-      if (films[deleteFilmName]) {
-        delete films[deleteFilmName];
-        return window.localStorage.setItem('films', JSON.stringify(films));
-      }
+    var filmName;
+    if (filmName = this.selectFilmName('Choose a film to DELETE...FOREVER')) {
+      return window.localStorage.removeItem(this.encodeStorageReference('film', filmName));
     }
   };
 
