@@ -5,9 +5,9 @@ global: document, window
 class PencilTest
 
   constructor: (@options) ->
+    savedOptions = @getStoredData 'app', 'options'
     for key, value of {
-      container: document.body
-      containerSelector: 'body'
+      container: 'body'
       hideCursor: false
       loop: true
       showStatus: true
@@ -16,9 +16,10 @@ class PencilTest
       onionSkinRange: 4
       onionSkinOpacity: 0.5
     }
+      @options[key] = savedOptions[key] if savedOptions and typeof savedOptions[key] isnt 'undefined'
       @options[key] = value if typeof @options[key] is 'undefined'
 
-    @container = @options.container or document.querySelector @options.containerSelector
+    @container = document.querySelector @options.container
     @container.className = 'penciltest-app'
 
     @buildContainer()
@@ -42,19 +43,34 @@ class PencilTest
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
-      action: -> @nextFrame 'stop'
+      action: ->
+        @goToFrame @currentFrameIndex + 1
+        @stop()
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
-      action: -> @prevFrame 'stop'
+      action: ->
+        @goToFrame @currentFrameIndex - 1
+        @stop()
     firstFrame:
       label: "First Frame"
       hotkey: ['Down']
-      action: -> @firstFrame 'stop'
+      action: ->
+        @goToFrame 0
+        @stop()
     lastFrame:
       label: "Last Frame"
       hotkey: ['Up']
-      action: -> @lastFrame 'stop'
+      action: ->
+        @goToFrame @film.frames.length - 1
+        @stop()
+    insertFrame:
+      label: "Insert Frame"
+      hotkey: ['I']
+      action: ->
+        newIndex = @currentFrameIndex + 1
+        @newFrame newIndex
+        @goToFrame newIndex
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
@@ -116,6 +132,10 @@ class PencilTest
       hotkey: ['Ctrl+N']
       repeat: true
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+    deleteFilm:
+      label: "Delete Film"
+      hotkey: ['Ctrl+Backspace']
+      listener: -> @deleteFilm()
     showHelp:
       label: "Help"
       title: "Show Keyboard Shortcuts"
@@ -268,41 +288,36 @@ class PencilTest
   addOtherListeners: ->
     self = @
     window.addEventListener 'beforeunload', ->
+      self.putStoredData 'app', 'options', self.options
       event.returnValue = "You have unsaved changes. Ctrl+S to save." if self.unsavedChanges
 
-  newFrame: (prepend = false) ->
-    newFrame =
+  newFrame: (index = null) ->
+    frame =
       hold: 1
       strokes: []
 
-    if prepend isnt false
-      @currentFrameIndex = 0
-      @frames.unshift newFrame
-    else
-      @currentFrameIndex = @frames.length
-      @frames.push newFrame
+    if index is null
+      index = @film.frames.length
 
-    @currentStrokeIndex = null
-
-    @drawCurrentFrame()
+    @film.frames.splice index, 0, frame
 
   getCurrentFrame: ->
-    @frames[@currentFrameIndex]
+    @film.frames[@currentFrameIndex]
 
   getCurrentStroke: ->
-    @getCurrentFrame().strokes[@currentStrokeIndex]
+    @getCurrentFrame().strokes[@currentStrokeIndex or 0]
 
   mark: (x,y) ->
-    if @currentStrokeIndex is null
-      @currentStrokeIndex = @getCurrentFrame().strokes.length
-      @drawSegmentStart = "M#{x} #{y}"
-      @drawSegmentEnd = null
-      @getCurrentFrame().strokes.push [@drawSegmentStart]
-    else
+    if @currentStrokeIndex?
       @drawSegmentStart = @drawSegmentEnd.replace(/^L/, 'M') if @drawSegmentEnd
       @drawSegmentEnd = "L#{x} #{y}"
       @getCurrentStroke().push @drawSegmentEnd
       @field.path "#{@drawSegmentStart}#{@drawSegmentEnd}"
+    else
+      @currentStrokeIndex = @getCurrentFrame().strokes.length
+      @drawSegmentStart = "M#{x} #{y}"
+      @drawSegmentEnd = null
+      @getCurrentFrame().strokes.push [@drawSegmentStart]
 
     @clearRedo()
     @unsavedChanges = true
@@ -330,19 +345,18 @@ class PencilTest
 
   goToFrame: (newIndex, stop = false) ->
 
-    if newIndex < 0
-      @newFrame 'prepend'
-    else if newIndex >= @frames.length
-      @newFrame()
-    else
-      @currentFrameIndex = newIndex
+    if newIndex < 0 or newIndex >= @film.frames.length
+      newIndex = Math.max 0, Math.min @film.frames.length, newIndex
+      @newFrame newIndex
+      @lift()
 
+    @currentFrameIndex = newIndex
     @drawCurrentFrame()
     if stop isnt false then @stop()
 
   play: ->
     self = @
-    if @currentFrameIndex < @frames.length - 1
+    if @currentFrameIndex < @film.frames.length - 1
       @framesHeld = 0
     else
       @framesHeld = -1
@@ -353,7 +367,7 @@ class PencilTest
       currentFrame = self.getCurrentFrame()
       if self.framesHeld >= currentFrame.hold
         self.framesHeld = 0
-        if self.currentFrameIndex >= self.frames.length - 1
+        if self.currentFrameIndex >= self.film.frames.length - 1
           if self.options.loop
             self.goToFrame 0
           else
@@ -379,42 +393,26 @@ class PencilTest
       for i in [0...@options.onionSkinRange]
         if @currentFrameIndex > i - 1
           @drawFrame @currentFrameIndex - i, "rgba(255,0,0,#{Math.pow(@options.onionSkinOpacity, i)})"
-        if @currentFrameIndex < @frames.length - i
+        if @currentFrameIndex < @film.frames.length - i
           @drawFrame @currentFrameIndex + i, "rgba(0,0,255,#{Math.pow(@options.onionSkinOpacity, i)})"
     @drawFrame @currentFrameIndex
     @updateStatus()
 
   drawFrame: (frameIndex, color = null) ->
-    for stroke in @frames[frameIndex].strokes
+    for stroke in @film.frames[frameIndex].strokes
       path = @field.path stroke.join ''
       path[0].style.stroke = color if color
 
   lift: ->
     @currentStrokeIndex = null
 
-  nextFrame: (stop = false) ->
-    @goToFrame @currentFrameIndex + 1
-    @stop() if stop
-
-  prevFrame: (stop = false) ->
-    @goToFrame @currentFrameIndex - 1
-    @stop() if stop
-
-  firstFrame: (stop = false) ->
-    @goToFrame 0
-    @stop() if stop
-
-  lastFrame: (stop = false) ->
-    @goToFrame @frames.length - 1
-    @stop() if stop
-
   dropFrame: ->
-    @frames.splice @currentFrameIndex, 1
-    @currentFrameIndex-- if @currentFrameIndex >= @frames.length and @currentFrameIndex > 0
-    if @frames.length > 0
-      @drawCurrentFrame()
-    else
+    @film.frames.splice @currentFrameIndex, 1
+    @currentFrameIndex-- if @currentFrameIndex >= @film.frames.length and @currentFrameIndex > 0
+    if @film.frames.length is 0
       @newFrame()
+
+    @drawCurrentFrame()
 
   undo: ->
     if @getCurrentFrame().strokes and @getCurrentFrame().strokes.length
@@ -440,62 +438,82 @@ class PencilTest
     if @options.showStatus
       markup = "#{@options.frameRate} FPS"
       markup += " | (hold #{@getCurrentFrame().hold})"
-      markup += " | #{@currentFrameIndex + 1}/#{@frames.length}"
+      markup += " | #{@currentFrameIndex + 1}/#{@film.frames.length}"
       @statusElement.innerHTML = markup
 
-  getSavedFilms: ->
-    films = {}
-    filmData = window.localStorage.getItem 'films'
-    if filmData
-      try
-        films = JSON.parse filmData
-      catch error
-        Utils.log error
-
-    films
-
   newFilm: ->
-    @frames = []
+    @film =
+      name: ''
+      frames: []
+
     @newFrame()
+    @goToFrame 0
+
+  getFilmNames: ->
+    filmNamePattern = /^film:/
+    filmNames = []
+    for storageName of window.localStorage
+      reference = @decodeStorageReference storageName
+      if reference and reference.namespace is 'film'
+        filmNames.push reference.name
+    filmNames
+
+  encodeStorageReference: (namespace, name) ->
+    "#{namespace}:#{name}"
+
+  decodeStorageReference: (encoded) ->
+    if match = encoded.match /^(app|film):(.*)/
+      {
+        namespace: match[1]
+        name: match[2]
+      }
+    else
+      false
+
+  getStoredData: (namespace, name) ->
+    storageName = @encodeStorageReference namespace, name
+    JSON.parse window.localStorage.getItem storageName
+
+  putStoredData: (namespace, name, data) ->
+    storageName = @encodeStorageReference namespace, name
+    window.localStorage.setItem storageName, JSON.stringify data
 
   saveFilm: ->
-    films = @getSavedFilms()
-    name = window.prompt "what will you name your film?"
-    if name and (not films[name]? or Utils.confirm "Overwrite existing film \"#{name}\"?")
-      films[name] = @frames
-      window.localStorage.setItem 'films', JSON.stringify films
+    name = window.prompt "what will you name your film?", @film.name
+    if name
+      @film.name = name
+      @putStoredData 'film', name, @film
       @unsavedChanges = false
 
-  loadFilm: ->
-    films = @getSavedFilms()
-    filmNames = []
-    filmNames.push name for name, film of films
+  selectFilmName: (message) ->
+    filmNames = @getFilmNames()
     if filmNames.length
-      loadFilmName = window.prompt "Choose a film to load:\n\n#{filmNames.join '\n'}"
+      message ?= 'Choose a film'
+      selectedFilmName = window.prompt "#{message}:\n\n#{filmNames.join '\n'}"
 
-      if loadFilmName and not films[loadFilmName]
+      if selectedFilmName and filmNames.indexOf selectedFilmName is -1
         for filmName in filmNames
-          loadFilmName = filmName if RegExp(loadFilmName).test filmName
+          selectedFilmName = filmName if RegExp(selectedFilmName).test filmName
 
-      if loadFilmName
-        @frames = films[loadFilmName]
-        @goToFrame 0
-        @updateStatus()
-        @unsavedChanges = false
+      if selectedFilmName and filmNames.indexOf selectedFilmName is -1
+        return selectedFilmName
       else
         Utils.alert "No film by that name."
     else
       Utils.alert "You don't have any saved films yet."
 
+    false
+
+  loadFilm: ->
+    if name = @selectFilmName 'Choose a film to load'
+      @film = @getStoredData 'film', name
+      @goToFrame 0
+      @updateStatus()
+      @unsavedChanges = false
+
   deleteFilm: ->
-    films = @getSavedFilms()
-    filmNames = []
-    filmNames.push name for name, film of films
-    if filmNames.length
-      deleteFilmName = window.prompt "Choose a film to DELETE...FOREVER:\n\n#{filmNames.join '\n'}"
-      if films[deleteFilmName]
-        delete films[deleteFilmName]
-        window.localStorage.setItem 'films', JSON.stringify films
+    if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'
+      window.localStorage.removeItem @encodeStorageReference 'film', filmName
 
   showHelp: ->
     helpDoc = 'Keyboard Shortcuts:\n'

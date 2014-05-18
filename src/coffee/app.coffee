@@ -6,6 +6,6 @@ global: window, document
 window.addEventListener 'load', ->
 
   window.penciltest = new PencilTest
-    container: document.getElementById 'penciltest'
+    container: '#penciltest'
 
   Utils.log window.penciltest
