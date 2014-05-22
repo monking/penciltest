@@ -43,12 +43,14 @@ class PencilTest
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
+      repeat: true
       listener: ->
         @goToFrame @currentFrameIndex + 1
         @stop()
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
+      repeat: true
       listener: ->
         @goToFrame @currentFrameIndex - 1
         @stop()
@@ -64,8 +66,15 @@ class PencilTest
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
-    insertFrame:
-      label: "Insert Frame"
+    insertFrameBefore:
+      label: "Insert Frame Before"
+      hotkey: ['Shift+I']
+      listener: ->
+        newIndex = @currentFrameIndex
+        @newFrame newIndex
+        @goToFrame newIndex
+    insertFrameAfter:
+      label: "Insert Frame After"
       hotkey: ['I']
       listener: ->
         newIndex = @currentFrameIndex + 1
@@ -155,7 +164,8 @@ class PencilTest
     Edit: [
       'undo'
       'redo'
-      'insertFrame'
+      'insertFrameAfter'
+      'insertFrameBefore'
       'dropFrame'
       'moreHold'
       'lessHold'
@@ -390,11 +400,7 @@ class PencilTest
     @drawCurrentFrame()
 
   goToFrame: (newIndex, stop = false) ->
-
-    if newIndex < 0 or newIndex >= @film.frames.length
-      newIndex = Math.max 0, Math.min @film.frames.length, newIndex
-      @newFrame newIndex
-      @lift()
+    newIndex = Math.max 0, Math.min @film.frames.length - 1, newIndex
 
     @currentFrameIndex = newIndex
     @drawCurrentFrame()

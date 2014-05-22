@@ -57,6 +57,7 @@ PencilTest = (function() {
     nextFrame: {
       label: "Next Frame",
       hotkey: ['Right', '.'],
+      repeat: true,
       listener: function() {
         this.goToFrame(this.currentFrameIndex + 1);
         return this.stop();
@@ -65,6 +66,7 @@ PencilTest = (function() {
     prevFrame: {
       label: "Previous Frame",
       hotkey: ['Left', ','],
+      repeat: true,
       listener: function() {
         this.goToFrame(this.currentFrameIndex - 1);
         return this.stop();
@@ -86,8 +88,18 @@ PencilTest = (function() {
         return this.stop();
       }
     },
-    insertFrame: {
-      label: "Insert Frame",
+    insertFrameBefore: {
+      label: "Insert Frame Before",
+      hotkey: ['Shift+I'],
+      listener: function() {
+        var newIndex;
+        newIndex = this.currentFrameIndex;
+        this.newFrame(newIndex);
+        return this.goToFrame(newIndex);
+      }
+    },
+    insertFrameAfter: {
+      label: "Insert Frame After",
       hotkey: ['I'],
       listener: function() {
         var newIndex;
@@ -220,7 +232,7 @@ PencilTest = (function() {
   PencilTest.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrame', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'showStatus'],
       Film: ['saveFilm', 'loadFilm', 'newFilm']
@@ -513,11 +525,7 @@ PencilTest = (function() {
     if (stop == null) {
       stop = false;
     }
-    if (newIndex < 0 || newIndex >= this.film.frames.length) {
-      newIndex = Math.max(0, Math.min(this.film.frames.length, newIndex));
-      this.newFrame(newIndex);
-      this.lift();
-    }
+    newIndex = Math.max(0, Math.min(this.film.frames.length - 1, newIndex));
     this.currentFrameIndex = newIndex;
     this.drawCurrentFrame();
     if (stop !== false) {
