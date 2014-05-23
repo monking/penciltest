@@ -39,7 +39,17 @@ class PencilTest
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
-      listener: -> @togglePlay()
+      cancelComplement: true
+      listener: ->
+        @playDirection = 1
+        @togglePlay()
+    playReverse:
+      label: "Play in Reverse"
+      hotkey: ['Shift+Space']
+      cancelComplement: true
+      listener: ->
+        @playDirection = -1
+        @togglePlay()
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
@@ -57,12 +67,14 @@ class PencilTest
     firstFrame:
       label: "First Frame"
       hotkey: ['Home','PgUp']
+      cancelComplement: true
       listener: ->
         @goToFrame 0
         @stop()
     lastFrame:
       label: "Last Frame"
       hotkey: ['End','PgDn']
+      cancelComplement: true
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
@@ -147,6 +159,27 @@ class PencilTest
       label: "Delete Film"
       hotkey: ['Alt+Backspace']
       listener: -> @deleteFilm()
+    exportFilm:
+      label: "Export"
+      hotkey: ['Alt+E']
+      cancelComplement: true
+      listener: ->
+        if @textElement.innerHTML
+          @textElement.innerHTML = JSON.stringify @film
+        else
+          Utils.toggleClass @textElement, 'active', true
+    importFilm:
+      label: "Import"
+      hotkey: ['Alt+I']
+      cancelComplement: true
+      listener: ->
+        if @textElement.innerHTML
+          @film = JSON.parse @textElement.innerHTML
+          @drawCurrentFrame()
+          @textElement.innerHTML = ''
+          Utils.toggleClass @textElement, 'active', false
+        else
+          Utils.toggleClass @textElement, 'active', true
     showHelp:
       label: "Help"
       title: "Show Keyboard Shortcuts"
@@ -182,6 +215,8 @@ class PencilTest
       'saveFilm'
       'loadFilm'
       'newFilm'
+      'importFilm'
+      'exportFilm'
     ]
     'showHelp'
   ]
@@ -190,6 +225,7 @@ class PencilTest
     markup = '<div class="field">' +
       '<div class="status"></div>' +
     '</div>' +
+    '<textarea></textarea>' +
     '<ul class="menu">' +
     @menuWalker(@menuOptions) +
     '</ul>'
@@ -311,6 +347,8 @@ class PencilTest
       option.addEventListener 'touchend', menuOptionListener
       option.addEventListener 'contextmenu', menuOptionListener
 
+    @textElement = @container.querySelector 'textarea'
+
   addKeyboardListeners: ->
     self = @
 
@@ -323,17 +361,26 @@ class PencilTest
         for hotkey in action.hotkey
           if action.repeat
             @keyBindings.keydown[hotkey] = name
+
+            if action.cancelComplement
+              @keyBindings.keyup[hotkey] = null
+
           else
+
             @keyBindings.keyup[hotkey] = name
+
+            if action.cancelComplement
+              @keyBindings.keydown[hotkey] = null
 
     keyboardListener = (event) ->
       combo = Utils.describeKeyCombo event
       actionName = self.keyBindings[event.type][combo]
-      if actionName
+
+      if actionName or actionName is null
         event.preventDefault()
-        self.doAppAction actionName
-      else if self.keyBindings.keydown[combo]
-        event.preventDefault()
+
+        if actionName
+          self.doAppAction actionName
 
       # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
@@ -408,6 +455,7 @@ class PencilTest
 
   play: ->
     self = @
+    @playDirection ?= 1
     if @currentFrameIndex < @film.frames.length - 1
       @framesHeld = 0
     else
@@ -419,13 +467,15 @@ class PencilTest
       currentFrame = self.getCurrentFrame()
       if self.framesHeld >= currentFrame.hold
         self.framesHeld = 0
-        if self.currentFrameIndex >= self.film.frames.length - 1
+        newIndex = self.currentFrameIndex + self.playDirection
+        if newIndex >= self.film.frames.length or newIndex < 0
           if self.options.loop
-            self.goToFrame 0
+            newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
+            self.goToFrame newIndex
           else
             self.stop()
         else
-          self.goToFrame self.currentFrameIndex + 1
+          self.goToFrame newIndex
 
     @stop()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
