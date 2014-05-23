@@ -130,3 +130,24 @@
 .penciltest-app.menu-visible .menu {
   display: block;
 }
+.penciltest-app textarea {
+  position: fixed;
+  width: 30%;
+  height: 100%;
+  top: 0;
+  right: -30%;
+  color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(0, 0, 0, 0.5);
+  border: none;
+  -webkit-transition-property: right;
+  -moz-transition-property: right;
+  -o-transition-property: right;
+  transition-property: right;
+  -webkit-transition-duration: 0.3s;
+  -moz-transition-duration: 0.3s;
+  -o-transition-duration: 0.3s;
+  transition-duration: 0.3s;
+}
+.penciltest-app textarea.active {
+  right: 0%;
+}

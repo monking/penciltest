@@ -8299,7 +8299,18 @@ PencilTest = (function() {
     playPause: {
       label: "Play/Pause",
       hotkey: ['Space'],
+      cancelComplement: true,
       listener: function() {
+        this.playDirection = 1;
+        return this.togglePlay();
+      }
+    },
+    playReverse: {
+      label: "Play in Reverse",
+      hotkey: ['Shift+Space'],
+      cancelComplement: true,
+      listener: function() {
+        this.playDirection = -1;
         return this.togglePlay();
       }
     },
@@ -8324,6 +8335,7 @@ PencilTest = (function() {
     firstFrame: {
       label: "First Frame",
       hotkey: ['Home', 'PgUp'],
+      cancelComplement: true,
       listener: function() {
         this.goToFrame(0);
         return this.stop();
@@ -8332,6 +8344,7 @@ PencilTest = (function() {
     lastFrame: {
       label: "Last Frame",
       hotkey: ['End', 'PgDn'],
+      cancelComplement: true,
       listener: function() {
         this.goToFrame(this.film.frames.length - 1);
         return this.stop();
@@ -8468,6 +8481,33 @@ PencilTest = (function() {
         return this.deleteFilm();
       }
     },
+    exportFilm: {
+      label: "Export",
+      hotkey: ['Alt+E'],
+      cancelComplement: true,
+      listener: function() {
+        if (this.textElement.innerHTML) {
+          return this.textElement.innerHTML = JSON.stringify(this.film);
+        } else {
+          return Utils.toggleClass(this.textElement, 'active', true);
+        }
+      }
+    },
+    importFilm: {
+      label: "Import",
+      hotkey: ['Alt+I'],
+      cancelComplement: true,
+      listener: function() {
+        if (this.textElement.innerHTML) {
+          this.film = JSON.parse(this.textElement.innerHTML);
+          this.drawCurrentFrame();
+          this.textElement.innerHTML = '';
+          return Utils.toggleClass(this.textElement, 'active', false);
+        } else {
+          return Utils.toggleClass(this.textElement, 'active', true);
+        }
+      }
+    },
     showHelp: {
       label: "Help",
       title: "Show Keyboard Shortcuts",
@@ -8484,13 +8524,13 @@ PencilTest = (function() {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'showStatus'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm']
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm']
     }, 'showHelp'
   ];
 
   PencilTest.prototype.buildContainer = function() {
     var markup;
-    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
+    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<textarea></textarea>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
     this.container.innerHTML = markup;
     this.fieldElement = this.container.querySelector('.field');
     this.field = new Raphael(this.fieldElement);
@@ -8607,7 +8647,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addMenuListeners = function() {
-    var menuOptionListener, option, self, _i, _len, _ref, _results;
+    var menuOptionListener, option, self, _i, _len, _ref;
     self = this;
     this.menuElement = this.container.querySelector('.menu');
     this.menuItems = this.menuElement.querySelectorAll('LI');
@@ -8623,14 +8663,13 @@ PencilTest = (function() {
       }
     };
     _ref = this.menuItems;
-    _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       option = _ref[_i];
       option.addEventListener('mouseup', menuOptionListener);
       option.addEventListener('touchend', menuOptionListener);
-      _results.push(option.addEventListener('contextmenu', menuOptionListener));
+      option.addEventListener('contextmenu', menuOptionListener);
     }
-    return _results;
+    return this.textElement = this.container.querySelector('textarea');
   };
 
   PencilTest.prototype.addKeyboardListeners = function() {
@@ -8649,8 +8688,14 @@ PencilTest = (function() {
           hotkey = _ref1[_i];
           if (action.repeat) {
             this.keyBindings.keydown[hotkey] = name;
+            if (action.cancelComplement) {
+              this.keyBindings.keyup[hotkey] = null;
+            }
           } else {
             this.keyBindings.keyup[hotkey] = name;
+            if (action.cancelComplement) {
+              this.keyBindings.keydown[hotkey] = null;
+            }
           }
         }
       }
@@ -8659,11 +8704,11 @@ PencilTest = (function() {
       var actionName, combo;
       combo = Utils.describeKeyCombo(event);
       actionName = self.keyBindings[event.type][combo];
-      if (actionName) {
+      if (actionName || actionName === null) {
         event.preventDefault();
-        return self.doAppAction(actionName);
-      } else if (self.keyBindings.keydown[combo]) {
-        return event.preventDefault();
+        if (actionName) {
+          return self.doAppAction(actionName);
+        }
       }
     };
     document.body.addEventListener('keydown', keyboardListener);
@@ -8785,6 +8830,9 @@ PencilTest = (function() {
   PencilTest.prototype.play = function() {
     var self, stepListener;
     self = this;
+    if (this.playDirection == null) {
+      this.playDirection = 1;
+    }
     if (this.currentFrameIndex < this.film.frames.length - 1) {
       this.framesHeld = 0;
     } else {
@@ -8792,19 +8840,21 @@ PencilTest = (function() {
       this.goToFrame(0);
     }
     stepListener = function() {
-      var currentFrame;
+      var currentFrame, newIndex;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
         self.framesHeld = 0;
-        if (self.currentFrameIndex >= self.film.frames.length - 1) {
+        newIndex = self.currentFrameIndex + self.playDirection;
+        if (newIndex >= self.film.frames.length || newIndex < 0) {
           if (self.options.loop) {
-            return self.goToFrame(0);
+            newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
+            return self.goToFrame(newIndex);
           } else {
             return self.stop();
           }
         } else {
-          return self.goToFrame(self.currentFrameIndex + 1);
+          return self.goToFrame(newIndex);
         }
       }
     };
