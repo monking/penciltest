@@ -6,10 +6,11 @@ var Utils, code, name, _base, _i, _ref;
 
 Utils = {
   toggleClass: function(element, className, presence) {
-    var classIndex, classes;
+    var added, classIndex, classes;
     if (presence == null) {
       presence = null;
     }
+    added = false;
     classes = element.className.split(/\s+/);
     classIndex = classes.indexOf(className);
     if (classIndex > -1) {
@@ -18,8 +19,10 @@ Utils = {
       }
     } else if (presence !== false) {
       classes.push(className);
+      added = true;
     }
-    return element.className = classes.join(' ');
+    element.className = classes.join(' ');
+    return added;
   },
   log: function() {
     return console.log(arguments[0]);

@@ -8124,10 +8124,11 @@ var Utils, code, name, _base, _i, _ref;
 
 Utils = {
   toggleClass: function(element, className, presence) {
-    var classIndex, classes;
+    var added, classIndex, classes;
     if (presence == null) {
       presence = null;
     }
+    added = false;
     classes = element.className.split(/\s+/);
     classIndex = classes.indexOf(className);
     if (classIndex > -1) {
@@ -8136,8 +8137,10 @@ Utils = {
       }
     } else if (presence !== false) {
       classes.push(className);
+      added = true;
     }
-    return element.className = classes.join(' ');
+    element.className = classes.join(' ');
+    return added;
   },
   log: function() {
     return console.log(arguments[0]);
@@ -8486,10 +8489,12 @@ PencilTest = (function() {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        if (this.textElement.innerHTML) {
-          return this.textElement.innerHTML = JSON.stringify(this.film);
+        var open;
+        open = Utils.toggleClass(this.textElement, 'active');
+        if (open) {
+          return this.textElement.value = JSON.stringify(this.film);
         } else {
-          return Utils.toggleClass(this.textElement, 'active', true);
+          return this.textElement.value = '';
         }
       }
     },
@@ -8498,13 +8503,16 @@ PencilTest = (function() {
       hotkey: ['Alt+I'],
       cancelComplement: true,
       listener: function() {
-        if (this.textElement.innerHTML) {
-          this.film = JSON.parse(this.textElement.innerHTML);
-          this.drawCurrentFrame();
-          this.textElement.innerHTML = '';
-          return Utils.toggleClass(this.textElement, 'active', false);
+        var importJSON, open;
+        open = Utils.toggleClass(this.textElement, 'active');
+        if (open) {
+          return this.textElement.value = '';
         } else {
-          return Utils.toggleClass(this.textElement, 'active', true);
+          importJSON = this.textElement.value;
+          try {
+            this.setFilm(JSON.parse(importJSON));
+          } catch (_error) {}
+          return this.textElement.value = '';
         }
       }
     },
@@ -9053,13 +9061,17 @@ PencilTest = (function() {
     return false;
   };
 
+  PencilTest.prototype.setFilm = function(film) {
+    this.film = film;
+    this.goToFrame(0);
+    this.updateStatus();
+    return this.unsavedChanges = false;
+  };
+
   PencilTest.prototype.loadFilm = function() {
     var name;
     if (name = this.selectFilmName('Choose a film to load')) {
-      this.film = this.getStoredData('film', name);
-      this.goToFrame(0);
-      this.updateStatus();
-      return this.unsavedChanges = false;
+      return this.setFilm(this.getStoredData('film', name));
     }
   };
 

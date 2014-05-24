@@ -164,22 +164,24 @@ class PencilTest
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        if @textElement.innerHTML
-          @textElement.innerHTML = JSON.stringify @film
+        open = Utils.toggleClass @textElement, 'active'
+        if open
+          @textElement.value = JSON.stringify @film
         else
-          Utils.toggleClass @textElement, 'active', true
+          @textElement.value = ''
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        if @textElement.innerHTML
-          @film = JSON.parse @textElement.innerHTML
-          @drawCurrentFrame()
-          @textElement.innerHTML = ''
-          Utils.toggleClass @textElement, 'active', false
+        open = Utils.toggleClass @textElement, 'active'
+        if open
+          @textElement.value = ''
         else
-          Utils.toggleClass @textElement, 'active', true
+          importJSON = @textElement.value
+          try
+            @setFilm JSON.parse importJSON
+          @textElement.value = ''
     showHelp:
       label: "Help"
       title: "Show Keyboard Shortcuts"
@@ -606,12 +608,15 @@ class PencilTest
 
     false
 
+  setFilm: (film) ->
+    @film = film
+    @goToFrame 0
+    @updateStatus()
+    @unsavedChanges = false
+
   loadFilm: ->
     if name = @selectFilmName 'Choose a film to load'
-      @film = @getStoredData 'film', name
-      @goToFrame 0
-      @updateStatus()
-      @unsavedChanges = false
+      @setFilm @getStoredData 'film', name
 
   deleteFilm: ->
     if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'

@@ -5,13 +5,16 @@ global: document, window
 Utils =
 
   toggleClass: (element, className, presence = null) ->
+    added = false
     classes = element.className.split /\s+/
     classIndex = classes.indexOf className
     if classIndex > -1
       classes.splice classIndex, 1 if presence isnt true
     else if presence isnt false
       classes.push className
+      added = true
     element.className = classes.join ' '
+    added
 
   log: ->
     # window.location.hash = arguments[0].toString()
