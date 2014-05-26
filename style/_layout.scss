@@ -25,12 +25,19 @@
       bottom: -2em;
       right: 0;
       width: 100%;
-      text-align: right;
       font-family: monospace;
       color: $white;
 
       &.hidden {
         display: none;
+      }
+
+      .settings {
+        float: left;
+      }
+
+      .frame {
+        float: right;
       }
     }
   }

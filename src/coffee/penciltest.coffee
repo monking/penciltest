@@ -4,20 +4,34 @@ global: document, window
 
 class PencilTest
 
-  constructor: (@options) ->
-    savedOptions = @getStoredData 'app', 'options'
-    for key, value of {
-      container: 'body'
-      hideCursor: false
-      loop: true
-      showStatus: true
-      frameRate: 12
-      onionSkin: true
-      onionSkinRange: 4
-      onionSkinOpacity: 0.5
-    }
-      @options[key] = savedOptions[key] if savedOptions and typeof savedOptions[key] isnt 'undefined'
-      @options[key] = value if typeof @options[key] is 'undefined'
+  states:
+    DRAWING: 'drawing'
+    BUSY: 'working'
+    PLAYING: 'playing'
+
+  constructor: (options) ->
+    @options = Utils.inherit(
+      @getStoredData 'app', 'options'
+      options
+      {
+        container: 'body'
+        hideCursor: false
+        loop: true
+        showStatus: true
+        frameRate: 12
+        onionSkin: true
+        smoothing: 3
+        onionSkinRange: 4
+        onionSkinOpacity: 0.5
+      }
+    )
+
+    @state = Utils.inherit(
+      @getStoredData 'app', 'state'
+      {
+        mode: PencilTest.prototype.states.DRAWING
+      }
+    )
 
     @container = document.querySelector @options.container
     @container.className = 'penciltest-app'
@@ -33,7 +47,7 @@ class PencilTest
 
     @newFilm()
 
-    window.penciltest = @
+    window.pt = @
 
   appActions:
     playPause:
@@ -119,7 +133,24 @@ class PencilTest
     dropFrame:
       label: "Drop Frame"
       hotkey: ['Backspace']
+      cancelComplement: true
       listener: -> @dropFrame()
+    smoothing:
+      label: "Smoothing..."
+      title: "How much your lines will be smoothed as you draw"
+      hotkey: ['Shift+S']
+      listener: -> @options.smoothing = Number Utils.prompt('Smoothing', @options.smoothing)
+      action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
+    smoothFrame:
+      label: "Smooth Frame"
+      title: "Draw the frame again, with current smoothing settings"
+      hotkey: ['Shift+M']
+      listener: -> @smoothFrame @currentFrameIndex
+    smoothFilm:
+      label: "Smooth All Frames"
+      title: "Redraw all frames in the film with the current smoothing setting"
+      hotkey: ['Alt+Shift+M']
+      listener: -> @smoothFilm()
     lessHold:
       label: "Shorter Frame Hold"
       hotkey: ['Down', '-']
@@ -212,6 +243,9 @@ class PencilTest
       'hideCursor'
       'onionSkin'
       'showStatus'
+      'smoothing'
+      'smoothFrame'
+      'smoothFilm'
     ]
     Film: [
       'saveFilm'
@@ -272,11 +306,12 @@ class PencilTest
 
       {x: eventLocation.pageX, y: eventLocation.pageY}
 
-    markFromEvent = (event) ->
-      coords = getEventPageXY event
-      self.mark(
-        coords.x - self.fieldElement.offsetLeft,
-        coords.y - self.fieldElement.offsetTop
+    trackFromEvent = (event) ->
+      pageCoords = getEventPageXY event
+
+      self.track(
+        pageCoords.x - self.fieldElement.offsetLeft,
+        pageCoords.y - self.fieldElement.offsetTop
       )
 
     mouseDownListener = (event) ->
@@ -293,7 +328,7 @@ class PencilTest
         else
           self.hideMenu()
 
-        markFromEvent event
+        trackFromEvent event
         document.body.addEventListener 'mousemove', mouseMoveListener
         document.body.addEventListener 'touchmove', mouseMoveListener
         document.body.addEventListener 'mouseup', mouseUpListener
@@ -301,7 +336,7 @@ class PencilTest
 
     mouseMoveListener = (event) ->
       event.preventDefault()
-      markFromEvent event if not self.isPlaying
+      trackFromEvent event if self.state is PencilTest.prototype.states.DRAWING
 
     mouseUpListener = (event) ->
       if event.button is 2
@@ -393,6 +428,7 @@ class PencilTest
     self = @
     window.addEventListener 'beforeunload', ->
       self.putStoredData 'app', 'options', self.options
+      self.putStoredData 'app', 'state', self.state
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.unsavedChanges
 
   newFrame: (index = null) ->
@@ -412,6 +448,9 @@ class PencilTest
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
 
   mark: (x,y) ->
+    x = Math.round(x * 10) / 10
+    y = Math.round(y * 10) / 10
+
     if @currentStrokeIndex?
       @drawSegmentStart = @drawSegmentEnd.replace(/^L/, 'M') if @drawSegmentEnd
       @drawSegmentEnd = "L#{x} #{y}"
@@ -425,6 +464,29 @@ class PencilTest
 
     @clearRedo()
     @unsavedChanges = true
+
+  track: (x,y) ->
+    coords =
+      x: x
+      y: y
+
+    makeMark = false
+
+    if not @currentStrokeIndex?
+      @markPoint = coords
+      @markBuffer = []
+      makeMark = true
+
+    @markBuffer.push coords
+
+    @markPoint.x = (@markPoint.x * @options.smoothing + x) / (@options.smoothing + 1)
+    @markPoint.y = (@markPoint.y * @options.smoothing + y) / (@options.smoothing + 1)
+
+    if @markBuffer.length > @state.smoothDrawInterval
+      @markBuffer = []
+      makeMark = true
+
+    @mark @markPoint.x, @markPoint.y if makeMark
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
@@ -448,12 +510,11 @@ class PencilTest
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()
 
-  goToFrame: (newIndex, stop = false) ->
+  goToFrame: (newIndex) ->
     newIndex = Math.max 0, Math.min @film.frames.length - 1, newIndex
 
     @currentFrameIndex = newIndex
     @drawCurrentFrame()
-    if stop isnt false then @stop()
 
   play: ->
     self = @
@@ -482,14 +543,16 @@ class PencilTest
     @stop()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @lift()
-    @isPlaying = true
+    @state.mode = PencilTest.prototype.states.PLAYING
 
   stop: ->
     clearInterval @playInterval
-    @isPlaying = false
+    if @state.mode is PencilTest.prototype.states.PLAYING
+      @state.mode = PencilTest.prototype.states.DRAWING
 
   togglePlay: ->
-    if @isPlaying then @stop() else @play()
+    if @state.mode isnt PencilTest.prototype.states.BUSY
+      if @state.mode is PencilTest.prototype.states.PLAYING then @stop() else @play()
 
   drawCurrentFrame: ->
     @field.clear()
@@ -508,6 +571,11 @@ class PencilTest
       path[0].style.stroke = color if color
 
   lift: ->
+    if @markBuffer && @markBuffer.length
+      Utils.log 'markBuffer has stuff'
+      last = @markBuffer.pop()
+      @mark last.x, last.y
+      @markBuffer = []
     @currentStrokeIndex = null
 
   dropFrame: ->
@@ -517,6 +585,38 @@ class PencilTest
       @newFrame()
 
     @drawCurrentFrame()
+
+  smoothFrame: (index, amount) ->
+    if not amount
+      amount = Number Utils.prompt 'How much to smooth? 1-5', 2
+    smoothingBackup = @options.smoothing
+    @options.smoothing = amount
+    frame = @film.frames[index]
+    oldStrokes = JSON.parse JSON.stringify frame.strokes
+    @lift()
+    frame.strokes = []
+    @currentFrameIndex = index
+    @field.clear()
+    for stroke in oldStrokes
+      for segment in stroke
+        coords = segment.match /[A-Z]([0-9.\-]+) ([0-9.\-]+)/
+        @track Number(coords[1]), Number(coords[2])
+      @lift()
+
+    @options.smoothing = smoothingBackup
+
+  smoothFilm: (amount) ->
+    if @state.mode is PencilTest.prototype.states.DRAWING
+      if Utils.confirm 'Would you like to smooth every frame of this film?'
+        if not amount
+          amount = Number Utils.prompt 'How much to smooth? 1-5', 2
+        @state.mode = PencilTest.prototype.states.BUSY
+        lastIndex = @film.frames.length - 1
+        for frame in [0..lastIndex]
+          @smoothFrame frame, amount
+        @state.mode = PencilTest.prototype.states.DRAWING
+    else
+      Utils.log 'Unable to alter film while playing'
 
   undo: ->
     if @getCurrentFrame().strokes and @getCurrentFrame().strokes.length
@@ -540,9 +640,14 @@ class PencilTest
 
   updateStatus: ->
     if @options.showStatus
-      markup = "#{@options.frameRate} FPS"
+      markup = "<div class=\"settings\">"
+      markup += "Smoothing: #{@options.smoothing}"
+      markup += "</div>"
+      markup += "<div class=\"frame\">"
+      markup += "#{@options.frameRate} FPS"
       markup += " | (hold #{@getCurrentFrame().hold})"
       markup += " | #{@currentFrameIndex + 1}/#{@film.frames.length}"
+      markup += "</div>"
       @statusElement.innerHTML = markup
 
   newFilm: ->

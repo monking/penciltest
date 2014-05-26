@@ -8120,7 +8120,8 @@
 /*
 global: document, window
  */
-var Utils, code, name, _base, _i, _ref;
+var Utils, code, name, _base, _i, _ref,
+  __slice = [].slice;
 
 Utils = {
   toggleClass: function(element, className, presence) {
@@ -8141,6 +8142,25 @@ Utils = {
     }
     element.className = classes.join(' ');
     return added;
+  },
+  inherit: function() {
+    var ancestor, ancestors, child, key, value, _i, _len;
+    child = arguments[0], ancestors = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    if (child == null) {
+      child = {};
+    }
+    for (_i = 0, _len = ancestors.length; _i < _len; _i++) {
+      ancestor = ancestors[_i];
+      if (ancestor) {
+        for (key in ancestor) {
+          value = ancestor[key];
+          if (typeof child[key] === 'undefined') {
+            child[key] = ancestor[key];
+          }
+        }
+      }
+    }
+    return child;
   },
   log: function() {
     return console.log(arguments[0]);
@@ -8257,29 +8277,28 @@ global: document, window
 var PencilTest;
 
 PencilTest = (function() {
+  PencilTest.prototype.states = {
+    DRAWING: 'drawing',
+    BUSY: 'working',
+    PLAYING: 'playing'
+  };
+
   function PencilTest(options) {
-    var key, optionName, savedOptions, value, _ref, _ref1, _ref2;
-    this.options = options;
-    savedOptions = this.getStoredData('app', 'options');
-    _ref = {
+    var optionName, _ref, _ref1;
+    this.options = Utils.inherit(this.getStoredData('app', 'options'), options, {
       container: 'body',
       hideCursor: false,
       loop: true,
       showStatus: true,
       frameRate: 12,
       onionSkin: true,
+      smoothing: 3,
       onionSkinRange: 4,
       onionSkinOpacity: 0.5
-    };
-    for (key in _ref) {
-      value = _ref[key];
-      if (savedOptions && typeof savedOptions[key] !== 'undefined') {
-        this.options[key] = savedOptions[key];
-      }
-      if (typeof this.options[key] === 'undefined') {
-        this.options[key] = value;
-      }
-    }
+    });
+    this.state = Utils.inherit(this.getStoredData('app', 'state'), {
+      mode: PencilTest.prototype.states.DRAWING
+    });
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
     this.buildContainer();
@@ -8288,14 +8307,14 @@ PencilTest = (function() {
     this.addKeyboardListeners();
     this.addOtherListeners();
     for (optionName in this.options) {
-      if ((_ref1 = this.appActions[optionName]) != null) {
-        if ((_ref2 = _ref1.action) != null) {
-          _ref2.call(this);
+      if ((_ref = this.appActions[optionName]) != null) {
+        if ((_ref1 = _ref.action) != null) {
+          _ref1.call(this);
         }
       }
     }
     this.newFilm();
-    window.penciltest = this;
+    window.pt = this;
   }
 
   PencilTest.prototype.appActions = {
@@ -8413,8 +8432,36 @@ PencilTest = (function() {
     dropFrame: {
       label: "Drop Frame",
       hotkey: ['Backspace'],
+      cancelComplement: true,
       listener: function() {
         return this.dropFrame();
+      }
+    },
+    smoothing: {
+      label: "Smoothing...",
+      title: "How much your lines will be smoothed as you draw",
+      hotkey: ['Shift+S'],
+      listener: function() {
+        return this.options.smoothing = Number(Utils.prompt('Smoothing', this.options.smoothing));
+      },
+      action: function() {
+        return this.state.smoothDrawInterval = Math.sqrt(this.options.smoothing);
+      }
+    },
+    smoothFrame: {
+      label: "Smooth Frame",
+      title: "Draw the frame again, with current smoothing settings",
+      hotkey: ['Shift+M'],
+      listener: function() {
+        return this.smoothFrame(this.currentFrameIndex);
+      }
+    },
+    smoothFilm: {
+      label: "Smooth All Frames",
+      title: "Redraw all frames in the film with the current smoothing setting",
+      hotkey: ['Alt+Shift+M'],
+      listener: function() {
+        return this.smoothFilm();
       }
     },
     lessHold: {
@@ -8531,7 +8578,7 @@ PencilTest = (function() {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
-      Tools: ['hideCursor', 'onionSkin', 'showStatus'],
+      Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm']
     }, 'showHelp'
   ];
@@ -8571,7 +8618,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.addInputListeners = function() {
-    var contextMenuListener, getEventPageXY, markFromEvent, mouseDownListener, mouseMoveListener, mouseUpListener, self;
+    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, trackFromEvent;
     self = this;
     getEventPageXY = function(event) {
       var eventLocation;
@@ -8585,10 +8632,10 @@ PencilTest = (function() {
         y: eventLocation.pageY
       };
     };
-    markFromEvent = function(event) {
-      var coords;
-      coords = getEventPageXY(event);
-      return self.mark(coords.x - self.fieldElement.offsetLeft, coords.y - self.fieldElement.offsetTop);
+    trackFromEvent = function(event) {
+      var pageCoords;
+      pageCoords = getEventPageXY(event);
+      return self.track(pageCoords.x - self.fieldElement.offsetLeft, pageCoords.y - self.fieldElement.offsetTop);
     };
     mouseDownListener = function(event) {
       event.preventDefault();
@@ -8605,7 +8652,7 @@ PencilTest = (function() {
         } else {
           self.hideMenu();
         }
-        markFromEvent(event);
+        trackFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
         document.body.addEventListener('touchmove', mouseMoveListener);
         document.body.addEventListener('mouseup', mouseUpListener);
@@ -8614,8 +8661,8 @@ PencilTest = (function() {
     };
     mouseMoveListener = function(event) {
       event.preventDefault();
-      if (!self.isPlaying) {
-        return markFromEvent(event);
+      if (self.state === PencilTest.prototype.states.DRAWING) {
+        return trackFromEvent(event);
       }
     };
     mouseUpListener = function(event) {
@@ -8728,6 +8775,7 @@ PencilTest = (function() {
     self = this;
     return window.addEventListener('beforeunload', function() {
       self.putStoredData('app', 'options', self.options);
+      self.putStoredData('app', 'state', self.state);
       if (self.unsavedChanges) {
         return event.returnValue = "You have unsaved changes. Alt+S to save.";
       }
@@ -8758,6 +8806,8 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.mark = function(x, y) {
+    x = Math.round(x * 10) / 10;
+    y = Math.round(y * 10) / 10;
     if (this.currentStrokeIndex != null) {
       if (this.drawSegmentEnd) {
         this.drawSegmentStart = this.drawSegmentEnd.replace(/^L/, 'M');
@@ -8773,6 +8823,30 @@ PencilTest = (function() {
     }
     this.clearRedo();
     return this.unsavedChanges = true;
+  };
+
+  PencilTest.prototype.track = function(x, y) {
+    var coords, makeMark;
+    coords = {
+      x: x,
+      y: y
+    };
+    makeMark = false;
+    if (this.currentStrokeIndex == null) {
+      this.markPoint = coords;
+      this.markBuffer = [];
+      makeMark = true;
+    }
+    this.markBuffer.push(coords);
+    this.markPoint.x = (this.markPoint.x * this.options.smoothing + x) / (this.options.smoothing + 1);
+    this.markPoint.y = (this.markPoint.y * this.options.smoothing + y) / (this.options.smoothing + 1);
+    if (this.markBuffer.length > this.state.smoothDrawInterval) {
+      this.markBuffer = [];
+      makeMark = true;
+    }
+    if (makeMark) {
+      return this.mark(this.markPoint.x, this.markPoint.y);
+    }
   };
 
   PencilTest.prototype.showMenu = function(coords) {
@@ -8823,16 +8897,10 @@ PencilTest = (function() {
     return this.drawCurrentFrame();
   };
 
-  PencilTest.prototype.goToFrame = function(newIndex, stop) {
-    if (stop == null) {
-      stop = false;
-    }
+  PencilTest.prototype.goToFrame = function(newIndex) {
     newIndex = Math.max(0, Math.min(this.film.frames.length - 1, newIndex));
     this.currentFrameIndex = newIndex;
-    this.drawCurrentFrame();
-    if (stop !== false) {
-      return this.stop();
-    }
+    return this.drawCurrentFrame();
   };
 
   PencilTest.prototype.play = function() {
@@ -8869,19 +8937,23 @@ PencilTest = (function() {
     this.stop();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
-    return this.isPlaying = true;
+    return this.state.mode = PencilTest.prototype.states.PLAYING;
   };
 
   PencilTest.prototype.stop = function() {
     clearInterval(this.playInterval);
-    return this.isPlaying = false;
+    if (this.state.mode === PencilTest.prototype.states.PLAYING) {
+      return this.state.mode = PencilTest.prototype.states.DRAWING;
+    }
   };
 
   PencilTest.prototype.togglePlay = function() {
-    if (this.isPlaying) {
-      return this.stop();
-    } else {
-      return this.play();
+    if (this.state.mode !== PencilTest.prototype.states.BUSY) {
+      if (this.state.mode === PencilTest.prototype.states.PLAYING) {
+        return this.stop();
+      } else {
+        return this.play();
+      }
     }
   };
 
@@ -8922,6 +8994,13 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.lift = function() {
+    var last;
+    if (this.markBuffer && this.markBuffer.length) {
+      Utils.log('markBuffer has stuff');
+      last = this.markBuffer.pop();
+      this.mark(last.x, last.y);
+      this.markBuffer = [];
+    }
     return this.currentStrokeIndex = null;
   };
 
@@ -8934,6 +9013,50 @@ PencilTest = (function() {
       this.newFrame();
     }
     return this.drawCurrentFrame();
+  };
+
+  PencilTest.prototype.smoothFrame = function(index, amount) {
+    var coords, frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1;
+    if (!amount) {
+      amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
+    }
+    smoothingBackup = this.options.smoothing;
+    this.options.smoothing = amount;
+    frame = this.film.frames[index];
+    oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
+    this.lift();
+    frame.strokes = [];
+    this.currentFrameIndex = index;
+    this.field.clear();
+    for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
+      stroke = oldStrokes[_i];
+      for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
+        segment = stroke[_j];
+        coords = segment.match(/[A-Z]([0-9.\-]+) ([0-9.\-]+)/);
+        this.track(Number(coords[1]), Number(coords[2]));
+      }
+      this.lift();
+    }
+    return this.options.smoothing = smoothingBackup;
+  };
+
+  PencilTest.prototype.smoothFilm = function(amount) {
+    var frame, lastIndex, _i;
+    if (this.state.mode === PencilTest.prototype.states.DRAWING) {
+      if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+        if (!amount) {
+          amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
+        }
+        this.state.mode = PencilTest.prototype.states.BUSY;
+        lastIndex = this.film.frames.length - 1;
+        for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
+          this.smoothFrame(frame, amount);
+        }
+        return this.state.mode = PencilTest.prototype.states.DRAWING;
+      }
+    } else {
+      return Utils.log('Unable to alter film while playing');
+    }
   };
 
   PencilTest.prototype.undo = function() {
@@ -8967,9 +9090,14 @@ PencilTest = (function() {
   PencilTest.prototype.updateStatus = function() {
     var markup;
     if (this.options.showStatus) {
-      markup = "" + this.options.frameRate + " FPS";
+      markup = "<div class=\"settings\">";
+      markup += "Smoothing: " + this.options.smoothing;
+      markup += "</div>";
+      markup += "<div class=\"frame\">";
+      markup += "" + this.options.frameRate + " FPS";
       markup += " | (hold " + (this.getCurrentFrame().hold) + ")";
       markup += " | " + (this.currentFrameIndex + 1) + "/" + this.film.frames.length;
+      markup += "</div>";
       return this.statusElement.innerHTML = markup;
     }
   };

@@ -19,12 +19,17 @@
   bottom: -2em;
   right: 0;
   width: 100%;
-  text-align: right;
   font-family: monospace;
   color: white;
 }
 .penciltest-app .field .status.hidden {
   display: none;
+}
+.penciltest-app .field .status .settings {
+  float: left;
+}
+.penciltest-app .field .status .frame {
+  float: right;
 }
 .penciltest-app .menu {
   display: none;

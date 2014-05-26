@@ -2,7 +2,8 @@
 /*
 global: document, window
  */
-var Utils, code, name, _base, _i, _ref;
+var Utils, code, name, _base, _i, _ref,
+  __slice = [].slice;
 
 Utils = {
   toggleClass: function(element, className, presence) {
@@ -23,6 +24,25 @@ Utils = {
     }
     element.className = classes.join(' ');
     return added;
+  },
+  inherit: function() {
+    var ancestor, ancestors, child, key, value, _i, _len;
+    child = arguments[0], ancestors = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    if (child == null) {
+      child = {};
+    }
+    for (_i = 0, _len = ancestors.length; _i < _len; _i++) {
+      ancestor = ancestors[_i];
+      if (ancestor) {
+        for (key in ancestor) {
+          value = ancestor[key];
+          if (typeof child[key] === 'undefined') {
+            child[key] = ancestor[key];
+          }
+        }
+      }
+    }
+    return child;
   },
   log: function() {
     return console.log(arguments[0]);

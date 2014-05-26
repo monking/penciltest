@@ -1,7 +1,7 @@
 {
-  "name": "Tunewich",
-  "version": "0.1.1",
-  "repository": "git@git.lovejoy.io:services/tunewich.git",
+  "name": "Penciltest",
+  "version": "0.0.1",
+  "repository": "git@github.com:monking/penciltest.git",
   "devDependencies": {
     "grunt-contrib-compass": "^0.7.2",
     "grunt-contrib-coffee": "^0.10.1",

@@ -16,6 +16,13 @@ Utils =
     element.className = classes.join ' '
     added
 
+  inherit: (child = {}, ancestors...) ->
+    for ancestor in ancestors
+      if ancestor
+        for key, value of ancestor
+          child[key] = ancestor[key] if typeof child[key] is 'undefined'
+    child
+
   log: ->
     # window.location.hash = arguments[0].toString()
     console.log arguments[0]
