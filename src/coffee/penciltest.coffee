@@ -4,33 +4,36 @@ global: document, window
 
 class PencilTest
 
-  states:
+  modes:
     DRAWING: 'drawing'
     BUSY: 'working'
     PLAYING: 'playing'
+
+  options:
+    container: 'body'
+    hideCursor: false
+    loop: true
+    showStatus: true
+    frameRate: 12
+    onionSkin: true
+    smoothing: 3
+    onionSkinRange: 4
+    onionSkinOpacity: 0.5
+
+  state:
+    version: '0.0.1'
+    mode: PencilTest.prototype.modes.DRAWING
 
   constructor: (options) ->
     @options = Utils.inherit(
       @getStoredData 'app', 'options'
       options
-      {
-        container: 'body'
-        hideCursor: false
-        loop: true
-        showStatus: true
-        frameRate: 12
-        onionSkin: true
-        smoothing: 3
-        onionSkinRange: 4
-        onionSkinOpacity: 0.5
-      }
+      PencilTest.prototype.options
     )
 
     @state = Utils.inherit(
       @getStoredData 'app', 'state'
-      {
-        mode: PencilTest.prototype.states.DRAWING
-      }
+      PencilTest.prototype.state
     )
 
     @container = document.querySelector @options.container
@@ -46,6 +49,13 @@ class PencilTest
     @appActions[optionName]?.action?.call @ for optionName of @options
 
     @newFilm()
+
+    if @state.version isnt PencilTest.prototype.state.version
+      if LegacyDefinitions.hasOwnProperty @state.version
+        confirmMessage = "You last used v#{@state.version}. Currently v#{PencilTest.prototype.state.version}. Update your saved films to the new format now?"
+        if Utils.confirm confirmMessage
+          Utils.log "upgrading saved films not currently supported...working on it"
+      @state.version = PencilTest.prototype.state.version
 
     window.pt = @
 
@@ -336,7 +346,7 @@ class PencilTest
 
     mouseMoveListener = (event) ->
       event.preventDefault()
-      trackFromEvent event if self.state is PencilTest.prototype.states.DRAWING
+      trackFromEvent event if self.state is PencilTest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
       if event.button is 2
@@ -543,16 +553,16 @@ class PencilTest
     @stop()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @lift()
-    @state.mode = PencilTest.prototype.states.PLAYING
+    @state.mode = PencilTest.prototype.modes.PLAYING
 
   stop: ->
     clearInterval @playInterval
-    if @state.mode is PencilTest.prototype.states.PLAYING
-      @state.mode = PencilTest.prototype.states.DRAWING
+    if @state.mode is PencilTest.prototype.modes.PLAYING
+      @state.mode = PencilTest.prototype.modes.DRAWING
 
   togglePlay: ->
-    if @state.mode isnt PencilTest.prototype.states.BUSY
-      if @state.mode is PencilTest.prototype.states.PLAYING then @stop() else @play()
+    if @state.mode isnt PencilTest.prototype.modes.BUSY
+      if @state.mode is PencilTest.prototype.modes.PLAYING then @stop() else @play()
 
   drawCurrentFrame: ->
     @field.clear()
@@ -606,15 +616,15 @@ class PencilTest
     @options.smoothing = smoothingBackup
 
   smoothFilm: (amount) ->
-    if @state.mode is PencilTest.prototype.states.DRAWING
+    if @state.mode is PencilTest.prototype.modes.DRAWING
       if Utils.confirm 'Would you like to smooth every frame of this film?'
         if not amount
           amount = Number Utils.prompt 'How much to smooth? 1-5', 2
-        @state.mode = PencilTest.prototype.states.BUSY
+        @state.mode = PencilTest.prototype.modes.BUSY
         lastIndex = @film.frames.length - 1
         for frame in [0..lastIndex]
           @smoothFrame frame, amount
-        @state.mode = PencilTest.prototype.states.DRAWING
+        @state.mode = PencilTest.prototype.modes.DRAWING
     else
       Utils.log 'Unable to alter film while playing'
 
@@ -641,7 +651,8 @@ class PencilTest
   updateStatus: ->
     if @options.showStatus
       markup = "<div class=\"settings\">"
-      markup += "Smoothing: #{@options.smoothing}"
+      markup += "v#{PencilTest.prototype.state.version}"
+      markup += " Smoothing: #{@options.smoothing}"
       markup += "</div>"
       markup += "<div class=\"frame\">"
       markup += "#{@options.frameRate} FPS"
