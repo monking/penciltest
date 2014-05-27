@@ -8270,6 +8270,17 @@ for (name in _ref) {
   Utils.shiftKeyCodes[code] = name;
 }
 
+var LegacyDefinitions;
+
+LegacyDefinitions = {
+  "0.0.1": {
+    film: {
+      name: String,
+      frames: [['x:Number', 'y:Number']]
+    }
+  }
+};
+
 
 /*
 global: document, window
@@ -8277,28 +8288,33 @@ global: document, window
 var PencilTest;
 
 PencilTest = (function() {
-  PencilTest.prototype.states = {
+  PencilTest.prototype.modes = {
     DRAWING: 'drawing',
     BUSY: 'working',
     PLAYING: 'playing'
   };
 
+  PencilTest.prototype.options = {
+    container: 'body',
+    hideCursor: false,
+    loop: true,
+    showStatus: true,
+    frameRate: 12,
+    onionSkin: true,
+    smoothing: 3,
+    onionSkinRange: 4,
+    onionSkinOpacity: 0.5
+  };
+
+  PencilTest.prototype.state = {
+    version: '0.0.1',
+    mode: PencilTest.prototype.modes.DRAWING
+  };
+
   function PencilTest(options) {
-    var optionName, _ref, _ref1;
-    this.options = Utils.inherit(this.getStoredData('app', 'options'), options, {
-      container: 'body',
-      hideCursor: false,
-      loop: true,
-      showStatus: true,
-      frameRate: 12,
-      onionSkin: true,
-      smoothing: 3,
-      onionSkinRange: 4,
-      onionSkinOpacity: 0.5
-    });
-    this.state = Utils.inherit(this.getStoredData('app', 'state'), {
-      mode: PencilTest.prototype.states.DRAWING
-    });
+    var confirmMessage, optionName, _ref, _ref1;
+    this.options = Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options);
+    this.state = Utils.inherit(this.getStoredData('app', 'state'), PencilTest.prototype.state);
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
     this.buildContainer();
@@ -8314,6 +8330,15 @@ PencilTest = (function() {
       }
     }
     this.newFilm();
+    if (this.state.version !== PencilTest.prototype.state.version) {
+      if (LegacyDefinitions.hasOwnProperty(this.state.version)) {
+        confirmMessage = "You last used v" + this.state.version + ". Currently v" + PencilTest.prototype.state.version + ". Update your saved films to the new format now?";
+        if (Utils.confirm(confirmMessage)) {
+          Utils.log("upgrading saved films not currently supported...working on it");
+        }
+      }
+      this.state.version = PencilTest.prototype.state.version;
+    }
     window.pt = this;
   }
 
@@ -8661,7 +8686,7 @@ PencilTest = (function() {
     };
     mouseMoveListener = function(event) {
       event.preventDefault();
-      if (self.state === PencilTest.prototype.states.DRAWING) {
+      if (self.state === PencilTest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
@@ -8937,19 +8962,19 @@ PencilTest = (function() {
     this.stop();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
-    return this.state.mode = PencilTest.prototype.states.PLAYING;
+    return this.state.mode = PencilTest.prototype.modes.PLAYING;
   };
 
   PencilTest.prototype.stop = function() {
     clearInterval(this.playInterval);
-    if (this.state.mode === PencilTest.prototype.states.PLAYING) {
-      return this.state.mode = PencilTest.prototype.states.DRAWING;
+    if (this.state.mode === PencilTest.prototype.modes.PLAYING) {
+      return this.state.mode = PencilTest.prototype.modes.DRAWING;
     }
   };
 
   PencilTest.prototype.togglePlay = function() {
-    if (this.state.mode !== PencilTest.prototype.states.BUSY) {
-      if (this.state.mode === PencilTest.prototype.states.PLAYING) {
+    if (this.state.mode !== PencilTest.prototype.modes.BUSY) {
+      if (this.state.mode === PencilTest.prototype.modes.PLAYING) {
         return this.stop();
       } else {
         return this.play();
@@ -9042,17 +9067,17 @@ PencilTest = (function() {
 
   PencilTest.prototype.smoothFilm = function(amount) {
     var frame, lastIndex, _i;
-    if (this.state.mode === PencilTest.prototype.states.DRAWING) {
+    if (this.state.mode === PencilTest.prototype.modes.DRAWING) {
       if (Utils.confirm('Would you like to smooth every frame of this film?')) {
         if (!amount) {
           amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
         }
-        this.state.mode = PencilTest.prototype.states.BUSY;
+        this.state.mode = PencilTest.prototype.modes.BUSY;
         lastIndex = this.film.frames.length - 1;
         for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
           this.smoothFrame(frame, amount);
         }
-        return this.state.mode = PencilTest.prototype.states.DRAWING;
+        return this.state.mode = PencilTest.prototype.modes.DRAWING;
       }
     } else {
       return Utils.log('Unable to alter film while playing');
@@ -9091,7 +9116,8 @@ PencilTest = (function() {
     var markup;
     if (this.options.showStatus) {
       markup = "<div class=\"settings\">";
-      markup += "Smoothing: " + this.options.smoothing;
+      markup += "v" + PencilTest.prototype.state.version;
+      markup += " Smoothing: " + this.options.smoothing;
       markup += "</div>";
       markup += "<div class=\"frame\">";
       markup += "" + this.options.frameRate + " FPS";
