@@ -25,7 +25,7 @@ class PencilTest
     mode: PencilTest.prototype.modes.DRAWING
 
   constructor: (options) ->
-    @options = Utils.inherit(
+    @setOptions Utils.inherit(
       @getStoredData 'app', 'options'
       options
       PencilTest.prototype.options
@@ -58,6 +58,16 @@ class PencilTest
       @state.version = PencilTest.prototype.state.version
 
     window.pt = @
+
+  setOptions: (options) ->
+    @options = Utils.inherit(
+      options
+      @options or {}
+      PencilTest.prototype.state
+    )
+
+    for key, value of options
+      @appActions[key].action() if key in @appActions and @appActions[key].action
 
   appActions:
     playPause:
@@ -92,14 +102,14 @@ class PencilTest
         @scrubAudio() if @audioElement
     firstFrame:
       label: "First Frame"
-      hotkey: ['Home','PgUp']
+      hotkey: ['0','Home','PgUp']
       cancelComplement: true
       listener: ->
         @goToFrame 0
         @stop()
     lastFrame:
       label: "Last Frame"
-      hotkey: ['End','PgDn']
+      hotkey: ['$','End','PgDn']
       cancelComplement: true
       listener: ->
         @goToFrame @film.frames.length - 1
@@ -133,6 +143,9 @@ class PencilTest
       hotkey: ['U','Alt+Z']
       repeat: true
       listener: -> @undo()
+    frameRate:
+      label: "Frame Rate"
+      action: -> @singleFrameDuration = 1 / @options.frameRate
     redo:
       label: "Redo"
       title: "Put back a line removed by 'Undo'"
@@ -562,7 +575,14 @@ class PencilTest
     newIndex = Math.max 0, Math.min @film.frames.length - 1, newIndex
 
     @currentFrameIndex = newIndex
+
+    if @state.mode isnt PencilTest.prototype.modes.PLAYING
+      @audioGoToFrame newIndex
     @drawCurrentFrame()
+
+  audioGoToFrame: (index) ->
+    if @audioElement
+      @seekAudio @frameTimeIndex[index] + @audioOffset * @singleFrameDuration
 
   play: ->
     self = @
@@ -572,7 +592,6 @@ class PencilTest
     else
       @framesHeld = -1
       @goToFrame 0
-      @seekAudio 0
 
     stepListener = ->
       self.framesHeld++
@@ -584,14 +603,13 @@ class PencilTest
           if self.options.loop
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
             self.goToFrame newIndex
-            singleFrameDuration = 1 / @options.frameRate
-            self.seekAudio self.frameTimeIndex[newIndex] + @audioOffset * singleFrameDuration
           else
             self.stop()
         else
           self.goToFrame newIndex
 
     @stop()
+    stepListener()
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @lift()
     @state.mode = PencilTest.prototype.modes.PLAYING
@@ -825,8 +843,7 @@ class PencilTest
   scrubAudio: ->
     Utils.log 'scrubAudio'
     self = @
-    singleFrameDuration = 1 / @options.frameRate
-    @seekAudio @frameTimeIndex[@currentFrameIndex] + @audioOffset * singleFrameDuration
+    @audioGoToFrame @currentFrameIndex
     clearTimeout @scrubAudioTimeout
     @playAudio()
     @scrubAudioTimeout = setTimeout(

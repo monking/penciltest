@@ -8293,7 +8293,8 @@ LegacyDefinitions = {
 /*
 global: document, window
  */
-var PencilTest;
+var PencilTest,
+  __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
 PencilTest = (function() {
   PencilTest.prototype.modes = {
@@ -8321,7 +8322,7 @@ PencilTest = (function() {
 
   function PencilTest(options) {
     var confirmMessage, optionName, _ref, _ref1;
-    this.options = Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options);
+    this.setOptions(Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options));
     this.state = Utils.inherit(this.getStoredData('app', 'state'), PencilTest.prototype.state);
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
@@ -8349,6 +8350,21 @@ PencilTest = (function() {
     }
     window.pt = this;
   }
+
+  PencilTest.prototype.setOptions = function(options) {
+    var key, value, _results;
+    this.options = Utils.inherit(options, this.options || {}, PencilTest.prototype.state);
+    _results = [];
+    for (key in options) {
+      value = options[key];
+      if (__indexOf.call(this.appActions, key) >= 0 && this.appActions[key].action) {
+        _results.push(this.appActions[key].action());
+      } else {
+        _results.push(void 0);
+      }
+    }
+    return _results;
+  };
 
   PencilTest.prototype.appActions = {
     playPause: {
@@ -8395,7 +8411,7 @@ PencilTest = (function() {
     },
     firstFrame: {
       label: "First Frame",
-      hotkey: ['Home', 'PgUp'],
+      hotkey: ['0', 'Home', 'PgUp'],
       cancelComplement: true,
       listener: function() {
         this.goToFrame(0);
@@ -8404,7 +8420,7 @@ PencilTest = (function() {
     },
     lastFrame: {
       label: "Last Frame",
-      hotkey: ['End', 'PgDn'],
+      hotkey: ['$', 'End', 'PgDn'],
       cancelComplement: true,
       listener: function() {
         this.goToFrame(this.film.frames.length - 1);
@@ -8452,6 +8468,12 @@ PencilTest = (function() {
       repeat: true,
       listener: function() {
         return this.undo();
+      }
+    },
+    frameRate: {
+      label: "Frame Rate",
+      action: function() {
+        return this.singleFrameDuration = 1 / this.options.frameRate;
       }
     },
     redo: {
@@ -8993,7 +9015,16 @@ PencilTest = (function() {
   PencilTest.prototype.goToFrame = function(newIndex) {
     newIndex = Math.max(0, Math.min(this.film.frames.length - 1, newIndex));
     this.currentFrameIndex = newIndex;
+    if (this.state.mode !== PencilTest.prototype.modes.PLAYING) {
+      this.audioGoToFrame(newIndex);
+    }
     return this.drawCurrentFrame();
+  };
+
+  PencilTest.prototype.audioGoToFrame = function(index) {
+    if (this.audioElement) {
+      return this.seekAudio(this.frameTimeIndex[index] + this.audioOffset * this.singleFrameDuration);
+    }
   };
 
   PencilTest.prototype.play = function() {
@@ -9007,10 +9038,9 @@ PencilTest = (function() {
     } else {
       this.framesHeld = -1;
       this.goToFrame(0);
-      this.seekAudio(0);
     }
     stepListener = function() {
-      var currentFrame, newIndex, singleFrameDuration;
+      var currentFrame, newIndex;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
@@ -9019,9 +9049,7 @@ PencilTest = (function() {
         if (newIndex >= self.film.frames.length || newIndex < 0) {
           if (self.options.loop) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
-            self.goToFrame(newIndex);
-            singleFrameDuration = 1 / this.options.frameRate;
-            return self.seekAudio(self.frameTimeIndex[newIndex] + this.audioOffset * singleFrameDuration);
+            return self.goToFrame(newIndex);
           } else {
             return self.stop();
           }
@@ -9031,6 +9059,7 @@ PencilTest = (function() {
       }
     };
     this.stop();
+    stepListener();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
     this.state.mode = PencilTest.prototype.modes.PLAYING;
@@ -9380,11 +9409,10 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.scrubAudio = function() {
-    var self, singleFrameDuration;
+    var self;
     Utils.log('scrubAudio');
     self = this;
-    singleFrameDuration = 1 / this.options.frameRate;
-    this.seekAudio(this.frameTimeIndex[this.currentFrameIndex] + this.audioOffset * singleFrameDuration);
+    this.audioGoToFrame(this.currentFrameIndex);
     clearTimeout(this.scrubAudioTimeout);
     this.playAudio();
     return this.scrubAudioTimeout = setTimeout(function() {
