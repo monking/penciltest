@@ -81,6 +81,7 @@ class PencilTest
       listener: ->
         @goToFrame @currentFrameIndex + 1
         @stop()
+        @scrubAudio() if @audioElement
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
@@ -88,6 +89,7 @@ class PencilTest
       listener: ->
         @goToFrame @currentFrameIndex - 1
         @stop()
+        @scrubAudio() if @audioElement
     firstFrame:
       label: "First Frame"
       hotkey: ['Home','PgUp']
@@ -115,6 +117,15 @@ class PencilTest
       listener: ->
         newIndex = @currentFrameIndex + 1
         @newFrame newIndex
+        @goToFrame newIndex
+    insertSeconds:
+      label: "Insert Seconds"
+      hotkey: ['Alt+Shift+I']
+      listener: ->
+        seconds = Number Utils.prompt '# of seconds to insert: ', 1
+        first = @currentFrameIndex + 1
+        last = @currentFrameIndex + Math.floor @options.frameRate * seconds
+        @newFrame newIndex for newIndex in [first..last]
         @goToFrame newIndex
     undo:
       label: "Undo"
@@ -223,6 +234,30 @@ class PencilTest
           try
             @setFilm JSON.parse importJSON
           @textElement.value = ''
+    importAudio:
+      label: "Import Audio"
+      hotkey: ['Alt+A']
+      listener: ->
+        audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
+        @loadAudio audioURL if audioURL?
+    unloadAudio:
+      label: "Unload Audio"
+      listener: ->
+        @destroyAudio
+    shiftAudioEarlier:
+      label: "Shift Audio Earlier"
+      hotkey: ['[']
+      listener: ->
+        Utils.log "Shift Audio Earlier"
+        @audioOffset-- if @audioElement
+        @updateStatus()
+    shiftAudioLater:
+      label: "Shift Audio Later"
+      hotkey: [']']
+      listener: ->
+        Utils.log "Shift Audio Later"
+        @audioOffset++ if @audioElement
+        @updateStatus()
     showHelp:
       label: "Help"
       title: "Show Keyboard Shortcuts"
@@ -242,6 +277,7 @@ class PencilTest
       'redo'
       'insertFrameAfter'
       'insertFrameBefore'
+      'insertSeconds'
       'dropFrame'
       'moreHold'
       'lessHold'
@@ -256,6 +292,7 @@ class PencilTest
       'smoothing'
       'smoothFrame'
       'smoothFilm'
+      'importAudio'
     ]
     Film: [
       'saveFilm'
@@ -346,7 +383,7 @@ class PencilTest
 
     mouseMoveListener = (event) ->
       event.preventDefault()
-      trackFromEvent event if self.state is PencilTest.prototype.modes.DRAWING
+      trackFromEvent event if self.state.mode is PencilTest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
       if event.button is 2
@@ -450,6 +487,7 @@ class PencilTest
       index = @film.frames.length
 
     @film.frames.splice index, 0, frame
+    @buildFrameTimeIndex()
 
   getCurrentFrame: ->
     @film.frames[@currentFrameIndex]
@@ -458,8 +496,8 @@ class PencilTest
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
 
   mark: (x,y) ->
-    x = Math.round(x * 10) / 10
-    y = Math.round(y * 10) / 10
+    x = Utils.getDecimal x, 1
+    y = Utils.getDecimal y, 1
 
     if @currentStrokeIndex?
       @drawSegmentStart = @drawSegmentEnd.replace(/^L/, 'M') if @drawSegmentEnd
@@ -534,6 +572,7 @@ class PencilTest
     else
       @framesHeld = -1
       @goToFrame 0
+      @seekAudio 0
 
     stepListener = ->
       self.framesHeld++
@@ -545,6 +584,8 @@ class PencilTest
           if self.options.loop
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
             self.goToFrame newIndex
+            singleFrameDuration = 1 / @options.frameRate
+            self.seekAudio self.frameTimeIndex[newIndex] + @audioOffset * singleFrameDuration
           else
             self.stop()
         else
@@ -555,7 +596,10 @@ class PencilTest
     @lift()
     @state.mode = PencilTest.prototype.modes.PLAYING
 
+    @playAudio()
+
   stop: ->
+    @pauseAudio() if @audioElement
     clearInterval @playInterval
     if @state.mode is PencilTest.prototype.modes.PLAYING
       @state.mode = PencilTest.prototype.modes.DRAWING
@@ -594,6 +638,7 @@ class PencilTest
     if @film.frames.length is 0
       @newFrame()
 
+    @buildFrameTimeIndex()
     @drawCurrentFrame()
 
   smoothFrame: (index, amount) ->
@@ -646,6 +691,7 @@ class PencilTest
 
   setCurrentFrameHold: (newHold) ->
     @getCurrentFrame().hold = Math.max 1, newHold
+    @buildFrameTimeIndex()
     @updateStatus()
 
   updateStatus: ->
@@ -658,6 +704,9 @@ class PencilTest
       markup += "#{@options.frameRate} FPS"
       markup += " | (hold #{@getCurrentFrame().hold})"
       markup += " | #{@currentFrameIndex + 1}/#{@film.frames.length}"
+      markup += " | #{Utils.getDecimal @frameTimeIndex[@currentFrameIndex], 1}"
+      if @audioOffset
+        markup += " #{if @audioOffset >= 0 then '+' else ''}#{@audioOffset}"
       markup += "</div>"
       @statusElement.innerHTML = markup
 
@@ -727,6 +776,7 @@ class PencilTest
   setFilm: (film) ->
     @film = film
     @goToFrame 0
+    @buildFrameTimeIndex()
     @updateStatus()
     @unsavedChanges = false
 
@@ -737,6 +787,52 @@ class PencilTest
   deleteFilm: ->
     if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'
       window.localStorage.removeItem @encodeStorageReference 'film', filmName
+
+  buildFrameTimeIndex: ->
+    time = 0
+    @frameTimeIndex = ( time += @getFrameDuration i for i in [0...@film.frames.length] )
+
+  getFrameDuration: (frameIndex = @currentFrameIndex) ->
+    frame = @film.frames[frameIndex]
+    frame.hold * 1 / @options.frameRate
+
+  loadAudio: (audioURL) ->
+    @state.audioURL = audioURL
+    if not @audioElement
+      @audioElement = document.createElement 'audio'
+      @fieldElement.insertBefore @audioElement
+      @fieldElement.preload = true
+      @audioOffset = 0
+    else
+      @pauseAudio()
+    @audioElement.src = @state.audioURL
+
+  destroyAudio: ->
+    if @audioElement
+      @pauseAudio()
+      @audioElement.remove()
+      @audioElement = null
+
+  pauseAudio: ->
+    @audioElement.pause() if @audioElement and not @audioElement.paused
+
+  playAudio: ->
+    @audioElement.play() if @audioElement and @audioElement.paused
+
+  seekAudio: (time) ->
+    ( @audioElement.currentTime = time ) if @audioElement
+
+  scrubAudio: ->
+    Utils.log 'scrubAudio'
+    self = @
+    singleFrameDuration = 1 / @options.frameRate
+    @seekAudio @frameTimeIndex[@currentFrameIndex] + @audioOffset * singleFrameDuration
+    clearTimeout @scrubAudioTimeout
+    @playAudio()
+    @scrubAudioTimeout = setTimeout(
+      -> self.pauseAudio()
+      Math.max @getFrameDuration( @currentFrame ) * 1000, 100
+    )
 
   showHelp: ->
     helpDoc = 'Keyboard Shortcuts:\n'

@@ -84,7 +84,10 @@ PencilTest = (function() {
       repeat: true,
       listener: function() {
         this.goToFrame(this.currentFrameIndex + 1);
-        return this.stop();
+        this.stop();
+        if (this.audioElement) {
+          return this.scrubAudio();
+        }
       }
     },
     prevFrame: {
@@ -93,7 +96,10 @@ PencilTest = (function() {
       repeat: true,
       listener: function() {
         this.goToFrame(this.currentFrameIndex - 1);
-        return this.stop();
+        this.stop();
+        if (this.audioElement) {
+          return this.scrubAudio();
+        }
       }
     },
     firstFrame: {
@@ -131,6 +137,20 @@ PencilTest = (function() {
         var newIndex;
         newIndex = this.currentFrameIndex + 1;
         this.newFrame(newIndex);
+        return this.goToFrame(newIndex);
+      }
+    },
+    insertSeconds: {
+      label: "Insert Seconds",
+      hotkey: ['Alt+Shift+I'],
+      listener: function() {
+        var first, last, newIndex, seconds, _i;
+        seconds = Number(Utils.prompt('# of seconds to insert: ', 1));
+        first = this.currentFrameIndex + 1;
+        last = this.currentFrameIndex + Math.floor(this.options.frameRate * seconds);
+        for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
+          this.newFrame(newIndex);
+        }
         return this.goToFrame(newIndex);
       }
     },
@@ -305,6 +325,45 @@ PencilTest = (function() {
         }
       }
     },
+    importAudio: {
+      label: "Import Audio",
+      hotkey: ['Alt+A'],
+      listener: function() {
+        var audioURL;
+        audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
+        if (audioURL != null) {
+          return this.loadAudio(audioURL);
+        }
+      }
+    },
+    unloadAudio: {
+      label: "Unload Audio",
+      listener: function() {
+        return this.destroyAudio;
+      }
+    },
+    shiftAudioEarlier: {
+      label: "Shift Audio Earlier",
+      hotkey: ['['],
+      listener: function() {
+        Utils.log("Shift Audio Earlier");
+        if (this.audioElement) {
+          this.audioOffset--;
+        }
+        return this.updateStatus();
+      }
+    },
+    shiftAudioLater: {
+      label: "Shift Audio Later",
+      hotkey: [']'],
+      listener: function() {
+        Utils.log("Shift Audio Later");
+        if (this.audioElement) {
+          this.audioOffset++;
+        }
+        return this.updateStatus();
+      }
+    },
     showHelp: {
       label: "Help",
       title: "Show Keyboard Shortcuts",
@@ -318,9 +377,9 @@ PencilTest = (function() {
   PencilTest.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
-      Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm'],
+      Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm']
     }, 'showHelp'
   ];
@@ -403,7 +462,7 @@ PencilTest = (function() {
     };
     mouseMoveListener = function(event) {
       event.preventDefault();
-      if (self.state === PencilTest.prototype.modes.DRAWING) {
+      if (self.state.mode === PencilTest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
@@ -536,7 +595,8 @@ PencilTest = (function() {
     if (index === null) {
       index = this.film.frames.length;
     }
-    return this.film.frames.splice(index, 0, frame);
+    this.film.frames.splice(index, 0, frame);
+    return this.buildFrameTimeIndex();
   };
 
   PencilTest.prototype.getCurrentFrame = function() {
@@ -548,8 +608,8 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.mark = function(x, y) {
-    x = Math.round(x * 10) / 10;
-    y = Math.round(y * 10) / 10;
+    x = Utils.getDecimal(x, 1);
+    y = Utils.getDecimal(y, 1);
     if (this.currentStrokeIndex != null) {
       if (this.drawSegmentEnd) {
         this.drawSegmentStart = this.drawSegmentEnd.replace(/^L/, 'M');
@@ -656,9 +716,10 @@ PencilTest = (function() {
     } else {
       this.framesHeld = -1;
       this.goToFrame(0);
+      this.seekAudio(0);
     }
     stepListener = function() {
-      var currentFrame, newIndex;
+      var currentFrame, newIndex, singleFrameDuration;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
@@ -667,7 +728,9 @@ PencilTest = (function() {
         if (newIndex >= self.film.frames.length || newIndex < 0) {
           if (self.options.loop) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
-            return self.goToFrame(newIndex);
+            self.goToFrame(newIndex);
+            singleFrameDuration = 1 / this.options.frameRate;
+            return self.seekAudio(self.frameTimeIndex[newIndex] + this.audioOffset * singleFrameDuration);
           } else {
             return self.stop();
           }
@@ -679,10 +742,14 @@ PencilTest = (function() {
     this.stop();
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
-    return this.state.mode = PencilTest.prototype.modes.PLAYING;
+    this.state.mode = PencilTest.prototype.modes.PLAYING;
+    return this.playAudio();
   };
 
   PencilTest.prototype.stop = function() {
+    if (this.audioElement) {
+      this.pauseAudio();
+    }
     clearInterval(this.playInterval);
     if (this.state.mode === PencilTest.prototype.modes.PLAYING) {
       return this.state.mode = PencilTest.prototype.modes.DRAWING;
@@ -754,6 +821,7 @@ PencilTest = (function() {
     if (this.film.frames.length === 0) {
       this.newFrame();
     }
+    this.buildFrameTimeIndex();
     return this.drawCurrentFrame();
   };
 
@@ -826,6 +894,7 @@ PencilTest = (function() {
 
   PencilTest.prototype.setCurrentFrameHold = function(newHold) {
     this.getCurrentFrame().hold = Math.max(1, newHold);
+    this.buildFrameTimeIndex();
     return this.updateStatus();
   };
 
@@ -840,6 +909,10 @@ PencilTest = (function() {
       markup += "" + this.options.frameRate + " FPS";
       markup += " | (hold " + (this.getCurrentFrame().hold) + ")";
       markup += " | " + (this.currentFrameIndex + 1) + "/" + this.film.frames.length;
+      markup += " | " + (Utils.getDecimal(this.frameTimeIndex[this.currentFrameIndex], 1));
+      if (this.audioOffset) {
+        markup += " " + (this.audioOffset >= 0 ? '+' : '') + this.audioOffset;
+      }
       markup += "</div>";
       return this.statusElement.innerHTML = markup;
     }
@@ -935,6 +1008,7 @@ PencilTest = (function() {
   PencilTest.prototype.setFilm = function(film) {
     this.film = film;
     this.goToFrame(0);
+    this.buildFrameTimeIndex();
     this.updateStatus();
     return this.unsavedChanges = false;
   };
@@ -951,6 +1025,80 @@ PencilTest = (function() {
     if (filmName = this.selectFilmName('Choose a film to DELETE...FOREVER')) {
       return window.localStorage.removeItem(this.encodeStorageReference('film', filmName));
     }
+  };
+
+  PencilTest.prototype.buildFrameTimeIndex = function() {
+    var i, time;
+    time = 0;
+    return this.frameTimeIndex = (function() {
+      var _i, _ref, _results;
+      _results = [];
+      for (i = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+        _results.push(time += this.getFrameDuration(i));
+      }
+      return _results;
+    }).call(this);
+  };
+
+  PencilTest.prototype.getFrameDuration = function(frameIndex) {
+    var frame;
+    if (frameIndex == null) {
+      frameIndex = this.currentFrameIndex;
+    }
+    frame = this.film.frames[frameIndex];
+    return frame.hold * 1 / this.options.frameRate;
+  };
+
+  PencilTest.prototype.loadAudio = function(audioURL) {
+    this.state.audioURL = audioURL;
+    if (!this.audioElement) {
+      this.audioElement = document.createElement('audio');
+      this.fieldElement.insertBefore(this.audioElement);
+      this.fieldElement.preload = true;
+      this.audioOffset = 0;
+    } else {
+      this.pauseAudio();
+    }
+    return this.audioElement.src = this.state.audioURL;
+  };
+
+  PencilTest.prototype.destroyAudio = function() {
+    if (this.audioElement) {
+      this.pauseAudio();
+      this.audioElement.remove();
+      return this.audioElement = null;
+    }
+  };
+
+  PencilTest.prototype.pauseAudio = function() {
+    if (this.audioElement && !this.audioElement.paused) {
+      return this.audioElement.pause();
+    }
+  };
+
+  PencilTest.prototype.playAudio = function() {
+    if (this.audioElement && this.audioElement.paused) {
+      return this.audioElement.play();
+    }
+  };
+
+  PencilTest.prototype.seekAudio = function(time) {
+    if (this.audioElement) {
+      return this.audioElement.currentTime = time;
+    }
+  };
+
+  PencilTest.prototype.scrubAudio = function() {
+    var self, singleFrameDuration;
+    Utils.log('scrubAudio');
+    self = this;
+    singleFrameDuration = 1 / this.options.frameRate;
+    this.seekAudio(this.frameTimeIndex[this.currentFrameIndex] + this.audioOffset * singleFrameDuration);
+    clearTimeout(this.scrubAudioTimeout);
+    this.playAudio();
+    return this.scrubAudioTimeout = setTimeout(function() {
+      return self.pauseAudio();
+    }, Math.max(this.getFrameDuration(this.currentFrame) * 1000, 100));
   };
 
   PencilTest.prototype.showHelp = function() {

@@ -58,6 +58,8 @@ Utils =
     187 : '='
     189 : '-'
     191 : '/'
+    219 : '['
+    221 : ']'
     222 : '\''
 
   shiftKeyCodeNames:
@@ -108,3 +110,7 @@ for code in [0...256]
 
 Utils.shiftKeyCodes = {}
 Utils.shiftKeyCodes[code] = name for name, code of Utils.shiftKeyCodeNames
+
+Utils.getDecimal = (value, precision) ->
+  factor = Math.pow 10, precision
+  Math.round(value * factor) / factor

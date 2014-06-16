@@ -78,6 +78,8 @@ Utils = {
     187: '=',
     189: '-',
     191: '/',
+    219: '[',
+    221: ']',
     222: '\''
   },
   shiftKeyCodeNames: {
@@ -151,3 +153,9 @@ for (name in _ref) {
   code = _ref[name];
   Utils.shiftKeyCodes[code] = name;
 }
+
+Utils.getDecimal = function(value, precision) {
+  var factor;
+  factor = Math.pow(10, precision);
+  return Math.round(value * factor) / factor;
+};
