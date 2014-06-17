@@ -8272,10 +8272,24 @@ for (name in _ref) {
   Utils.shiftKeyCodes[code] = name;
 }
 
-Utils.getDecimal = function(value, precision) {
-  var factor;
+Utils.getDecimal = function(value, precision, type) {
+  var factor, output, parts;
+  if (type == null) {
+    type = Number;
+  }
   factor = Math.pow(10, precision);
-  return Math.round(value * factor) / factor;
+  output = Math.round(value * factor) / factor;
+  if (type === String) {
+    parts = output.toString().split('.');
+    if (parts.length === 1) {
+      parts.push('0');
+    }
+    while (parts[1].length < precision) {
+      parts[1] += '0';
+    }
+    output = parts.join('.');
+  }
+  return output;
 };
 
 var LegacyDefinitions;
@@ -8316,8 +8330,16 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.state = {
-    version: '0.0.2',
+    version: '0.0.3',
     mode: PencilTest.prototype.modes.DRAWING
+  };
+
+  PencilTest.prototype.current = {
+    frameIndex: [],
+    exposureIndex: [],
+    exposures: 0,
+    exposureNumber: 0,
+    frameNumber: 0
   };
 
   function PencilTest(options) {
@@ -8390,7 +8412,7 @@ PencilTest = (function() {
       hotkey: ['Right', '.'],
       repeat: true,
       listener: function() {
-        this.goToFrame(this.currentFrameIndex + 1);
+        this.goToFrame(this.current.frameNumber + 1);
         this.stop();
         if (this.audioElement) {
           return this.scrubAudio();
@@ -8402,7 +8424,7 @@ PencilTest = (function() {
       hotkey: ['Left', ','],
       repeat: true,
       listener: function() {
-        this.goToFrame(this.currentFrameIndex - 1);
+        this.goToFrame(this.current.frameNumber - 1);
         this.stop();
         if (this.audioElement) {
           return this.scrubAudio();
@@ -8432,7 +8454,7 @@ PencilTest = (function() {
       hotkey: ['Shift+I'],
       listener: function() {
         var newIndex;
-        newIndex = this.currentFrameIndex;
+        newIndex = this.current.frameNumber;
         this.newFrame(newIndex);
         return this.goToFrame(newIndex);
       }
@@ -8442,7 +8464,7 @@ PencilTest = (function() {
       hotkey: ['I'],
       listener: function() {
         var newIndex;
-        newIndex = this.currentFrameIndex + 1;
+        newIndex = this.current.frameNumber + 1;
         this.newFrame(newIndex);
         return this.goToFrame(newIndex);
       }
@@ -8453,8 +8475,8 @@ PencilTest = (function() {
       listener: function() {
         var first, last, newIndex, seconds, _i;
         seconds = Number(Utils.prompt('# of seconds to insert: ', 1));
-        first = this.currentFrameIndex + 1;
-        last = this.currentFrameIndex + Math.floor(this.options.frameRate * seconds);
+        first = this.current.frameNumber + 1;
+        last = this.current.frameNumber + Math.floor(this.options.frameRate * seconds);
         for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
           this.newFrame(newIndex);
         }
@@ -8528,7 +8550,7 @@ PencilTest = (function() {
       title: "Draw the frame again, with current smoothing settings",
       hotkey: ['Shift+M'],
       listener: function() {
-        return this.smoothFrame(this.currentFrameIndex);
+        return this.smoothFrame(this.current.frameNumber);
       }
     },
     smoothFilm: {
@@ -8642,9 +8664,14 @@ PencilTest = (function() {
       label: "Import Audio",
       hotkey: ['Alt+A'],
       listener: function() {
-        var audioURL;
+        var audioURL, _base;
         audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
         if (audioURL != null) {
+          if ((_base = this.film).audio == null) {
+            _base.audio = {};
+          }
+          this.film.audio.url = audioURL;
+          this.unsavedChanges = true;
           return this.loadAudio(audioURL);
         }
       }
@@ -8660,8 +8687,8 @@ PencilTest = (function() {
       hotkey: ['['],
       listener: function() {
         Utils.log("Shift Audio Earlier");
-        if (this.audioElement) {
-          this.audioOffset--;
+        if (this.film.audio) {
+          this.film.audio.offset--;
         }
         return this.updateStatus();
       }
@@ -8671,8 +8698,8 @@ PencilTest = (function() {
       hotkey: [']'],
       listener: function() {
         Utils.log("Shift Audio Later");
-        if (this.audioElement) {
-          this.audioOffset++;
+        if (this.film.audio) {
+          this.film.audio.offset++;
         }
         return this.updateStatus();
       }
@@ -8909,11 +8936,11 @@ PencilTest = (function() {
       index = this.film.frames.length;
     }
     this.film.frames.splice(index, 0, frame);
-    return this.buildFrameTimeIndex();
+    return this.buildFilmMeta();
   };
 
   PencilTest.prototype.getCurrentFrame = function() {
-    return this.film.frames[this.currentFrameIndex];
+    return this.film.frames[this.current.frameNumber];
   };
 
   PencilTest.prototype.getCurrentStroke = function() {
@@ -9014,16 +9041,19 @@ PencilTest = (function() {
 
   PencilTest.prototype.goToFrame = function(newIndex) {
     newIndex = Math.max(0, Math.min(this.film.frames.length - 1, newIndex));
-    this.currentFrameIndex = newIndex;
+    this.current.frameNumber = newIndex;
+    this.current.frame = this.film.frames[this.current.frameNumber];
     if (this.state.mode !== PencilTest.prototype.modes.PLAYING) {
-      this.audioGoToFrame(newIndex);
+      this.seekToAudioAtExposure(newIndex);
     }
     return this.drawCurrentFrame();
   };
 
-  PencilTest.prototype.audioGoToFrame = function(index) {
-    if (this.audioElement) {
-      return this.seekAudio(this.frameTimeIndex[index] + this.audioOffset * this.singleFrameDuration);
+  PencilTest.prototype.seekToAudioAtExposure = function(index) {
+    var seekTime;
+    if (this.film.audio) {
+      seekTime = (this.current.frameIndex[index].time - this.film.audio.offset) * this.singleFrameDuration;
+      return this.seekAudio;
     }
   };
 
@@ -9033,7 +9063,7 @@ PencilTest = (function() {
     if (this.playDirection == null) {
       this.playDirection = 1;
     }
-    if (this.currentFrameIndex < this.film.frames.length - 1) {
+    if (this.current.frameNumber < this.film.frames.length - 1) {
       this.framesHeld = 0;
     } else {
       this.framesHeld = -1;
@@ -9045,7 +9075,7 @@ PencilTest = (function() {
       currentFrame = self.getCurrentFrame();
       if (self.framesHeld >= currentFrame.hold) {
         self.framesHeld = 0;
-        newIndex = self.currentFrameIndex + self.playDirection;
+        newIndex = self.current.frameNumber + self.playDirection;
         if (newIndex >= self.film.frames.length || newIndex < 0) {
           if (self.options.loop) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
@@ -9091,15 +9121,15 @@ PencilTest = (function() {
     this.field.clear();
     if (this.options.onionSkin) {
       for (i = _i = 0, _ref = this.options.onionSkinRange; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        if (this.currentFrameIndex > i - 1) {
-          this.drawFrame(this.currentFrameIndex - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+        if (this.current.frameNumber > i - 1) {
+          this.drawFrame(this.current.frameNumber - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
         }
-        if (this.currentFrameIndex < this.film.frames.length - i) {
-          this.drawFrame(this.currentFrameIndex + i, "rgba(0,0,255," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+        if (this.current.frameNumber < this.film.frames.length - i) {
+          this.drawFrame(this.current.frameNumber + i, "rgba(0,0,255," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
         }
       }
     }
-    this.drawFrame(this.currentFrameIndex);
+    this.drawFrame(this.current.frameNumber);
     return this.updateStatus();
   };
 
@@ -9134,14 +9164,14 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.dropFrame = function() {
-    this.film.frames.splice(this.currentFrameIndex, 1);
-    if (this.currentFrameIndex >= this.film.frames.length && this.currentFrameIndex > 0) {
-      this.currentFrameIndex--;
+    this.film.frames.splice(this.current.frameNumber, 1);
+    if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
+      this.current.frameNumber--;
     }
     if (this.film.frames.length === 0) {
       this.newFrame();
     }
-    this.buildFrameTimeIndex();
+    this.buildFilmMeta();
     return this.drawCurrentFrame();
   };
 
@@ -9156,7 +9186,7 @@ PencilTest = (function() {
     oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
     this.lift();
     frame.strokes = [];
-    this.currentFrameIndex = index;
+    this.current.frameNumber = index;
     this.field.clear();
     for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
       stroke = oldStrokes[_i];
@@ -9214,12 +9244,12 @@ PencilTest = (function() {
 
   PencilTest.prototype.setCurrentFrameHold = function(newHold) {
     this.getCurrentFrame().hold = Math.max(1, newHold);
-    this.buildFrameTimeIndex();
+    this.buildFilmMeta();
     return this.updateStatus();
   };
 
   PencilTest.prototype.updateStatus = function() {
-    var markup;
+    var markup, _ref;
     if (this.options.showStatus) {
       markup = "<div class=\"settings\">";
       markup += "v" + PencilTest.prototype.state.version;
@@ -9228,10 +9258,10 @@ PencilTest = (function() {
       markup += "<div class=\"frame\">";
       markup += "" + this.options.frameRate + " FPS";
       markup += " | (hold " + (this.getCurrentFrame().hold) + ")";
-      markup += " | " + (this.currentFrameIndex + 1) + "/" + this.film.frames.length;
-      markup += " | " + (Utils.getDecimal(this.frameTimeIndex[this.currentFrameIndex], 1));
-      if (this.audioOffset) {
-        markup += " " + (this.audioOffset >= 0 ? '+' : '') + this.audioOffset;
+      markup += " | " + (this.current.frameNumber + 1) + "/" + this.film.frames.length;
+      markup += " | " + (Utils.getDecimal(this.current.frameIndex[this.current.frameNumber].time, 1, String));
+      if ((_ref = this.film.audio) != null ? _ref.offset : void 0) {
+        markup += " " + (this.film.audio.offset >= 0 ? '+' : '') + this.film.audio.offset;
       }
       markup += "</div>";
       return this.statusElement.innerHTML = markup;
@@ -9314,7 +9344,7 @@ PencilTest = (function() {
           }
         }
       }
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
+      if (selectedFilmName && filmNames.indexOf(selectedFilmName) !== -1) {
         return selectedFilmName;
       } else {
         Utils.alert("No film by that name.");
@@ -9327,8 +9357,13 @@ PencilTest = (function() {
 
   PencilTest.prototype.setFilm = function(film) {
     this.film = film;
+    if (this.film.audio && this.film.audio.url) {
+      this.loadAudio(this.film.audio.url);
+    } else {
+      this.destroyAudio();
+    }
     this.goToFrame(0);
-    this.buildFrameTimeIndex();
+    this.buildFilmMeta();
     this.updateStatus();
     return this.unsavedChanges = false;
   };
@@ -9347,23 +9382,32 @@ PencilTest = (function() {
     }
   };
 
-  PencilTest.prototype.buildFrameTimeIndex = function() {
-    var i, time;
-    time = 0;
-    return this.frameTimeIndex = (function() {
-      var _i, _ref, _results;
-      _results = [];
-      for (i = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        _results.push(time += this.getFrameDuration(i));
+  PencilTest.prototype.buildFilmMeta = function() {
+    var frame, frameMeta, i, _i, _j, _ref, _ref1;
+    this.current.frameIndex = [];
+    this.current.exposureIndex = [];
+    this.current.exposures = 0;
+    for (i = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+      frame = this.film.frames[i];
+      frameMeta = {
+        id: i,
+        exposure: this.current.exposures,
+        duration: frame.hold * this.singleFrameDuration,
+        time: this.current.exposures * this.singleFrameDuration
+      };
+      this.current.frameIndex.push(frameMeta);
+      for (_j = 1, _ref1 = frame.hold; 1 <= _ref1 ? _j < _ref1 : _j > _ref1; 1 <= _ref1 ? _j++ : _j--) {
+        this.current.exposureIndex.push(frameMeta);
       }
-      return _results;
-    }).call(this);
+      this.current.exposures += this.film.frames[i].hold;
+    }
+    return this.current.duration = this.current.exposures * this.singleFrameDuration;
   };
 
   PencilTest.prototype.getFrameDuration = function(frameIndex) {
     var frame;
     if (frameIndex == null) {
-      frameIndex = this.currentFrameIndex;
+      frameIndex = this.current.frameNumber;
     }
     frame = this.film.frames[frameIndex];
     return frame.hold * 1 / this.options.frameRate;
@@ -9375,7 +9419,6 @@ PencilTest = (function() {
       this.audioElement = document.createElement('audio');
       this.fieldElement.insertBefore(this.audioElement);
       this.fieldElement.preload = true;
-      this.audioOffset = 0;
     } else {
       this.pauseAudio();
     }
@@ -9412,12 +9455,12 @@ PencilTest = (function() {
     var self;
     Utils.log('scrubAudio');
     self = this;
-    this.audioGoToFrame(this.currentFrameIndex);
+    this.seekToAudioAtExposure(this.current.frameNumber);
     clearTimeout(this.scrubAudioTimeout);
     this.playAudio();
     return this.scrubAudioTimeout = setTimeout(function() {
       return self.pauseAudio();
-    }, Math.max(this.getFrameDuration(this.currentFrame) * 1000, 100));
+    }, Math.max(this.getFrameDuration(this.current.frameNumber) * 1000, 100));
   };
 
   PencilTest.prototype.showHelp = function() {
