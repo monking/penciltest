@@ -21,8 +21,15 @@ class PencilTest
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.0.2'
+    version: '0.0.3'
     mode: PencilTest.prototype.modes.DRAWING
+
+  current:
+    frameIndex: []
+    exposureIndex: []
+    exposures: 0
+    exposureNumber: 0
+    frameNumber: 0
 
   constructor: (options) ->
     @setOptions Utils.inherit(
@@ -89,7 +96,7 @@ class PencilTest
       hotkey: ['Right','.']
       repeat: true
       listener: ->
-        @goToFrame @currentFrameIndex + 1
+        @goToFrame @current.frameNumber + 1
         @stop()
         @scrubAudio() if @audioElement
     prevFrame:
@@ -97,7 +104,7 @@ class PencilTest
       hotkey: ['Left',',']
       repeat: true
       listener: ->
-        @goToFrame @currentFrameIndex - 1
+        @goToFrame @current.frameNumber - 1
         @stop()
         @scrubAudio() if @audioElement
     firstFrame:
@@ -118,14 +125,14 @@ class PencilTest
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
       listener: ->
-        newIndex = @currentFrameIndex
+        newIndex = @current.frameNumber
         @newFrame newIndex
         @goToFrame newIndex
     insertFrameAfter:
       label: "Insert Frame After"
       hotkey: ['I']
       listener: ->
-        newIndex = @currentFrameIndex + 1
+        newIndex = @current.frameNumber + 1
         @newFrame newIndex
         @goToFrame newIndex
     insertSeconds:
@@ -133,8 +140,8 @@ class PencilTest
       hotkey: ['Alt+Shift+I']
       listener: ->
         seconds = Number Utils.prompt '# of seconds to insert: ', 1
-        first = @currentFrameIndex + 1
-        last = @currentFrameIndex + Math.floor @options.frameRate * seconds
+        first = @current.frameNumber + 1
+        last = @current.frameNumber + Math.floor @options.frameRate * seconds
         @newFrame newIndex for newIndex in [first..last]
         @goToFrame newIndex
     undo:
@@ -179,7 +186,7 @@ class PencilTest
       label: "Smooth Frame"
       title: "Draw the frame again, with current smoothing settings"
       hotkey: ['Shift+M']
-      listener: -> @smoothFrame @currentFrameIndex
+      listener: -> @smoothFrame @current.frameNumber
     smoothFilm:
       label: "Smooth All Frames"
       title: "Redraw all frames in the film with the current smoothing setting"
@@ -252,7 +259,11 @@ class PencilTest
       hotkey: ['Alt+A']
       listener: ->
         audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
-        @loadAudio audioURL if audioURL?
+        if audioURL?
+          @film.audio ?= {}
+          @film.audio.url = audioURL
+          @unsavedChanges = true
+          @loadAudio audioURL
     unloadAudio:
       label: "Unload Audio"
       listener: ->
@@ -262,14 +273,14 @@ class PencilTest
       hotkey: ['[']
       listener: ->
         Utils.log "Shift Audio Earlier"
-        @audioOffset-- if @audioElement
+        @film.audio.offset-- if @film.audio
         @updateStatus()
     shiftAudioLater:
       label: "Shift Audio Later"
       hotkey: [']']
       listener: ->
         Utils.log "Shift Audio Later"
-        @audioOffset++ if @audioElement
+        @film.audio.offset++ if @film.audio
         @updateStatus()
     showHelp:
       label: "Help"
@@ -500,10 +511,10 @@ class PencilTest
       index = @film.frames.length
 
     @film.frames.splice index, 0, frame
-    @buildFrameTimeIndex()
+    @buildFilmMeta()
 
   getCurrentFrame: ->
-    @film.frames[@currentFrameIndex]
+    @film.frames[@current.frameNumber]
 
   getCurrentStroke: ->
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
@@ -574,20 +585,22 @@ class PencilTest
   goToFrame: (newIndex) ->
     newIndex = Math.max 0, Math.min @film.frames.length - 1, newIndex
 
-    @currentFrameIndex = newIndex
+    @current.frameNumber = newIndex
+    @current.frame = @film.frames[@current.frameNumber]
 
     if @state.mode isnt PencilTest.prototype.modes.PLAYING
-      @audioGoToFrame newIndex
+      @seekToAudioAtExposure newIndex
     @drawCurrentFrame()
 
-  audioGoToFrame: (index) ->
-    if @audioElement
-      @seekAudio @frameTimeIndex[index] + @audioOffset * @singleFrameDuration
+  seekToAudioAtExposure: (index) ->
+    if @film.audio
+      seekTime = ( @current.frameIndex[index].time - @film.audio.offset ) * @singleFrameDuration
+      @seekAudio 
 
   play: ->
     self = @
     @playDirection ?= 1
-    if @currentFrameIndex < @film.frames.length - 1
+    if @current.frameNumber < @film.frames.length - 1
       @framesHeld = 0
     else
       @framesHeld = -1
@@ -598,7 +611,7 @@ class PencilTest
       currentFrame = self.getCurrentFrame()
       if self.framesHeld >= currentFrame.hold
         self.framesHeld = 0
-        newIndex = self.currentFrameIndex + self.playDirection
+        newIndex = self.current.frameNumber + self.playDirection
         if newIndex >= self.film.frames.length or newIndex < 0
           if self.options.loop
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
@@ -613,7 +626,6 @@ class PencilTest
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @lift()
     @state.mode = PencilTest.prototype.modes.PLAYING
-
     @playAudio()
 
   stop: ->
@@ -630,11 +642,11 @@ class PencilTest
     @field.clear()
     if @options.onionSkin
       for i in [0...@options.onionSkinRange]
-        if @currentFrameIndex > i - 1
-          @drawFrame @currentFrameIndex - i, "rgba(255,0,0,#{Math.pow(@options.onionSkinOpacity, i)})"
-        if @currentFrameIndex < @film.frames.length - i
-          @drawFrame @currentFrameIndex + i, "rgba(0,0,255,#{Math.pow(@options.onionSkinOpacity, i)})"
-    @drawFrame @currentFrameIndex
+        if @current.frameNumber > i - 1
+          @drawFrame @current.frameNumber - i, "rgba(255,0,0,#{Math.pow(@options.onionSkinOpacity, i)})"
+        if @current.frameNumber < @film.frames.length - i
+          @drawFrame @current.frameNumber + i, "rgba(0,0,255,#{Math.pow(@options.onionSkinOpacity, i)})"
+    @drawFrame @current.frameNumber
     @updateStatus()
 
   drawFrame: (frameIndex, color = null) ->
@@ -651,12 +663,12 @@ class PencilTest
     @currentStrokeIndex = null
 
   dropFrame: ->
-    @film.frames.splice @currentFrameIndex, 1
-    @currentFrameIndex-- if @currentFrameIndex >= @film.frames.length and @currentFrameIndex > 0
+    @film.frames.splice @current.frameNumber, 1
+    @current.frameNumber-- if @current.frameNumber >= @film.frames.length and @current.frameNumber > 0
     if @film.frames.length is 0
       @newFrame()
 
-    @buildFrameTimeIndex()
+    @buildFilmMeta()
     @drawCurrentFrame()
 
   smoothFrame: (index, amount) ->
@@ -668,7 +680,7 @@ class PencilTest
     oldStrokes = JSON.parse JSON.stringify frame.strokes
     @lift()
     frame.strokes = []
-    @currentFrameIndex = index
+    @current.frameNumber = index
     @field.clear()
     for stroke in oldStrokes
       for segment in stroke
@@ -709,7 +721,7 @@ class PencilTest
 
   setCurrentFrameHold: (newHold) ->
     @getCurrentFrame().hold = Math.max 1, newHold
-    @buildFrameTimeIndex()
+    @buildFilmMeta()
     @updateStatus()
 
   updateStatus: ->
@@ -721,10 +733,10 @@ class PencilTest
       markup += "<div class=\"frame\">"
       markup += "#{@options.frameRate} FPS"
       markup += " | (hold #{@getCurrentFrame().hold})"
-      markup += " | #{@currentFrameIndex + 1}/#{@film.frames.length}"
-      markup += " | #{Utils.getDecimal @frameTimeIndex[@currentFrameIndex], 1}"
-      if @audioOffset
-        markup += " #{if @audioOffset >= 0 then '+' else ''}#{@audioOffset}"
+      markup += " | #{@current.frameNumber + 1}/#{@film.frames.length}"
+      markup += " | #{Utils.getDecimal @current.frameIndex[@current.frameNumber].time, 1, String}"
+      if @film.audio?.offset
+        markup += " #{if @film.audio.offset >= 0 then '+' else ''}#{@film.audio.offset}"
       markup += "</div>"
       @statusElement.innerHTML = markup
 
@@ -782,7 +794,7 @@ class PencilTest
         for filmName in filmNames
           selectedFilmName = filmName if RegExp(selectedFilmName).test filmName
 
-      if selectedFilmName and filmNames.indexOf selectedFilmName is -1
+      if selectedFilmName and filmNames.indexOf( selectedFilmName ) isnt -1
         return selectedFilmName
       else
         Utils.alert "No film by that name."
@@ -793,8 +805,12 @@ class PencilTest
 
   setFilm: (film) ->
     @film = film
+    if @film.audio and @film.audio.url
+      @loadAudio @film.audio.url
+    else
+      @destroyAudio()
     @goToFrame 0
-    @buildFrameTimeIndex()
+    @buildFilmMeta()
     @updateStatus()
     @unsavedChanges = false
 
@@ -806,11 +822,25 @@ class PencilTest
     if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'
       window.localStorage.removeItem @encodeStorageReference 'film', filmName
 
-  buildFrameTimeIndex: ->
-    time = 0
-    @frameTimeIndex = ( time += @getFrameDuration i for i in [0...@film.frames.length] )
+  buildFilmMeta: ->
+    @current.frameIndex = []
+    @current.exposureIndex = []
+    @current.exposures = 0
 
-  getFrameDuration: (frameIndex = @currentFrameIndex) ->
+    for i in [0...@film.frames.length]
+      frame = @film.frames[i]
+      frameMeta =
+        id: i
+        exposure: @current.exposures
+        duration: frame.hold * @singleFrameDuration
+        time: @current.exposures * @singleFrameDuration
+      @current.frameIndex.push frameMeta
+      @current.exposureIndex.push frameMeta for [1...frame.hold]
+      @current.exposures += @film.frames[i].hold
+
+    @current.duration = @current.exposures * @singleFrameDuration
+
+  getFrameDuration: (frameIndex = @current.frameNumber) ->
     frame = @film.frames[frameIndex]
     frame.hold * 1 / @options.frameRate
 
@@ -820,7 +850,6 @@ class PencilTest
       @audioElement = document.createElement 'audio'
       @fieldElement.insertBefore @audioElement
       @fieldElement.preload = true
-      @audioOffset = 0
     else
       @pauseAudio()
     @audioElement.src = @state.audioURL
@@ -843,12 +872,12 @@ class PencilTest
   scrubAudio: ->
     Utils.log 'scrubAudio'
     self = @
-    @audioGoToFrame @currentFrameIndex
+    @seekToAudioAtExposure @current.frameNumber
     clearTimeout @scrubAudioTimeout
     @playAudio()
     @scrubAudioTimeout = setTimeout(
       -> self.pauseAudio()
-      Math.max @getFrameDuration( @currentFrame ) * 1000, 100
+      Math.max @getFrameDuration( @current.frameNumber ) * 1000, 100
     )
 
   showHelp: ->

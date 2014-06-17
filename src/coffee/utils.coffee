@@ -111,6 +111,15 @@ for code in [0...256]
 Utils.shiftKeyCodes = {}
 Utils.shiftKeyCodes[code] = name for name, code of Utils.shiftKeyCodeNames
 
-Utils.getDecimal = (value, precision) ->
+Utils.getDecimal = (value, precision, type = Number) ->
   factor = Math.pow 10, precision
-  Math.round(value * factor) / factor
+  output = Math.round(value * factor) / factor
+
+  if type is String
+    parts = output.toString().split '.'
+    if parts.length is 1
+      parts.push '0'
+    parts[1] += '0' while parts[1].length < precision
+    output = parts.join '.'
+
+  output

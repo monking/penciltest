@@ -7,5 +7,3 @@ window.addEventListener 'load', ->
 
   window.penciltest = new PencilTest
     container: '#penciltest'
-
-  Utils.log window.penciltest

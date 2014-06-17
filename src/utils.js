@@ -154,8 +154,22 @@ for (name in _ref) {
   Utils.shiftKeyCodes[code] = name;
 }
 
-Utils.getDecimal = function(value, precision) {
-  var factor;
+Utils.getDecimal = function(value, precision, type) {
+  var factor, output, parts;
+  if (type == null) {
+    type = Number;
+  }
   factor = Math.pow(10, precision);
-  return Math.round(value * factor) / factor;
+  output = Math.round(value * factor) / factor;
+  if (type === String) {
+    parts = output.toString().split('.');
+    if (parts.length === 1) {
+      parts.push('0');
+    }
+    while (parts[1].length < precision) {
+      parts[1] += '0';
+    }
+    output = parts.join('.');
+  }
+  return output;
 };

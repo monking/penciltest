@@ -1,6 +1,6 @@
 {
   "name": "Penciltest",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "repository": "git@github.com:monking/penciltest.git",
   "devDependencies": {
     "grunt-contrib-compass": "^0.7.2",
