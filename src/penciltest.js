@@ -993,6 +993,7 @@ PencilTest = (function() {
   PencilTest.prototype.newFilm = function() {
     this.film = {
       name: '',
+      version: PencilTest.prototype.state.version,
       frames: []
     };
     this.newFrame();

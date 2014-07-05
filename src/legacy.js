@@ -38,6 +38,7 @@ PencilTestLegacy = {
               }
             }
           }
+          film.version = '0.0.4';
           _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
         } else {
           _results.push(void 0);
