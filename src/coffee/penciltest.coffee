@@ -21,7 +21,7 @@ class PencilTest
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.0.1'
+    version: '0.0.2'
     mode: PencilTest.prototype.modes.DRAWING
 
   constructor: (options) ->
