@@ -30,6 +30,7 @@ class RendererInterface
     null
 
   setLineOverrides: ( options ) ->
+    @overrides = options
     @currentLineOptions = Utils.inherit(
       options
       @overrides
@@ -58,4 +59,7 @@ class RendererInterface
     null
 
   clear: ->
+    null
+
+  destroy: ->
     null

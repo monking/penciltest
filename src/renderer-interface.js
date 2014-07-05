@@ -31,6 +31,7 @@ RendererInterface = (function() {
   };
 
   RendererInterface.prototype.setLineOverrides = function(options) {
+    this.overrides = options;
     return this.currentLineOptions = Utils.inherit(options, this.overrides, this.defaultLineOptions());
   };
 
@@ -65,6 +66,10 @@ RendererInterface = (function() {
   };
 
   RendererInterface.prototype.clear = function() {
+    return null;
+  };
+
+  RendererInterface.prototype.destroy = function() {
     return null;
   };
 

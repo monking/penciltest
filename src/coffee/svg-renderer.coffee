@@ -32,3 +32,7 @@ class SVGRenderer extends RendererInterface
   clear: ->
     @field.clear()
     super()
+
+  destroy: ->
+    @field.remove()
+    super()

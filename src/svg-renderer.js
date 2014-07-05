@@ -44,6 +44,11 @@ SVGRenderer = (function(_super) {
     return SVGRenderer.__super__.clear.call(this);
   };
 
+  SVGRenderer.prototype.destroy = function() {
+    this.field.remove();
+    return SVGRenderer.__super__.destroy.call(this);
+  };
+
   return SVGRenderer;
 
 })(RendererInterface);

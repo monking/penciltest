@@ -22,7 +22,7 @@ class PencilTest
     onionSkin: true
     smoothing: 3
     onionSkinRange: 4
-    renderer: 'svg'
+    renderer: 'canvas'
     onionSkinOpacity: 0.5
 
   state:
@@ -42,7 +42,7 @@ class PencilTest
       PencilTest.prototype.state
     )
 
-    @setOptions Utils.inherit(
+    @options = Utils.inherit( # set options without actions
       @getStoredData 'app', 'options'
       options
       PencilTest.prototype.options
@@ -58,7 +58,7 @@ class PencilTest
     @addKeyboardListeners()
     @addOtherListeners()
 
-    @appActions[optionName]?.action?.call @ for optionName of @options
+    @setOptions @options # do all the option actions
 
     @newFilm()
 
@@ -75,17 +75,18 @@ class PencilTest
     )
 
     for key, value of options
-      @appActions[key].action() if key in @appActions and @appActions[key].action
+      @appActions[key].action.call @ if key of @appActions and @appActions[key].action
 
   appActions:
     renderer:
       label: "Set Renderer"
       listener: ->
         name = Utils.prompt 'renderer (svg, canvas): ', @options.renderer
-        if name in @availableRenderers
-          @options.renderer = name
+        if name of @availableRenderers
+          @setOptions renderer: name
       action: ->
         if @fieldElement
+          @renderer?.destroy()
           @renderer = new @availableRenderers[ @options.renderer ](
             container: @fieldElement
           )
@@ -174,14 +175,14 @@ class PencilTest
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['C']
-      listener: -> @options.hideCursor = not @options.hideCursor
+      listener: -> @setOptions hideCursor: not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
       label: "Onion Skin"
       hotkey: ['O']
       title: "show previous and next frames in red and blue"
       listener: ->
-        @options.onionSkin = not @options.onionSkin
+        @setOptions onionSkin: not @options.onionSkin
         @drawCurrentFrame()
     dropFrame:
       label: "Drop Frame"
@@ -192,7 +193,7 @@ class PencilTest
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
       hotkey: ['Shift+S']
-      listener: -> @options.smoothing = Number Utils.prompt('Smoothing', @options.smoothing)
+      listener: -> @setOptions smoothing: Number Utils.prompt('Smoothing', @options.smoothing)
       action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
     smoothFrame:
       label: "Smooth Frame"
@@ -218,12 +219,12 @@ class PencilTest
       label: "Show Status"
       title: "hide the film status bar"
       hotkey: ['S']
-      listener: -> @options.showStatus = not @options.showStatus
+      listener: -> @setOptions showStatus: not @options.showStatus
       action: -> Utils.toggleClass @statusElement, 'hidden', not @options.showStatus
     loop:
       label: "Loop"
       hotkey: ['L']
-      listener: -> @options.loop = not @options.loop
+      listener: -> @setOptions loop: not @options.loop
     saveFilm:
       label: "Save"
       hotkey: ['Alt+S']
@@ -342,7 +343,8 @@ class PencilTest
       'importFilm'
       'exportFilm'
     ]
-    Help: [
+    Settings: [
+      'renderer'
       'keyboardShortcuts'
       'reset'
     ]
@@ -455,7 +457,6 @@ class PencilTest
 
   doAppAction: (optionName) ->
     @appActions[optionName].listener?.call @
-    @appActions[optionName].action?.call @
 
   addMenuListeners: ->
     self = @
@@ -684,8 +685,8 @@ class PencilTest
     @drawFrame @current.frameNumber
     @updateStatus()
 
-  drawFrame: (frameIndex, lineOptions) ->
-    @renderer.setLineOverrides lineOptions if lineOptions
+  drawFrame: (frameIndex, overrides) ->
+    @renderer.setLineOverrides overrides if overrides
 
     for stroke in @film.frames[frameIndex].strokes
       @renderer.path stroke

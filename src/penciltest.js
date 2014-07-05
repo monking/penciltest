@@ -2,8 +2,7 @@
 /*
 global: document, window
  */
-var PencilTest,
-  __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
+var PencilTest;
 
 PencilTest = (function() {
   PencilTest.prototype.modes = {
@@ -26,7 +25,7 @@ PencilTest = (function() {
     onionSkin: true,
     smoothing: 3,
     onionSkinRange: 4,
-    renderer: 'svg',
+    renderer: 'canvas',
     onionSkinOpacity: 0.5
   };
 
@@ -44,9 +43,8 @@ PencilTest = (function() {
   };
 
   function PencilTest(options) {
-    var optionName, _ref, _ref1;
     this.state = Utils.inherit(this.getStoredData('app', 'state'), PencilTest.prototype.state);
-    this.setOptions(Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options));
+    this.options = Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options);
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
     this.buildContainer();
@@ -54,13 +52,7 @@ PencilTest = (function() {
     this.addMenuListeners();
     this.addKeyboardListeners();
     this.addOtherListeners();
-    for (optionName in this.options) {
-      if ((_ref = this.appActions[optionName]) != null) {
-        if ((_ref1 = _ref.action) != null) {
-          _ref1.call(this);
-        }
-      }
-    }
+    this.setOptions(this.options);
     this.newFilm();
     if (this.state.version !== PencilTest.prototype.state.version) {
       this.state.version = PencilTestLegacy.update(this, this.state.version, PencilTest.prototype.state.version);
@@ -74,8 +66,8 @@ PencilTest = (function() {
     _results = [];
     for (key in options) {
       value = options[key];
-      if (__indexOf.call(this.appActions, key) >= 0 && this.appActions[key].action) {
-        _results.push(this.appActions[key].action());
+      if (key in this.appActions && this.appActions[key].action) {
+        _results.push(this.appActions[key].action.call(this));
       } else {
         _results.push(void 0);
       }
@@ -89,12 +81,18 @@ PencilTest = (function() {
       listener: function() {
         var name;
         name = Utils.prompt('renderer (svg, canvas): ', this.options.renderer);
-        if (__indexOf.call(this.availableRenderers, name) >= 0) {
-          return this.options.renderer = name;
+        if (name in this.availableRenderers) {
+          return this.setOptions({
+            renderer: name
+          });
         }
       },
       action: function() {
+        var _ref;
         if (this.fieldElement) {
+          if ((_ref = this.renderer) != null) {
+            _ref.destroy();
+          }
           return this.renderer = new this.availableRenderers[this.options.renderer]({
             container: this.fieldElement
           });
@@ -223,7 +221,9 @@ PencilTest = (function() {
       label: "Hide Cursor",
       hotkey: ['C'],
       listener: function() {
-        return this.options.hideCursor = !this.options.hideCursor;
+        return this.setOptions({
+          hideCursor: !this.options.hideCursor
+        });
       },
       action: function() {
         return Utils.toggleClass(this.container, 'hide-cursor', this.options.hideCursor);
@@ -234,7 +234,9 @@ PencilTest = (function() {
       hotkey: ['O'],
       title: "show previous and next frames in red and blue",
       listener: function() {
-        this.options.onionSkin = !this.options.onionSkin;
+        this.setOptions({
+          onionSkin: !this.options.onionSkin
+        });
         return this.drawCurrentFrame();
       }
     },
@@ -251,7 +253,9 @@ PencilTest = (function() {
       title: "How much your lines will be smoothed as you draw",
       hotkey: ['Shift+S'],
       listener: function() {
-        return this.options.smoothing = Number(Utils.prompt('Smoothing', this.options.smoothing));
+        return this.setOptions({
+          smoothing: Number(Utils.prompt('Smoothing', this.options.smoothing))
+        });
       },
       action: function() {
         return this.state.smoothDrawInterval = Math.sqrt(this.options.smoothing);
@@ -294,7 +298,9 @@ PencilTest = (function() {
       title: "hide the film status bar",
       hotkey: ['S'],
       listener: function() {
-        return this.options.showStatus = !this.options.showStatus;
+        return this.setOptions({
+          showStatus: !this.options.showStatus
+        });
       },
       action: function() {
         return Utils.toggleClass(this.statusElement, 'hidden', !this.options.showStatus);
@@ -304,7 +310,9 @@ PencilTest = (function() {
       label: "Loop",
       hotkey: ['L'],
       listener: function() {
-        return this.options.loop = !this.options.loop;
+        return this.setOptions({
+          loop: !this.options.loop
+        });
       }
     },
     saveFilm: {
@@ -440,7 +448,7 @@ PencilTest = (function() {
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
-      Help: ['keyboardShortcuts', 'reset']
+      Settings: ['renderer', 'keyboardShortcuts', 'reset']
     }
   ];
 
@@ -556,11 +564,8 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.doAppAction = function(optionName) {
-    var _ref, _ref1;
-    if ((_ref = this.appActions[optionName].listener) != null) {
-      _ref.call(this);
-    }
-    return (_ref1 = this.appActions[optionName].action) != null ? _ref1.call(this) : void 0;
+    var _ref;
+    return (_ref = this.appActions[optionName].listener) != null ? _ref.call(this) : void 0;
   };
 
   PencilTest.prototype.addMenuListeners = function() {
@@ -863,10 +868,10 @@ PencilTest = (function() {
     return this.updateStatus();
   };
 
-  PencilTest.prototype.drawFrame = function(frameIndex, lineOptions) {
+  PencilTest.prototype.drawFrame = function(frameIndex, overrides) {
     var stroke, _i, _len, _ref;
-    if (lineOptions) {
-      this.renderer.setLineOverrides(lineOptions);
+    if (overrides) {
+      this.renderer.setLineOverrides(overrides);
     }
     _ref = this.film.frames[frameIndex].strokes;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
