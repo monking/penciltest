@@ -33,6 +33,8 @@ module.exports = (grunt) ->
             'src/vendor/*.js',
             'src/utils.js',
             'src/legacy.js'
+            'src/renderer-interface.js',
+            'src/*-renderer.js',
             'src/penciltest.js',
           ]
           'public/js/app.js':[

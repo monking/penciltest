@@ -4,7 +4,7 @@
 .penciltest-app.hide-cursor .field {
   cursor: none;
 }
-.penciltest-app .field {
+.penciltest-app .field-container {
   width: 720px;
   height: 405px;
   background-color: white;
@@ -14,7 +14,14 @@
   position: relative;
   cursor: crosshair;
 }
-.penciltest-app .field .status {
+.penciltest-app .field-container .field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.penciltest-app .field-container .status {
   position: absolute;
   bottom: -2em;
   right: 0;
@@ -22,13 +29,13 @@
   font-family: monospace;
   color: white;
 }
-.penciltest-app .field .status.hidden {
+.penciltest-app .field-container .status.hidden {
   display: none;
 }
-.penciltest-app .field .status .settings {
+.penciltest-app .field-container .status .settings {
   float: left;
 }
-.penciltest-app .field .status .frame {
+.penciltest-app .field-container .status .frame {
   float: right;
 }
 .penciltest-app .menu {
@@ -137,13 +144,15 @@
 }
 .penciltest-app textarea {
   position: fixed;
-  width: 30%;
+  width: 70%;
   height: 100%;
   top: 0;
-  right: -30%;
-  color: rgba(255, 255, 255, 0.5);
-  background-color: rgba(0, 0, 0, 0.5);
+  right: -70%;
+  color: #EEE;
+  background-color: rgba(0, 0, 0, 0.7);
   border: none;
+  font-size: 0.9em;
+  line-height: 1.7em;
   -webkit-transition-property: right;
   -moz-transition-property: right;
   -o-transition-property: right;

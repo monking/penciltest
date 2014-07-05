@@ -9,6 +9,10 @@ class PencilTest
     BUSY: 'working'
     PLAYING: 'playing'
 
+  availableRenderers:
+    canvas: CanvasRenderer
+    svg: SVGRenderer
+
   options:
     container: 'body'
     hideCursor: false
@@ -18,10 +22,11 @@ class PencilTest
     onionSkin: true
     smoothing: 3
     onionSkinRange: 4
+    renderer: 'svg'
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.0.3'
+    version: '0.0.4'
     mode: PencilTest.prototype.modes.DRAWING
 
   current:
@@ -32,15 +37,15 @@ class PencilTest
     frameNumber: 0
 
   constructor: (options) ->
+    @state = Utils.inherit(
+      @getStoredData 'app', 'state'
+      PencilTest.prototype.state
+    )
+
     @setOptions Utils.inherit(
       @getStoredData 'app', 'options'
       options
       PencilTest.prototype.options
-    )
-
-    @state = Utils.inherit(
-      @getStoredData 'app', 'state'
-      PencilTest.prototype.state
     )
 
     @container = document.querySelector @options.container
@@ -58,11 +63,7 @@ class PencilTest
     @newFilm()
 
     if @state.version isnt PencilTest.prototype.state.version
-      if LegacyDefinitions.hasOwnProperty @state.version
-        confirmMessage = "You last used v#{@state.version}. Currently v#{PencilTest.prototype.state.version}. Update your saved films to the new format now?"
-        if Utils.confirm confirmMessage
-          Utils.log "upgrading saved films not currently supported...working on it"
-      @state.version = PencilTest.prototype.state.version
+      @state.version = PencilTestLegacy.update @, @state.version, PencilTest.prototype.state.version
 
     window.pt = @
 
@@ -77,6 +78,17 @@ class PencilTest
       @appActions[key].action() if key in @appActions and @appActions[key].action
 
   appActions:
+    renderer:
+      label: "Set Renderer"
+      listener: ->
+        name = Utils.prompt 'renderer (svg, canvas): ', @options.renderer
+        if name in @availableRenderers
+          @options.renderer = name
+      action: ->
+        if @fieldElement
+          @renderer = new @availableRenderers[ @options.renderer ](
+            container: @fieldElement
+          )
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
@@ -173,7 +185,7 @@ class PencilTest
         @drawCurrentFrame()
     dropFrame:
       label: "Drop Frame"
-      hotkey: ['Backspace']
+      hotkey: ['X','Backspace']
       cancelComplement: true
       listener: -> @dropFrame()
     smoothing:
@@ -282,11 +294,16 @@ class PencilTest
         Utils.log "Shift Audio Later"
         @film.audio.offset++ if @film.audio
         @updateStatus()
-    showHelp:
-      label: "Help"
-      title: "Show Keyboard Shortcuts"
+    keyboardShortcuts:
+      label: "Keyboard Shortcuts"
       hotkey: ['?']
-      listener: -> @showHelp()
+      listener: -> @keyboardShortcuts()
+    reset:
+      label: "Reset"
+      title: "Clear settings; helpful if the app has stopped working."
+      action: ->
+        @state = Utils.inherit {}, PencilTest.prototype.state
+        @setOptions Utils.inherit {}, PencilTest.prototype.options
 
   menuOptions: [
     _icons: [
@@ -325,11 +342,15 @@ class PencilTest
       'importFilm'
       'exportFilm'
     ]
-    'showHelp'
+    Help: [
+      'keyboardShortcuts'
+      'reset'
+    ]
   ]
 
   buildContainer: ->
-    markup = '<div class="field">' +
+    markup = '<div class="field-container">' +
+      '<div class="field"></div>' +
       '<div class="status"></div>' +
     '</div>' +
     '<textarea></textarea>' +
@@ -339,14 +360,14 @@ class PencilTest
 
     @container.innerHTML = markup
 
+    @fieldContainer = @container.querySelector '.field-container'
     @fieldElement = @container.querySelector '.field'
-    @field = new Raphael @fieldElement
-      # container: @fieldElement
-      # width: 1280
-      # height: 720
-      # # TODO: pipe the callback parameter into a promise
-
     @statusElement = @container.querySelector '.status'
+
+    # FIXME: this will have already been called in the constructor. some way to
+    # execute initial option actions in such an order that this doesn't need to
+    # be called again?
+    @appActions.renderer.action()
 
   menuWalker: (level) ->
     markup = ''
@@ -381,8 +402,8 @@ class PencilTest
       pageCoords = getEventPageXY event
 
       self.track(
-        pageCoords.x - self.fieldElement.offsetLeft,
-        pageCoords.y - self.fieldElement.offsetTop
+        pageCoords.x - self.fieldContainer.offsetLeft,
+        pageCoords.y - self.fieldContainer.offsetTop
       )
 
     mouseDownListener = (event) ->
@@ -510,6 +531,7 @@ class PencilTest
     if index is null
       index = @film.frames.length
 
+    @lift()
     @film.frames.splice index, 0, frame
     @buildFilmMeta()
 
@@ -523,16 +545,17 @@ class PencilTest
     x = Utils.getDecimal x, 1
     y = Utils.getDecimal y, 1
 
-    if @currentStrokeIndex?
-      @drawSegmentStart = @drawSegmentEnd.replace(/^L/, 'M') if @drawSegmentEnd
-      @drawSegmentEnd = "L#{x} #{y}"
-      @getCurrentStroke().push @drawSegmentEnd
-      @field.path "#{@drawSegmentStart}#{@drawSegmentEnd}"
-    else
+    if not @currentStrokeIndex
+      @getCurrentFrame().strokes ?= []
       @currentStrokeIndex = @getCurrentFrame().strokes.length
-      @drawSegmentStart = "M#{x} #{y}"
-      @drawSegmentEnd = null
-      @getCurrentFrame().strokes.push [@drawSegmentStart]
+      @getCurrentFrame().strokes.push []
+      @renderer.moveTo x, y
+    else
+      @renderer.lineTo x, y
+
+    @getCurrentStroke().push [x, y]
+    if @state.mode is PencilTest.prototype.modes.DRAWING
+      @renderer.render()
 
     @clearRedo()
     @unsavedChanges = true
@@ -592,9 +615,9 @@ class PencilTest
       @seekToAudioAtExposure newIndex
     @drawCurrentFrame()
 
-  seekToAudioAtExposure: (index) ->
+  seekToAudioAtExposure: (frameNumber) ->
     if @film.audio
-      seekTime = ( @current.frameIndex[index].time - @film.audio.offset ) * @singleFrameDuration
+      seekTime = ( @current.frameIndex[frameNumber].time - @film.audio.offset ) * @singleFrameDuration
       @seekAudio 
 
   play: ->
@@ -639,24 +662,38 @@ class PencilTest
       if @state.mode is PencilTest.prototype.modes.PLAYING then @stop() else @play()
 
   drawCurrentFrame: ->
-    @field.clear()
+    @renderer.clear()
     if @options.onionSkin
-      for i in [0...@options.onionSkinRange]
-        if @current.frameNumber > i - 1
-          @drawFrame @current.frameNumber - i, "rgba(255,0,0,#{Math.pow(@options.onionSkinOpacity, i)})"
+      for i in [1..@options.onionSkinRange]
+        if @current.frameNumber >= i
+          @drawFrame(
+            @current.frameNumber - i
+            {
+              color: [255, 0, 0],
+              opacity: Math.pow @options.onionSkinOpacity, i
+            }
+          )
         if @current.frameNumber < @film.frames.length - i
-          @drawFrame @current.frameNumber + i, "rgba(0,0,255,#{Math.pow(@options.onionSkinOpacity, i)})"
+          @drawFrame(
+            @current.frameNumber + i
+            {
+              color: [0, 0, 255],
+              opacity: Math.pow @options.onionSkinOpacity, i
+            }
+          )
     @drawFrame @current.frameNumber
     @updateStatus()
 
-  drawFrame: (frameIndex, color = null) ->
+  drawFrame: (frameIndex, lineOptions) ->
+    @renderer.setLineOverrides lineOptions if lineOptions
+
     for stroke in @film.frames[frameIndex].strokes
-      path = @field.path stroke.join ''
-      path[0].style.stroke = color if color
+      @renderer.path stroke
+
+    @renderer.clearLineOverrides()
 
   lift: ->
     if @markBuffer && @markBuffer.length
-      Utils.log 'markBuffer has stuff'
       last = @markBuffer.pop()
       @mark last.x, last.y
       @markBuffer = []
@@ -681,11 +718,10 @@ class PencilTest
     @lift()
     frame.strokes = []
     @current.frameNumber = index
-    @field.clear()
+    @renderer.clear()
     for stroke in oldStrokes
       for segment in stroke
-        coords = segment.match /[A-Z]([0-9.\-]+) ([0-9.\-]+)/
-        @track Number(coords[1]), Number(coords[2])
+        @track.apply @, segment
       @lift()
 
     @options.smoothing = smoothingBackup
@@ -743,6 +779,7 @@ class PencilTest
   newFilm: ->
     @film =
       name: ''
+      version: PencilTest.prototype.state.version
       frames: []
 
     @newFrame()
@@ -805,12 +842,12 @@ class PencilTest
 
   setFilm: (film) ->
     @film = film
+    @buildFilmMeta()
     if @film.audio and @film.audio.url
       @loadAudio @film.audio.url
     else
       @destroyAudio()
     @goToFrame 0
-    @buildFilmMeta()
     @updateStatus()
     @unsavedChanges = false
 
@@ -840,16 +877,16 @@ class PencilTest
 
     @current.duration = @current.exposures * @singleFrameDuration
 
-  getFrameDuration: (frameIndex = @current.frameNumber) ->
-    frame = @film.frames[frameIndex]
-    frame.hold * 1 / @options.frameRate
+  getFrameDuration: (frameNumber = @current.frameNumber) ->
+    frame = @film.frames[frameNumber]
+    frame.hold / @options.frameRate
 
   loadAudio: (audioURL) ->
     @state.audioURL = audioURL
     if not @audioElement
       @audioElement = document.createElement 'audio'
       @fieldElement.insertBefore @audioElement
-      @fieldElement.preload = true
+      @audioElement.preload = true
     else
       @pauseAudio()
     @audioElement.src = @state.audioURL
@@ -880,14 +917,21 @@ class PencilTest
       Math.max @getFrameDuration( @current.frameNumber ) * 1000, 100
     )
 
-  showHelp: ->
-    helpDoc = 'Keyboard Shortcuts:\n'
-    for name, action of @appActions
-      helpDoc += action.label or name
-      if action.hotkey
-        helpDoc += " [#{action.hotkey.join ' or '}]"
-      if action.title
-        helpDoc += " - #{action.title}"
-      helpDoc += '\n'
+  keyboardShortcuts: ->
+    open = Utils.toggleClass @textElement, 'active'
+    if open
+      helpDoc = 'Keyboard Shortcuts:\n'
 
-    alert helpDoc
+      for name, action of @appActions
+        if not action.hotkey then continue
+
+        helpDoc += action.label or name
+        if action.hotkey
+          helpDoc += " [#{action.hotkey.join ' or '}]"
+        if action.title
+          helpDoc += " - #{action.title}"
+        helpDoc += '\n'
+
+      @textElement.value = helpDoc
+    else
+      @textElement.value = ''
