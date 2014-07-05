@@ -28,7 +28,7 @@ CanvasRenderer = (function(_super) {
 
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
-      return this.context.setStrokeColor(this.currentLineOptions.color[0], this.currentLineOptions.color[1], this.currentLineOptions.color[2], this.currentLineOptions.opacity);
+      return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
     }
   };
 

@@ -21,12 +21,11 @@ class CanvasRenderer extends RendererInterface
 
   updateStrokeStyle: ->
     if @context
-      @context.setStrokeColor(
-        @currentLineOptions.color[0]
-        @currentLineOptions.color[1]
-        @currentLineOptions.color[2]
-        @currentLineOptions.opacity
-      )
+      @context.strokeStyle = 'rgba(' +
+        @currentLineOptions.color[0] + ',' +
+        @currentLineOptions.color[1] + ',' +
+        @currentLineOptions.color[2] + ',' +
+        @currentLineOptions.opacity + ')'
 
   setLineOverrides: (options) ->
     super options
