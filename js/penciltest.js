@@ -8332,6 +8332,7 @@ PencilTestLegacy = {
               }
             }
           }
+          film.version = '0.0.4';
           _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
         } else {
           _results.push(void 0);
@@ -9504,6 +9505,7 @@ PencilTest = (function() {
   PencilTest.prototype.newFilm = function() {
     this.film = {
       name: '',
+      version: PencilTest.prototype.state.version,
       frames: []
     };
     this.newFrame();
