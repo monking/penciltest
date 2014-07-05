@@ -8292,16 +8292,222 @@ Utils.getDecimal = function(value, precision, type) {
   return output;
 };
 
-var LegacyDefinitions;
+var PencilTestLegacy;
 
-LegacyDefinitions = {
-  "0.0.1": {
-    film: {
-      name: String,
-      frames: [['x:Number', 'y:Number']]
+PencilTestLegacy = {
+  index: ['0.0.3', '0.0.4'],
+  workers: {
+    '0.0.3': null,
+    '0.0.4': function() {
+      var film, filmNamePattern, frame, frameIndex, i, newSegment, segment, segmentIndex, storageName, stroke, strokeIndex, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _results;
+      filmNamePattern = /^film:/;
+      _results = [];
+      for (storageName in window.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          film = JSON.parse(window.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) {
+            continue;
+          }
+          _ref = film.frames;
+          for (frameIndex = _i = 0, _len = _ref.length; _i < _len; frameIndex = ++_i) {
+            frame = _ref[frameIndex];
+            _ref1 = frame.strokes;
+            for (strokeIndex = _j = 0, _len1 = _ref1.length; _j < _len1; strokeIndex = ++_j) {
+              stroke = _ref1[strokeIndex];
+              for (segmentIndex = _k = 0, _len2 = stroke.length; _k < _len2; segmentIndex = ++_k) {
+                segment = stroke[segmentIndex];
+                if (typeof segment === 'string') {
+                  newSegment = segment.replace(/[ML]/g, '').split(' ');
+                  if (newSegment.length !== 2) {
+                    throw new Error("bad stroke segment '" + segment + "': " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
+                  }
+                  if (isNaN(newSegment[0] || isNaN(newSegment[1]))) {
+                    throw new Error("NaN stroke segment '" + segment + "':  " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
+                  }
+                  for (i = _l = 0, _ref2 = newSegment.length; 0 <= _ref2 ? _l < _ref2 : _l > _ref2; i = 0 <= _ref2 ? ++_l : --_l) {
+                    newSegment[i] = Number(newSegment[i]);
+                  }
+                  film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment;
+                }
+              }
+            }
+          }
+          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
     }
+  },
+  update: function(pt, from, to) {
+    var at, confirmMessage, error, fromIndex, i, version, _i, _ref, _ref1, _ref2;
+    at = from;
+    fromIndex = this.index.indexOf(from);
+    if (fromIndex !== -1 && fromIndex < this.index.length - 1) {
+      confirmMessage = "You last used v" + from + ". Currently v" + to + ". Update your saved films to the new format now?";
+      if (Utils.confirm(confirmMessage)) {
+        try {
+          for (i = _i = _ref = fromIndex + 1, _ref1 = this.index.length; _ref <= _ref1 ? _i < _ref1 : _i > _ref1; i = _ref <= _ref1 ? ++_i : --_i) {
+            version = this.index[i];
+            if ((_ref2 = this.workers[version]) != null) {
+              _ref2.call(pt);
+            }
+            at = version;
+          }
+        } catch (_error) {
+          error = _error;
+          Utils.log(error);
+          Utils.alert("The conversion from " + at + " to " + version + " failed. Your data is still compatible with " + at);
+        }
+      }
+    }
+    return at;
   }
 };
+
+
+/*
+global: document, window
+ */
+var RendererInterface;
+
+RendererInterface = (function() {
+  RendererInterface.prototype.options = {
+    container: 'body',
+    lineColor: [0, 0, 0],
+    lineWeight: 1,
+    lineOpacity: 1
+  };
+
+  function RendererInterface(options) {
+    this.options = Utils.inherit(options, this.options);
+    if (typeof this.options.container === 'string') {
+      this.container = document.querySelector(this.options.container);
+    } else {
+      this.container = this.options.container;
+    }
+    this.clearLineOverrides();
+  }
+
+  RendererInterface.prototype.moveTo = function(x, y) {
+    return null;
+  };
+
+  RendererInterface.prototype.lineTo = function(x, y) {
+    return null;
+  };
+
+  RendererInterface.prototype.setLineOverrides = function(options) {
+    return this.currentLineOptions = Utils.inherit(options, this.overrides, this.defaultLineOptions());
+  };
+
+  RendererInterface.prototype.defaultLineOptions = function() {
+    return {
+      color: this.options.lineColor,
+      weight: this.options.lineWeight,
+      opacity: this.options.lineOpacity
+    };
+  };
+
+  RendererInterface.prototype.clearLineOverrides = function() {
+    this.overrides = {};
+    return this.currentLineOptions = this.defaultLineOptions();
+  };
+
+  RendererInterface.prototype.path = function(path) {
+    var i, segment, _i, _len;
+    for (i = _i = 0, _len = path.length; _i < _len; i = ++_i) {
+      segment = path[i];
+      if (i === 0) {
+        this.moveTo(segment[0], segment[1]);
+      } else {
+        this.lineTo(segment[0], segment[1]);
+      }
+    }
+    return this.render();
+  };
+
+  RendererInterface.prototype.render = function() {
+    return null;
+  };
+
+  RendererInterface.prototype.clear = function() {
+    return null;
+  };
+
+  return RendererInterface;
+
+})();
+
+
+/*
+global: document, window
+ */
+var CanvasRenderer,
+  __hasProp = {}.hasOwnProperty,
+  __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+CanvasRenderer = (function(_super) {
+  __extends(CanvasRenderer, _super);
+
+  function CanvasRenderer(options) {
+    CanvasRenderer.__super__.constructor.call(this, options);
+  }
+
+  return CanvasRenderer;
+
+})(RendererInterface);
+
+
+/*
+global: document, window
+ */
+var SVGRenderer,
+  __hasProp = {}.hasOwnProperty,
+  __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+SVGRenderer = (function(_super) {
+  __extends(SVGRenderer, _super);
+
+  function SVGRenderer(options) {
+    SVGRenderer.__super__.constructor.call(this, options);
+    this.field = new Raphael(this.container);
+  }
+
+  SVGRenderer.prototype.lineTo = function(x, y) {
+    SVGRenderer.__super__.lineTo.call(this, x, y);
+    return this.drawingPath += "L" + x + " " + y;
+  };
+
+  SVGRenderer.prototype.moveTo = function(x, y) {
+    SVGRenderer.__super__.moveTo.call(this, x, y);
+    if (this.drawingPath == null) {
+      this.drawingPath = '';
+    }
+    return this.drawingPath = "M" + x + " " + y;
+  };
+
+  SVGRenderer.prototype.render = function() {
+    var path, pathStyle;
+    if (this.drawingPath) {
+      path = this.field.path(this.drawingPath);
+    }
+    if (this.currentLineOptions.color.join(' ' !== '0 0 0' || this.currentLineOptions.opacity !== 1)) {
+      pathStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
+      path[0].style.stroke = pathStyle;
+    }
+    return SVGRenderer.__super__.render.call(this);
+  };
+
+  SVGRenderer.prototype.clear = function() {
+    this.field.clear();
+    return SVGRenderer.__super__.clear.call(this);
+  };
+
+  return SVGRenderer;
+
+})(RendererInterface);
 
 
 /*
@@ -8317,6 +8523,11 @@ PencilTest = (function() {
     PLAYING: 'playing'
   };
 
+  PencilTest.prototype.availableRenderers = {
+    canvas: CanvasRenderer,
+    svg: SVGRenderer
+  };
+
   PencilTest.prototype.options = {
     container: 'body',
     hideCursor: false,
@@ -8326,11 +8537,12 @@ PencilTest = (function() {
     onionSkin: true,
     smoothing: 3,
     onionSkinRange: 4,
+    renderer: 'svg',
     onionSkinOpacity: 0.5
   };
 
   PencilTest.prototype.state = {
-    version: '0.0.3',
+    version: '0.0.4',
     mode: PencilTest.prototype.modes.DRAWING
   };
 
@@ -8343,9 +8555,9 @@ PencilTest = (function() {
   };
 
   function PencilTest(options) {
-    var confirmMessage, optionName, _ref, _ref1;
-    this.setOptions(Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options));
+    var optionName, _ref, _ref1;
     this.state = Utils.inherit(this.getStoredData('app', 'state'), PencilTest.prototype.state);
+    this.setOptions(Utils.inherit(this.getStoredData('app', 'options'), options, PencilTest.prototype.options));
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
     this.buildContainer();
@@ -8362,13 +8574,7 @@ PencilTest = (function() {
     }
     this.newFilm();
     if (this.state.version !== PencilTest.prototype.state.version) {
-      if (LegacyDefinitions.hasOwnProperty(this.state.version)) {
-        confirmMessage = "You last used v" + this.state.version + ". Currently v" + PencilTest.prototype.state.version + ". Update your saved films to the new format now?";
-        if (Utils.confirm(confirmMessage)) {
-          Utils.log("upgrading saved films not currently supported...working on it");
-        }
-      }
-      this.state.version = PencilTest.prototype.state.version;
+      this.state.version = PencilTestLegacy.update(this, this.state.version, PencilTest.prototype.state.version);
     }
     window.pt = this;
   }
@@ -8389,6 +8595,23 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.appActions = {
+    renderer: {
+      label: "Set Renderer",
+      listener: function() {
+        var name;
+        name = Utils.prompt('renderer (svg, canvas): ', this.options.renderer);
+        if (__indexOf.call(this.availableRenderers, name) >= 0) {
+          return this.options.renderer = name;
+        }
+      },
+      action: function() {
+        if (this.fieldElement) {
+          return this.renderer = new this.availableRenderers[this.options.renderer]({
+            container: this.fieldElement
+          });
+        }
+      }
+    },
     playPause: {
       label: "Play/Pause",
       hotkey: ['Space'],
@@ -8528,7 +8751,7 @@ PencilTest = (function() {
     },
     dropFrame: {
       label: "Drop Frame",
-      hotkey: ['Backspace'],
+      hotkey: ['X', 'Backspace'],
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
@@ -8704,12 +8927,19 @@ PencilTest = (function() {
         return this.updateStatus();
       }
     },
-    showHelp: {
-      label: "Help",
-      title: "Show Keyboard Shortcuts",
+    keyboardShortcuts: {
+      label: "Keyboard Shortcuts",
       hotkey: ['?'],
       listener: function() {
-        return this.showHelp();
+        return this.keyboardShortcuts();
+      }
+    },
+    reset: {
+      label: "Reset",
+      title: "Clear settings; helpful if the app has stopped working.",
+      action: function() {
+        this.state = Utils.inherit({}, PencilTest.prototype.state);
+        return this.setOptions(Utils.inherit({}, PencilTest.prototype.options));
       }
     }
   };
@@ -8720,17 +8950,19 @@ PencilTest = (function() {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm']
-    }, 'showHelp'
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
+      Help: ['keyboardShortcuts', 'reset']
+    }
   ];
 
   PencilTest.prototype.buildContainer = function() {
     var markup;
-    markup = '<div class="field">' + '<div class="status"></div>' + '</div>' + '<textarea></textarea>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
+    markup = '<div class="field-container">' + '<div class="field"></div>' + '<div class="status"></div>' + '</div>' + '<textarea></textarea>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
     this.container.innerHTML = markup;
+    this.fieldContainer = this.container.querySelector('.field-container');
     this.fieldElement = this.container.querySelector('.field');
-    this.field = new Raphael(this.fieldElement);
-    return this.statusElement = this.container.querySelector('.status');
+    this.statusElement = this.container.querySelector('.status');
+    return this.appActions.renderer.action();
   };
 
   PencilTest.prototype.menuWalker = function(level) {
@@ -8776,7 +9008,7 @@ PencilTest = (function() {
     trackFromEvent = function(event) {
       var pageCoords;
       pageCoords = getEventPageXY(event);
-      return self.track(pageCoords.x - self.fieldElement.offsetLeft, pageCoords.y - self.fieldElement.offsetTop);
+      return self.track(pageCoords.x - self.fieldContainer.offsetLeft, pageCoords.y - self.fieldContainer.offsetTop);
     };
     mouseDownListener = function(event) {
       event.preventDefault();
@@ -8935,6 +9167,7 @@ PencilTest = (function() {
     if (index === null) {
       index = this.film.frames.length;
     }
+    this.lift();
     this.film.frames.splice(index, 0, frame);
     return this.buildFilmMeta();
   };
@@ -8948,20 +9181,22 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.mark = function(x, y) {
+    var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
-    if (this.currentStrokeIndex != null) {
-      if (this.drawSegmentEnd) {
-        this.drawSegmentStart = this.drawSegmentEnd.replace(/^L/, 'M');
+    if (!this.currentStrokeIndex) {
+      if ((_base = this.getCurrentFrame()).strokes == null) {
+        _base.strokes = [];
       }
-      this.drawSegmentEnd = "L" + x + " " + y;
-      this.getCurrentStroke().push(this.drawSegmentEnd);
-      this.field.path("" + this.drawSegmentStart + this.drawSegmentEnd);
-    } else {
       this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
-      this.drawSegmentStart = "M" + x + " " + y;
-      this.drawSegmentEnd = null;
-      this.getCurrentFrame().strokes.push([this.drawSegmentStart]);
+      this.getCurrentFrame().strokes.push([]);
+      this.renderer.moveTo(x, y);
+    } else {
+      this.renderer.lineTo(x, y);
+    }
+    this.getCurrentStroke().push([x, y]);
+    if (this.state.mode === PencilTest.prototype.modes.DRAWING) {
+      this.renderer.render();
     }
     this.clearRedo();
     return this.unsavedChanges = true;
@@ -9049,10 +9284,10 @@ PencilTest = (function() {
     return this.drawCurrentFrame();
   };
 
-  PencilTest.prototype.seekToAudioAtExposure = function(index) {
+  PencilTest.prototype.seekToAudioAtExposure = function(frameNumber) {
     var seekTime;
     if (this.film.audio) {
-      seekTime = (this.current.frameIndex[index].time - this.film.audio.offset) * this.singleFrameDuration;
+      seekTime = (this.current.frameIndex[frameNumber].time - this.film.audio.offset) * this.singleFrameDuration;
       return this.seekAudio;
     }
   };
@@ -9118,14 +9353,20 @@ PencilTest = (function() {
 
   PencilTest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
-    this.field.clear();
+    this.renderer.clear();
     if (this.options.onionSkin) {
-      for (i = _i = 0, _ref = this.options.onionSkinRange; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        if (this.current.frameNumber > i - 1) {
-          this.drawFrame(this.current.frameNumber - i, "rgba(255,0,0," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+      for (i = _i = 1, _ref = this.options.onionSkinRange; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
+        if (this.current.frameNumber >= i) {
+          this.drawFrame(this.current.frameNumber - i, {
+            color: [255, 0, 0],
+            opacity: Math.pow(this.options.onionSkinOpacity, i)
+          });
         }
         if (this.current.frameNumber < this.film.frames.length - i) {
-          this.drawFrame(this.current.frameNumber + i, "rgba(0,0,255," + (Math.pow(this.options.onionSkinOpacity, i)) + ")");
+          this.drawFrame(this.current.frameNumber + i, {
+            color: [0, 0, 255],
+            opacity: Math.pow(this.options.onionSkinOpacity, i)
+          });
         }
       }
     }
@@ -9133,29 +9374,22 @@ PencilTest = (function() {
     return this.updateStatus();
   };
 
-  PencilTest.prototype.drawFrame = function(frameIndex, color) {
-    var path, stroke, _i, _len, _ref, _results;
-    if (color == null) {
-      color = null;
+  PencilTest.prototype.drawFrame = function(frameIndex, lineOptions) {
+    var stroke, _i, _len, _ref;
+    if (lineOptions) {
+      this.renderer.setLineOverrides(lineOptions);
     }
     _ref = this.film.frames[frameIndex].strokes;
-    _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      path = this.field.path(stroke.join(''));
-      if (color) {
-        _results.push(path[0].style.stroke = color);
-      } else {
-        _results.push(void 0);
-      }
+      this.renderer.path(stroke);
     }
-    return _results;
+    return this.renderer.clearLineOverrides();
   };
 
   PencilTest.prototype.lift = function() {
     var last;
     if (this.markBuffer && this.markBuffer.length) {
-      Utils.log('markBuffer has stuff');
       last = this.markBuffer.pop();
       this.mark(last.x, last.y);
       this.markBuffer = [];
@@ -9176,7 +9410,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.smoothFrame = function(index, amount) {
-    var coords, frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1;
+    var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1;
     if (!amount) {
       amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
     }
@@ -9187,13 +9421,12 @@ PencilTest = (function() {
     this.lift();
     frame.strokes = [];
     this.current.frameNumber = index;
-    this.field.clear();
+    this.renderer.clear();
     for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
       stroke = oldStrokes[_i];
       for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
         segment = stroke[_j];
-        coords = segment.match(/[A-Z]([0-9.\-]+) ([0-9.\-]+)/);
-        this.track(Number(coords[1]), Number(coords[2]));
+        this.track.apply(this, segment);
       }
       this.lift();
     }
@@ -9357,13 +9590,13 @@ PencilTest = (function() {
 
   PencilTest.prototype.setFilm = function(film) {
     this.film = film;
+    this.buildFilmMeta();
     if (this.film.audio && this.film.audio.url) {
       this.loadAudio(this.film.audio.url);
     } else {
       this.destroyAudio();
     }
     this.goToFrame(0);
-    this.buildFilmMeta();
     this.updateStatus();
     return this.unsavedChanges = false;
   };
@@ -9404,13 +9637,13 @@ PencilTest = (function() {
     return this.current.duration = this.current.exposures * this.singleFrameDuration;
   };
 
-  PencilTest.prototype.getFrameDuration = function(frameIndex) {
+  PencilTest.prototype.getFrameDuration = function(frameNumber) {
     var frame;
-    if (frameIndex == null) {
-      frameIndex = this.current.frameNumber;
+    if (frameNumber == null) {
+      frameNumber = this.current.frameNumber;
     }
-    frame = this.film.frames[frameIndex];
-    return frame.hold * 1 / this.options.frameRate;
+    frame = this.film.frames[frameNumber];
+    return frame.hold / this.options.frameRate;
   };
 
   PencilTest.prototype.loadAudio = function(audioURL) {
@@ -9418,7 +9651,7 @@ PencilTest = (function() {
     if (!this.audioElement) {
       this.audioElement = document.createElement('audio');
       this.fieldElement.insertBefore(this.audioElement);
-      this.fieldElement.preload = true;
+      this.audioElement.preload = true;
     } else {
       this.pauseAudio();
     }
@@ -9463,22 +9696,30 @@ PencilTest = (function() {
     }, Math.max(this.getFrameDuration(this.current.frameNumber) * 1000, 100));
   };
 
-  PencilTest.prototype.showHelp = function() {
-    var action, helpDoc, name, _ref;
-    helpDoc = 'Keyboard Shortcuts:\n';
-    _ref = this.appActions;
-    for (name in _ref) {
-      action = _ref[name];
-      helpDoc += action.label || name;
-      if (action.hotkey) {
-        helpDoc += " [" + (action.hotkey.join(' or ')) + "]";
+  PencilTest.prototype.keyboardShortcuts = function() {
+    var action, helpDoc, name, open, _ref;
+    open = Utils.toggleClass(this.textElement, 'active');
+    if (open) {
+      helpDoc = 'Keyboard Shortcuts:\n';
+      _ref = this.appActions;
+      for (name in _ref) {
+        action = _ref[name];
+        if (!action.hotkey) {
+          continue;
+        }
+        helpDoc += action.label || name;
+        if (action.hotkey) {
+          helpDoc += " [" + (action.hotkey.join(' or ')) + "]";
+        }
+        if (action.title) {
+          helpDoc += " - " + action.title;
+        }
+        helpDoc += '\n';
       }
-      if (action.title) {
-        helpDoc += " - " + action.title;
-      }
-      helpDoc += '\n';
+      return this.textElement.value = helpDoc;
+    } else {
+      return this.textElement.value = '';
     }
-    return alert(helpDoc);
   };
 
   return PencilTest;
