@@ -1,7 +1,7 @@
 var PencilTestLegacy;
 
 PencilTestLegacy = {
-  index: ['0.0.3', '0.0.4'],
+  index: ['0.0.3', '0.0.4', '0.0.5'],
   workers: {
     '0.0.3': null,
     '0.0.4': function() {
@@ -39,6 +39,30 @@ PencilTestLegacy = {
             }
           }
           film.version = '0.0.4';
+          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    },
+    '0.0.5': function() {
+      var film, filmNamePattern, storageName, _results;
+      filmNamePattern = /^film:/;
+      _results = [];
+      for (storageName in window.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          film = JSON.parse(window.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) {
+            continue;
+          }
+          if (film.aspect == null) {
+            film.aspect = '16:9';
+          }
+          if (film.width == null) {
+            film.width = 720;
+          }
+          film.version = '0.0.5';
           _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
         } else {
           _results.push(void 0);

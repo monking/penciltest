@@ -26,7 +26,7 @@ class PencilTest
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.0.4'
+    version: '0.0.5'
     mode: PencilTest.prototype.modes.DRAWING
 
   current:
@@ -64,6 +64,8 @@ class PencilTest
 
     if @state.version isnt PencilTest.prototype.state.version
       @state.version = PencilTestLegacy.update @, @state.version, PencilTest.prototype.state.version
+
+    @resize()
 
     window.pt = @
 
@@ -554,7 +556,8 @@ class PencilTest
     else
       @renderer.lineTo x, y
 
-    @getCurrentStroke().push [x, y]
+    frameScale = @film.width / @width
+    @getCurrentStroke().push @scaleCoordinates [x, y], frameScale
     if @state.mode is PencilTest.prototype.modes.DRAWING
       @renderer.render()
 
@@ -687,11 +690,24 @@ class PencilTest
 
   drawFrame: (frameIndex, overrides) ->
     @renderer.setLineOverrides overrides if overrides
+    frameScale = @width / @film.width
 
     for stroke in @film.frames[frameIndex].strokes
-      @renderer.path stroke
+      @renderer.path @scaleStroke stroke, frameScale
 
     @renderer.clearLineOverrides()
+    @renderer.options.lineWeight = frameScale
+
+  scaleStroke: (stroke, factor) ->
+    @scaleCoordinates coords, factor for coords in stroke
+
+  scaleCoordinates: (coords, factor) ->
+    newCoords = [
+      coords[0] * factor
+      coords[1] * factor
+    ]
+    newCoords.push  coords.slice 2
+    newCoords
 
   lift: ->
     if @markBuffer && @markBuffer.length
@@ -781,6 +797,8 @@ class PencilTest
     @film =
       name: ''
       version: PencilTest.prototype.state.version
+      aspect: '16:9'
+      width: 960
       frames: []
 
     @newFrame()
@@ -936,3 +954,25 @@ class PencilTest
       @textElement.value = helpDoc
     else
       @textElement.value = ''
+
+  resize: ->
+    containerWidth = @container.offsetWidth
+    containerHeight = @container.offsetHeight
+    if @options.showStatus
+      containerHeight -= 36
+    aspect = @film.aspect or '16:9'
+    aspectParts = aspect.split ':'
+    aspectNumber = aspectParts[0] / aspectParts[1]
+    containerAspect = containerWidth / containerHeight
+
+    if containerAspect > aspectNumber
+      @width = Math.floor containerHeight * aspectNumber
+      @height = containerHeight
+    else
+      @width = containerWidth
+      @height = Math.floor containerWidth / aspectNumber
+
+    @fieldContainer.style.width = "#{@width}px"
+    @fieldContainer.style.height = "#{@height}px"
+    @renderer.resize @width, @height
+    @drawCurrentFrame()

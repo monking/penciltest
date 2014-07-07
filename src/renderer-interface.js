@@ -9,7 +9,9 @@ RendererInterface = (function() {
     container: 'body',
     lineColor: [0, 0, 0],
     lineWeight: 1,
-    lineOpacity: 1
+    lineOpacity: 1,
+    width: 960,
+    height: 540
   };
 
   function RendererInterface(options) {
@@ -20,7 +22,13 @@ RendererInterface = (function() {
       this.container = this.options.container;
     }
     this.clearLineOverrides();
+    this.resize(this.options.width, this.options.height);
   }
+
+  RendererInterface.prototype.resize = function(width, height) {
+    this.width = width;
+    return this.height = height;
+  };
 
   RendererInterface.prototype.moveTo = function(x, y) {
     return null;

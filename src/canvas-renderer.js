@@ -10,15 +10,11 @@ CanvasRenderer = (function(_super) {
   __extends(CanvasRenderer, _super);
 
   function CanvasRenderer(options) {
-    CanvasRenderer.__super__.constructor.call(this, options);
-    this.width = this.container.offsetWidth;
-    this.height = this.container.offsetHeight;
     this.field = document.createElement('canvas');
-    this.field.setAttribute('width', this.width);
-    this.field.setAttribute('height', this.height);
     this.context = this.field.getContext('2d');
-    this.updateStrokeStyle();
+    CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
+    this.updateStrokeStyle();
   }
 
   CanvasRenderer.prototype.lineTo = function(x, y) {
@@ -28,6 +24,7 @@ CanvasRenderer = (function(_super) {
 
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
+      this.context.lineWidth = this.currentLineOptions.lineWeight;
       return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
     }
   };
@@ -49,9 +46,11 @@ CanvasRenderer = (function(_super) {
   };
 
   CanvasRenderer.prototype.render = function() {
-    this.context.stroke();
-    this.drawingPath = null;
-    return CanvasRenderer.__super__.render.call(this);
+    CanvasRenderer.__super__.render.call(this);
+    if (this.context) {
+      this.context.stroke();
+      return this.drawingPath = null;
+    }
   };
 
   CanvasRenderer.prototype.clear = function() {
@@ -63,6 +62,12 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.destroy = function() {
     this.field.remove();
     return CanvasRenderer.__super__.destroy.call(this);
+  };
+
+  CanvasRenderer.prototype.resize = function(width, height) {
+    this.field.setAttribute('width', width);
+    this.field.setAttribute('height', height);
+    return CanvasRenderer.__super__.resize.call(this, width, height);
   };
 
   return CanvasRenderer;

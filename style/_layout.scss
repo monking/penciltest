@@ -8,11 +8,8 @@
   }
 
   .field-container {
-    $fieldAspect: 16 9;
-    $fieldWidth: 720px;
-    $fieldHeight: $fieldWidth / nth($fieldAspect, 1) * nth($fieldAspect, 2);
-    width: $fieldWidth;
-    height: $fieldHeight;
+    width: 960px;
+    height: 540px;
     background-color: $white;
     display: block;
     margin: 0 auto;

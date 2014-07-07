@@ -3,6 +3,7 @@ PencilTestLegacy =
   index: [
     '0.0.3'
     '0.0.4'
+    '0.0.5'
   ]
 
   workers:
@@ -28,6 +29,18 @@ PencilTestLegacy =
                   film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment
 
           film.version = '0.0.4'
+          window.localStorage.setItem storageName, JSON.stringify film
+    '0.0.5': ->
+      # enable scaling, assuming 16:9, 720 width for undefined
+      filmNamePattern = /^film:/
+      for storageName of window.localStorage
+        if filmNamePattern.test storageName
+          film = JSON.parse window.localStorage.getItem storageName
+          if not film or not film.frames or not film.frames.length then continue
+
+          film.aspect ?= '16:9'
+          film.width ?= 720
+          film.version = '0.0.5'
           window.localStorage.setItem storageName, JSON.stringify film
 
   update: (pt, from, to) ->

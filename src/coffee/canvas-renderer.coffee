@@ -5,15 +5,14 @@ global: document, window
 class CanvasRenderer extends RendererInterface
 
   constructor: (options) ->
-    super options
-    @width = @container.offsetWidth
-    @height = @container.offsetHeight
     @field = document.createElement 'canvas'
-    @field.setAttribute 'width', @width
-    @field.setAttribute 'height', @height
     @context = @field.getContext '2d'
-    @updateStrokeStyle()
+
+    super options
+
     @container.appendChild @field
+
+    @updateStrokeStyle()
 
   lineTo: (x, y) ->
     super x, y
@@ -21,6 +20,7 @@ class CanvasRenderer extends RendererInterface
 
   updateStrokeStyle: ->
     if @context
+      @context.lineWidth = @currentLineOptions.lineWeight
       @context.strokeStyle = 'rgba(' +
         @currentLineOptions.color[0] + ',' +
         @currentLineOptions.color[1] + ',' +
@@ -41,9 +41,10 @@ class CanvasRenderer extends RendererInterface
     @drawingPath ?= @context.beginPath()
 
   render: ->
-    @context.stroke()
-    @drawingPath = null
     super()
+    if @context
+      @context.stroke()
+      @drawingPath = null
 
   clear: ->
     @drawingPath = null
@@ -53,3 +54,8 @@ class CanvasRenderer extends RendererInterface
   destroy: ->
     @field.remove()
     super()
+
+  resize: (width, height) ->
+    @field.setAttribute 'width', width
+    @field.setAttribute 'height', height
+    super width, height

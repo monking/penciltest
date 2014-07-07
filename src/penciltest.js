@@ -30,7 +30,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.state = {
-    version: '0.0.4',
+    version: '0.0.5',
     mode: PencilTest.prototype.modes.DRAWING
   };
 
@@ -57,6 +57,7 @@ PencilTest = (function() {
     if (this.state.version !== PencilTest.prototype.state.version) {
       this.state.version = PencilTestLegacy.update(this, this.state.version, PencilTest.prototype.state.version);
     }
+    this.resize();
     window.pt = this;
   }
 
@@ -675,7 +676,7 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.mark = function(x, y) {
-    var _base;
+    var frameScale, _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
     if (!this.currentStrokeIndex) {
@@ -688,7 +689,8 @@ PencilTest = (function() {
     } else {
       this.renderer.lineTo(x, y);
     }
-    this.getCurrentStroke().push([x, y]);
+    frameScale = this.film.width / this.width;
+    this.getCurrentStroke().push(this.scaleCoordinates([x, y], frameScale));
     if (this.state.mode === PencilTest.prototype.modes.DRAWING) {
       this.renderer.render();
     }
@@ -869,16 +871,35 @@ PencilTest = (function() {
   };
 
   PencilTest.prototype.drawFrame = function(frameIndex, overrides) {
-    var stroke, _i, _len, _ref;
+    var frameScale, stroke, _i, _len, _ref;
     if (overrides) {
       this.renderer.setLineOverrides(overrides);
     }
+    frameScale = this.width / this.film.width;
     _ref = this.film.frames[frameIndex].strokes;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      this.renderer.path(stroke);
+      this.renderer.path(this.scaleStroke(stroke, frameScale));
     }
-    return this.renderer.clearLineOverrides();
+    this.renderer.clearLineOverrides();
+    return this.renderer.options.lineWeight = frameScale;
+  };
+
+  PencilTest.prototype.scaleStroke = function(stroke, factor) {
+    var coords, _i, _len, _results;
+    _results = [];
+    for (_i = 0, _len = stroke.length; _i < _len; _i++) {
+      coords = stroke[_i];
+      _results.push(this.scaleCoordinates(coords, factor));
+    }
+    return _results;
+  };
+
+  PencilTest.prototype.scaleCoordinates = function(coords, factor) {
+    var newCoords;
+    newCoords = [coords[0] * factor, coords[1] * factor];
+    newCoords.push(coords.slice(2));
+    return newCoords;
   };
 
   PencilTest.prototype.lift = function() {
@@ -999,6 +1020,8 @@ PencilTest = (function() {
     this.film = {
       name: '',
       version: PencilTest.prototype.state.version,
+      aspect: '16:9',
+      width: 960,
       frames: []
     };
     this.newFrame();
@@ -1215,6 +1238,30 @@ PencilTest = (function() {
     } else {
       return this.textElement.value = '';
     }
+  };
+
+  PencilTest.prototype.resize = function() {
+    var aspect, aspectNumber, aspectParts, containerAspect, containerHeight, containerWidth;
+    containerWidth = this.container.offsetWidth;
+    containerHeight = this.container.offsetHeight;
+    if (this.options.showStatus) {
+      containerHeight -= 36;
+    }
+    aspect = this.film.aspect || '16:9';
+    aspectParts = aspect.split(':');
+    aspectNumber = aspectParts[0] / aspectParts[1];
+    containerAspect = containerWidth / containerHeight;
+    if (containerAspect > aspectNumber) {
+      this.width = Math.floor(containerHeight * aspectNumber);
+      this.height = containerHeight;
+    } else {
+      this.width = containerWidth;
+      this.height = Math.floor(containerWidth / aspectNumber);
+    }
+    this.fieldContainer.style.width = "" + this.width + "px";
+    this.fieldContainer.style.height = "" + this.height + "px";
+    this.renderer.resize(this.width, this.height);
+    return this.drawCurrentFrame();
   };
 
   return PencilTest;

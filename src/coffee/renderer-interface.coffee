@@ -9,6 +9,8 @@ class RendererInterface
     lineColor: [0, 0, 0]
     lineWeight: 1
     lineOpacity: 1
+    width: 960
+    height: 540
 
   constructor: (options) ->
     @options = Utils.inherit(
@@ -22,6 +24,12 @@ class RendererInterface
       @container = @options.container
 
     @clearLineOverrides()
+
+    @resize @options.width, @options.height
+
+  resize: (width, height) ->
+    @width = width
+    @height = height
 
   moveTo: (x, y) ->
     null
