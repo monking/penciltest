@@ -3,7 +3,11 @@
 global: window, document
  */
 window.addEventListener('load', function() {
-  return window.penciltest = new PencilTest({
+  var penciltest;
+  penciltest = new PencilTest({
     container: '#penciltest'
+  });
+  return window.addEventListener('resize', function() {
+    return penciltest.resize();
   });
 });
