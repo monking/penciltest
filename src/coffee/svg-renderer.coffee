@@ -9,6 +9,8 @@ class SVGRenderer extends RendererInterface
 
     @field = new Raphael @container
 
+    @init()
+
   lineTo: (x, y) ->
     super x, y
     @drawingPath += "L#{x} #{y}"
@@ -36,3 +38,7 @@ class SVGRenderer extends RendererInterface
   destroy: ->
     @field.remove()
     super()
+
+  resize: (width, height) ->
+    @field.setSize width, height
+    super width, height

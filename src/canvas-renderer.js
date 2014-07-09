@@ -10,10 +10,11 @@ CanvasRenderer = (function(_super) {
   __extends(CanvasRenderer, _super);
 
   function CanvasRenderer(options) {
+    CanvasRenderer.__super__.constructor.call(this, options);
     this.field = document.createElement('canvas');
     this.context = this.field.getContext('2d');
-    CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
+    this.init();
     this.updateStrokeStyle();
   }
 

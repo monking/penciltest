@@ -21,9 +21,12 @@ RendererInterface = (function() {
     } else {
       this.container = this.options.container;
     }
-    this.clearLineOverrides();
-    this.resize(this.options.width, this.options.height);
   }
+
+  RendererInterface.prototype.init = function() {
+    this.clearLineOverrides();
+    return this.resize(this.options.width, this.options.height);
+  };
 
   RendererInterface.prototype.resize = function(width, height) {
     this.width = width;

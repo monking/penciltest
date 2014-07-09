@@ -5,12 +5,13 @@ global: document, window
 class CanvasRenderer extends RendererInterface
 
   constructor: (options) ->
-    @field = document.createElement 'canvas'
-    @context = @field.getContext '2d'
-
     super options
 
+    @field = document.createElement 'canvas'
+    @context = @field.getContext '2d'
     @container.appendChild @field
+
+    @init()
 
     @updateStrokeStyle()
 

@@ -8456,9 +8456,12 @@ RendererInterface = (function() {
     } else {
       this.container = this.options.container;
     }
-    this.clearLineOverrides();
-    this.resize(this.options.width, this.options.height);
   }
+
+  RendererInterface.prototype.init = function() {
+    this.clearLineOverrides();
+    return this.resize(this.options.width, this.options.height);
+  };
 
   RendererInterface.prototype.resize = function(width, height) {
     this.width = width;
@@ -8532,10 +8535,11 @@ CanvasRenderer = (function(_super) {
   __extends(CanvasRenderer, _super);
 
   function CanvasRenderer(options) {
+    CanvasRenderer.__super__.constructor.call(this, options);
     this.field = document.createElement('canvas');
     this.context = this.field.getContext('2d');
-    CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
+    this.init();
     this.updateStrokeStyle();
   }
 
@@ -8610,6 +8614,7 @@ SVGRenderer = (function(_super) {
   function SVGRenderer(options) {
     SVGRenderer.__super__.constructor.call(this, options);
     this.field = new Raphael(this.container);
+    this.init();
   }
 
   SVGRenderer.prototype.lineTo = function(x, y) {
@@ -8645,6 +8650,11 @@ SVGRenderer = (function(_super) {
   SVGRenderer.prototype.destroy = function() {
     this.field.remove();
     return SVGRenderer.__super__.destroy.call(this);
+  };
+
+  SVGRenderer.prototype.resize = function(width, height) {
+    this.field.setSize(width, height);
+    return SVGRenderer.__super__.resize.call(this, width, height);
   };
 
   return SVGRenderer;

@@ -23,8 +23,10 @@ class RendererInterface
     else
       @container = @options.container
 
-    @clearLineOverrides()
+    # call @init() in the constructor implementing this interface
 
+  init: ->
+    @clearLineOverrides()
     @resize @options.width, @options.height
 
   resize: (width, height) ->
