@@ -31,7 +31,8 @@ class PenciltestUI extends PenciltestUIComponent
         className: 'app-status'
         parent: 'statusLeft'
       filmStatus:
-        className: 'film-status', @components.statusRight
+        className: 'film-status'
+        parent: 'statusRight'
       toggleTimeline:
         tagName: 'button'
         className: 'toggle-timeline fa fa-table'
@@ -408,7 +409,7 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
-    @components.toggleMenu.addEventListener 'click', contextMenuListener
+    @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value
@@ -433,8 +434,6 @@ class PenciltestUI extends PenciltestUIComponent
       option.addEventListener 'mouseup', menuOptionListener
       # option.addEventListener 'touchend', menuOptionListener
       option.addEventListener 'contextmenu', menuOptionListener
-
-    @components.textIO = @controller.container.querySelector 'textarea'
 
   addKeyboardListeners: ->
     self = @
@@ -482,7 +481,7 @@ class PenciltestUI extends PenciltestUIComponent
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
   describeKeyboardShortcuts: ->
-    open = Utils.toggleClass @components.textIO, 'active'
+    open = Utils.toggleClass @components.textIO.getElement, 'active'
     if open
       helpDoc = 'Keyboard Shortcuts:\n'
 
@@ -496,16 +495,16 @@ class PenciltestUI extends PenciltestUIComponent
           helpDoc += " - #{action.title}"
         helpDoc += '\n'
 
-      @components.textIO.value = helpDoc
+      @components.textIO.getElement().value = helpDoc
     else
-      @components.textIO.value = ''
+      @components.textIO.getElement().value = ''
 
   updateStatus: ->
     if @controller.options.showStatus
       appStatusMarkup = "v#{Penciltest.prototype.state.version}"
       appStatusMarkup += " Smoothing: #{@controller.options.smoothing}"
 
-      @components.appStatus.innerHTML = appStatusMarkup
+      @components.appStatus.setHTML appStatusMarkup
 
       filmStatusMarkup = "<div class=\"frame\">"
       filmStatusMarkup += "#{@controller.options.frameRate} FPS"
@@ -516,14 +515,14 @@ class PenciltestUI extends PenciltestUIComponent
         filmStatusMarkup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
       filmStatusMarkup += "</div>"
 
-      @components.filmStatus.innerHTML = filmStatusMarkup
+      @components.filmStatus.setHTML filmStatusMarkup
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
       @menuIsVisible = true
-      Utils.toggleClass @components.container, 'menu-visible', true
+      Utils.toggleClass @el.container, 'menu-visible', true
 
-      maxRight = @components.toggleMenu.offsetWidth
+      maxRight = @components.toggleMenu.getElement().offsetWidth
       maxBottom = 0
 
       if coords.x > document.body.offsetWidth - maxRight - @menuElement.offsetWidth
@@ -546,7 +545,7 @@ class PenciltestUI extends PenciltestUIComponent
   hideMenu: ->
     if @menuIsVisible
       @menuIsVisible = false
-      Utils.toggleClass @components.container, 'menu-visible', false
+      Utils.toggleClass @el.container, 'menu-visible', false
 
   toggleMenu: (coords) ->
     if @menuIsVisible then @hideMenu() else @showMenu coords
