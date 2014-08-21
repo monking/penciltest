@@ -1,8 +1,16 @@
-var PenciltestUI;
+var PenciltestUI,
+  __hasProp = {}.hasOwnProperty,
+  __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
-PenciltestUI = (function() {
+PenciltestUI = (function(_super) {
+  __extends(PenciltestUI, _super);
+
   function PenciltestUI(controller) {
     this.controller = controller;
+    PenciltestUI.__super__.constructor.call(this, {
+      className: 'penciltest-ui',
+      parent: this.controller.container
+    });
     this.markupDOMElements();
     this.addInputListeners();
     this.addMenuListeners();
@@ -11,19 +19,37 @@ PenciltestUI = (function() {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
+    var componentInfo, name, options, _i, _len;
     this.components = {};
-    this.components.container = new PencilTestUIComponent({
-      className: 'penciltest-ui',
-      parent: this.controller.container
-    });
-    this.components.toolbar = new PencilTestUIComponent({
-      className: 'toolbar',
-      parent: this.components.container
-    });
-    this.components.statusBar = createElement('div.status', this.components.toolbar);
-    this.components.statusLeft = createElement('div.status-left', this.components.statusBar);
-    this.components.statusRight = createElement('div.status-right', this.components.statusBar);
-    this.components.appStatus = createElement('div.app-status', this.components.statusLeft);
+    componentInfo = {
+      toolbar: {
+        className: 'toolbar',
+        parent: this
+      },
+      statusBar: {
+        className: 'status',
+        parent: 'toolbar'
+      },
+      statusLeft: {
+        className: 'status-left',
+        parent: 'statusBar'
+      },
+      statusRight: {
+        className: 'status-right',
+        parent: 'statusBar'
+      },
+      appStatus: {
+        className: 'app-status',
+        parent: 'statusLeft'
+      }
+    };
+    for (options = _i = 0, _len = componentInfo.length; _i < _len; options = ++_i) {
+      name = componentInfo[options];
+      if (typeof options.parent === 'string') {
+        options.parent = this.components[name];
+      }
+      this.components[name] = new PencilTestUIComponent(options);
+    }
     this.components.filmStatus = createElement('div.film-status', this.components.statusRight);
     this.components.toggleTimeline = createElement('button.toggle-timeline.fa.fa-table', this.components.statusRight);
     this.components.toggleMenu = createElement('button.toggle-menu.fa.fa-cog', this.components.statusRight);
@@ -699,4 +725,4 @@ PenciltestUI = (function() {
 
   return PenciltestUI;
 
-})();
+})(PenciltestUIComponent);

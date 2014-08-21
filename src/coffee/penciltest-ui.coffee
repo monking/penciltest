@@ -1,6 +1,8 @@
-class PenciltestUI
+class PenciltestUI extends PenciltestUIComponent
 
   constructor: (@controller) ->
+
+    super className: 'penciltest-ui', parent: @controller.container
 
     @markupDOMElements()
 
@@ -12,36 +14,46 @@ class PenciltestUI
   markupDOMElements: ->
     @components = {}
 
-    # container
-    @components.container = new PencilTestUIComponent(
-      className: 'penciltest-ui'
-      parent: @controller.container
-    )
+    componentInfo =
+      toolbar:
+        className: 'toolbar'
+        parent: this
+      statusBar:
+        className: 'status'
+        parent: 'toolbar'
+      statusLeft:
+        className: 'status-left'
+        parent: 'statusBar'
+      statusRight:
+        className: 'status-right'
+        parent: 'statusBar'
+      appStatus:
+        className: 'app-status'
+        parent: 'statusLeft'
+      filmStatus:
+        className: 'film-status', @components.statusRight
+      toggleTimeline:
+        tagName: 'button'
+        className: 'toggle-timeline fa fa-table'
+        parent: 'statusRight'
+      toggleMenu:
+        tagName: 'button'
+        className: 'toggle-menu fa fa-cog'
+        parent: 'statusRight'
+      menu:
+        tagName: 'ul'
+        className: 'menu'
+        parent: this
+      textIO:
+        tagName: 'textarea'
+        parent: 'toolbar'
 
-    # toolbar
-    @components.toolbar = new PencilTestUIComponent(
-      className: 'toolbar'
-      parent: @components.container
-    )
+    for name, options in componentInfo
+      if typeof options.parent is 'string'
+        options.parent = @components[name]
+      @components[name] = new PencilTestUIComponent options
 
-    # status & buttons
-    @components.statusBar = createElement 'div.status', @components.toolbar
-    @components.statusLeft = createElement 'div.status-left', @components.statusBar
-    @components.statusRight = createElement 'div.status-right', @components.statusBar
-
-    @components.appStatus = createElement 'div.app-status', @components.statusLeft
-
-    @components.filmStatus = createElement 'div.film-status', @components.statusRight
-    @components.toggleTimeline = createElement 'button.toggle-timeline.fa.fa-table', @components.statusRight
-    @components.toggleMenu = createElement 'button.toggle-menu.fa.fa-cog', @components.statusRight
-
-    # menu
-    @components.menu = createElement 'ul.menu', @components.container
-    @components.menu.innerHTML = @menuWalker @menuOptions
-
-    # text input/output
-    @components.textIO = document.createElement 'textarea'
-    @components.toolbar.appendChild @components.textIO
+    @components.menu.setHTML = @menuWalker @menuOptions
 
   # action and listener functions are called in controller scope
   appActions:
