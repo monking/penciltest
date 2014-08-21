@@ -169,11 +169,11 @@
         }
       }
     }
+    &.active {
+      display: block;
+    }
   }
 
-  &.menu-visible .menu {
-    display: block;
-  }
 
   textarea {
     $width: 70%;

@@ -168,7 +168,7 @@
 .penciltest-ui .menu li.icons li[rel="prevFrame"]::before {
   content: '\f048';
 }
-.penciltest-ui.menu-visible .menu {
+.penciltest-ui .menu.active {
   display: block;
 }
 .penciltest-ui textarea {

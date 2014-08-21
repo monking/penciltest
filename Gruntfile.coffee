@@ -30,13 +30,14 @@ module.exports = (grunt) ->
       dist:
         files:
           'public/js/penciltest.js':[
-            'src/vendor/*.js',
-            'src/utils.js',
+            'src/vendor/*.js'
+            'src/utils.js'
+            'src/penciltest-ui-component.js'
+            'src/renderer-interface.js'
+            'src/*-renderer.js'
+            'src/penciltest-ui.js'
+            'src/penciltest.js'
             'src/penciltest-legacy.js'
-            'src/renderer-interface.js',
-            'src/*-renderer.js',
-            'src/penciltest-ui.js',
-            'src/penciltest.js',
           ]
           'public/js/app.js':[
             'src/app.js'

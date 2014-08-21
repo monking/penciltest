@@ -1,0 +1,1 @@
+class PenciltestTimeline extends PenciltestUIComponent

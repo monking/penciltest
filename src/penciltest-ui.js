@@ -19,7 +19,7 @@ PenciltestUI = (function(_super) {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
-    var componentInfo, name, options, _i, _len;
+    var componentInfo, name, options;
     this.components = {};
     componentInfo = {
       toolbar: {
@@ -66,14 +66,14 @@ PenciltestUI = (function(_super) {
         parent: 'toolbar'
       }
     };
-    for (options = _i = 0, _len = componentInfo.length; _i < _len; options = ++_i) {
-      name = componentInfo[options];
+    for (name in componentInfo) {
+      options = componentInfo[name];
       if (typeof options.parent === 'string') {
-        options.parent = this.components[name];
+        options.parent = this.components[options.parent];
       }
-      this.components[name] = new PencilTestUIComponent(options);
+      this.components[name] = new PenciltestUIComponent(options);
     }
-    return this.components.menu.setHTML = this.menuWalker(this.menuOptions);
+    return this.components.menu.setHTML(this.menuWalker(this.menuOptions));
   };
 
   PenciltestUI.prototype.appActions = {
@@ -303,7 +303,7 @@ PenciltestUI = (function(_super) {
         });
       },
       action: function() {
-        return Utils.toggleClass(this.ui.components.statusBar, 'hidden', !this.options.showStatus);
+        return Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus);
       }
     },
     loop: {
@@ -562,8 +562,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.addMenuListeners = function() {
     var menuOptionListener, option, self, _i, _len, _ref, _results;
     self = this;
-    this.menuElement = this.controller.container.querySelector('.menu');
-    this.menuItems = this.menuElement.querySelectorAll('LI');
+    this.menuItems = this.components.menu.getElement().querySelectorAll('LI');
     menuOptionListener = function(event) {
       var optionName;
       if (/\bgroup\b/.test(this.className)) {
@@ -686,7 +685,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.showMenu = function(coords) {
-    var maxBottom, maxRight, option, _i, _len, _ref, _results;
+    var maxBottom, maxRight, menuElement, option, _i, _len, _ref, _results;
     if (coords == null) {
       coords = {
         x: 10,
@@ -695,22 +694,23 @@ PenciltestUI = (function(_super) {
     }
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
-      Utils.toggleClass(this.el.container, 'menu-visible', true);
-      maxRight = this.components.toggleMenu.getElement().offsetWidth;
+      menuElement = this.components.menu.getElement();
+      Utils.toggleClass(menuElement, 'active', true);
+      maxRight = this.components.menu.getElement().offsetWidth;
       maxBottom = 0;
-      if (coords.x > document.body.offsetWidth - maxRight - this.menuElement.offsetWidth) {
-        this.menuElement.style.right = "" + maxRight + "px";
-        this.menuElement.style.left = "auto";
+      if (coords.x > document.body.offsetWidth - maxRight - menuElement.offsetWidth) {
+        menuElement.style.right = "" + maxRight + "px";
+        menuElement.style.left = "auto";
       } else {
-        this.menuElement.style.left = "" + (coords.x + 1) + "px";
-        this.menuElement.style.right = "auto";
+        menuElement.style.left = "" + (coords.x + 1) + "px";
+        menuElement.style.right = "auto";
       }
-      if (coords.y > document.body.offsetHeight - maxBottom - this.menuElement.offsetHeight) {
-        this.menuElement.style.top = "auto";
-        this.menuElement.style.bottom = maxBottom;
+      if (coords.y > document.body.offsetHeight - maxBottom - menuElement.offsetHeight) {
+        menuElement.style.top = "auto";
+        menuElement.style.bottom = maxBottom;
       } else {
-        this.menuElement.style.top = "" + coords.y + "px";
-        this.menuElement.style.bottom = "auto";
+        menuElement.style.top = "" + coords.y + "px";
+        menuElement.style.bottom = "auto";
       }
       _ref = this.menuItems;
       _results = [];
@@ -729,7 +729,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.hideMenu = function() {
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
-      return Utils.toggleClass(this.el.container, 'menu-visible', false);
+      return Utils.toggleClass(this.components.menu.getElement(), 'active', false);
     }
   };
 

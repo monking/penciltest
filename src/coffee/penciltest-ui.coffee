@@ -49,12 +49,12 @@ class PenciltestUI extends PenciltestUIComponent
         tagName: 'textarea'
         parent: 'toolbar'
 
-    for name, options in componentInfo
+    for name, options of componentInfo
       if typeof options.parent is 'string'
-        options.parent = @components[name]
-      @components[name] = new PencilTestUIComponent options
+        options.parent = @components[options.parent]
+      @components[name] = new PenciltestUIComponent options
 
-    @components.menu.setHTML = @menuWalker @menuOptions
+    @components.menu.setHTML @menuWalker @menuOptions
 
   # action and listener functions are called in controller scope
   appActions:
@@ -199,7 +199,7 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Show Status"
       title: "hide the film status bar"
       listener: -> @setOptions showStatus: not @options.showStatus
-      action: -> Utils.toggleClass @ui.components.statusBar, 'hidden', not @options.showStatus
+      action: -> Utils.toggleClass @ui.components.statusBar.getElement(), 'hidden', not @options.showStatus
     loop:
       label: "Loop"
       hotkey: ['L']
@@ -418,8 +418,7 @@ class PenciltestUI extends PenciltestUIComponent
 
   addMenuListeners: ->
     self = @
-    @menuElement = @controller.container.querySelector '.menu'
-    @menuItems = @menuElement.querySelectorAll 'LI'
+    @menuItems = @components.menu.getElement().querySelectorAll 'LI'
 
     menuOptionListener = (event) ->
       if /\bgroup\b/.test @className
@@ -520,24 +519,25 @@ class PenciltestUI extends PenciltestUIComponent
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
       @menuIsVisible = true
-      Utils.toggleClass @el.container, 'menu-visible', true
+      menuElement = @components.menu.getElement()
+      Utils.toggleClass menuElement, 'active', true
 
-      maxRight = @components.toggleMenu.getElement().offsetWidth
+      maxRight = @components.menu.getElement().offsetWidth
       maxBottom = 0
 
-      if coords.x > document.body.offsetWidth - maxRight - @menuElement.offsetWidth
-        @menuElement.style.right = "#{maxRight}px"
-        @menuElement.style.left = "auto"
+      if coords.x > document.body.offsetWidth - maxRight - menuElement.offsetWidth
+        menuElement.style.right = "#{maxRight}px"
+        menuElement.style.left = "auto"
       else
-        @menuElement.style.left = "#{coords.x + 1}px"
-        @menuElement.style.right = "auto"
+        menuElement.style.left = "#{coords.x + 1}px"
+        menuElement.style.right = "auto"
 
-      if coords.y > document.body.offsetHeight - maxBottom - @menuElement.offsetHeight
-        @menuElement.style.top = "auto"
-        @menuElement.style.bottom = maxBottom
+      if coords.y > document.body.offsetHeight - maxBottom - menuElement.offsetHeight
+        menuElement.style.top = "auto"
+        menuElement.style.bottom = maxBottom
       else
-        @menuElement.style.top = "#{coords.y}px"
-        @menuElement.style.bottom = "auto"
+        menuElement.style.top = "#{coords.y}px"
+        menuElement.style.bottom = "auto"
 
       for option in @menuItems
         @updateMenuOption option if option.attributes.rel
@@ -545,7 +545,7 @@ class PenciltestUI extends PenciltestUIComponent
   hideMenu: ->
     if @menuIsVisible
       @menuIsVisible = false
-      Utils.toggleClass @el.container, 'menu-visible', false
+      Utils.toggleClass @components.menu.getElement(), 'active', false
 
   toggleMenu: (coords) ->
     if @menuIsVisible then @hideMenu() else @showMenu coords

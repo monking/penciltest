@@ -1,0 +1,1 @@
+class PenciltestMenu extends PenciltestUIComponent
