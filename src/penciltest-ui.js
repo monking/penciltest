@@ -507,15 +507,10 @@ PenciltestUI = (function() {
       event.preventDefault();
       return self.toggleMenu(getEventPageXY(event));
     };
-    this.el.toggleMenu.addEventListener('click', function() {
-      return self.toggleMenu({
-        x: 0,
-        y: 0
-      });
-    });
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
-    return this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
+    this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
+    return this.el.toggleMenu.addEventListener('click', contextMenuListener);
   };
 
   PenciltestUI.prototype.updateMenuOption = function(optionElement) {
@@ -546,7 +541,6 @@ PenciltestUI = (function() {
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       option = _ref[_i];
       option.addEventListener('mouseup', menuOptionListener);
-      option.addEventListener('touchend', menuOptionListener);
       option.addEventListener('contextmenu', menuOptionListener);
     }
     return this.el.textIO = this.controller.container.querySelector('textarea');
@@ -653,7 +647,7 @@ PenciltestUI = (function() {
   };
 
   PenciltestUI.prototype.showMenu = function(coords) {
-    var option, _i, _len, _ref, _results;
+    var maxBottom, maxRight, option, _i, _len, _ref, _results;
     if (coords == null) {
       coords = {
         x: 10,
@@ -663,10 +657,22 @@ PenciltestUI = (function() {
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
       Utils.toggleClass(this.el.container, 'menu-visible', true);
-      coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
-      coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
-      this.menuElement.style.left = "" + (coords.x + 1) + "px";
-      this.menuElement.style.top = "" + coords.y + "px";
+      maxRight = this.el.toggleMenu.offsetWidth;
+      maxBottom = 0;
+      if (coords.x > document.body.offsetWidth - maxRight - this.menuElement.offsetWidth) {
+        this.menuElement.style.right = "" + maxRight + "px";
+        this.menuElement.style.left = "auto";
+      } else {
+        this.menuElement.style.left = "" + (coords.x + 1) + "px";
+        this.menuElement.style.right = "auto";
+      }
+      if (coords.y > document.body.offsetHeight - maxBottom - this.menuElement.offsetHeight) {
+        this.menuElement.style.top = "auto";
+        this.menuElement.style.bottom = maxBottom;
+      } else {
+        this.menuElement.style.top = "" + coords.y + "px";
+        this.menuElement.style.bottom = "auto";
+      }
       _ref = this.menuItems;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {

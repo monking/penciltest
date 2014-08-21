@@ -399,12 +399,10 @@ class PenciltestUI
       event.preventDefault()
       self.toggleMenu getEventPageXY event
 
-    @el.toggleMenu.addEventListener 'click', ->
-      self.toggleMenu {x: 0, y: 0}
-
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
+    @el.toggleMenu.addEventListener 'click', contextMenuListener
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value
@@ -427,7 +425,7 @@ class PenciltestUI
 
     for option in @menuItems
       option.addEventListener 'mouseup', menuOptionListener
-      option.addEventListener 'touchend', menuOptionListener
+      # option.addEventListener 'touchend', menuOptionListener
       option.addEventListener 'contextmenu', menuOptionListener
 
     @el.textIO = @controller.container.querySelector 'textarea'
@@ -518,10 +516,24 @@ class PenciltestUI
     if not @menuIsVisible
       @menuIsVisible = true
       Utils.toggleClass @el.container, 'menu-visible', true
-      coords.x = Math.min document.body.offsetWidth - @menuElement.offsetWidth, coords.x
-      coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
-      @menuElement.style.left = "#{coords.x + 1}px"
-      @menuElement.style.top = "#{coords.y}px"
+
+      maxRight = @el.toggleMenu.offsetWidth
+      maxBottom = 0
+
+      if coords.x > document.body.offsetWidth - maxRight - @menuElement.offsetWidth
+        @menuElement.style.right = "#{maxRight}px"
+        @menuElement.style.left = "auto"
+      else
+        @menuElement.style.left = "#{coords.x + 1}px"
+        @menuElement.style.right = "auto"
+
+      if coords.y > document.body.offsetHeight - maxBottom - @menuElement.offsetHeight
+        @menuElement.style.top = "auto"
+        @menuElement.style.bottom = maxBottom
+      else
+        @menuElement.style.top = "#{coords.y}px"
+        @menuElement.style.bottom = "auto"
+
       for option in @menuItems
         @updateMenuOption option if option.attributes.rel
 

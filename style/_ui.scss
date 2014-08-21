@@ -2,18 +2,9 @@
   .toolbar {
     $toolbarMinHeight: 2em;
     position: fixed;
-    top: 100%;
+    bottom: 0;
     left: 0;
     width: 100%;
-    min-height: $toolbarMinHeight;
-    margin-top: -$toolbarMinHeight;
-    height: $toolbarMinHeight;
-
-    &.open {
-      top: auto;
-      height: auto;
-      bottom: 0;
-    }
 
     .status {
       font-family: monospace;
@@ -33,22 +24,33 @@
       }
 
       .status-left, .status-right {
-        margin: 0 0.5em;
-
         > * {
           display: inline-block;
           vertical-align: middle;
-          margin: 0 0.5em;
         }
+      }
+
+      .app-status, .film-status {
+        margin: 0 0.5em;
       }
 
       button {
         background-color: transparent;
         color: inherit;
         border-width: 0;
-        padding: 0 0.3em;
+        padding: 0 0.5em;
         font-size: 1.2em;
       }
+    }
+
+    .timeline {
+      height: 0;
+      overflow: auto;
+      max-height: 100%;
+    }
+
+    &.open .timeline {
+      height: auto;
     }
   }
 
@@ -62,6 +64,9 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
 
     ul, li {
       list-style: inherit;
