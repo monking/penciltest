@@ -223,9 +223,9 @@ class PenciltestUI
       listener: ->
         open = Utils.toggleClass @ui.el.textIO, 'active'
         if open
-          @el.textIO.value = JSON.stringify @film
+          @ui.el.textIO.value = JSON.stringify @film
         else
-          @el.textIO.value = ''
+          @ui.el.textIO.value = ''
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
@@ -233,12 +233,12 @@ class PenciltestUI
       listener: ->
         open = Utils.toggleClass @ui.el.textIO, 'active'
         if open
-          @el.textIO.value = ''
+          @ui.el.textIO.value = ''
         else
-          importJSON = @el.textIO.value
+          importJSON = @ui.el.textIO.value
           try
             @setFilm JSON.parse importJSON
-          @el.textIO.value = ''
+          @ui.el.textIO.value = ''
     importAudio:
       label: "Import Audio"
       hotkey: ['Alt+A']

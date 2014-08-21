@@ -318,9 +318,9 @@ PenciltestUI = (function() {
         var open;
         open = Utils.toggleClass(this.ui.el.textIO, 'active');
         if (open) {
-          return this.el.textIO.value = JSON.stringify(this.film);
+          return this.ui.el.textIO.value = JSON.stringify(this.film);
         } else {
-          return this.el.textIO.value = '';
+          return this.ui.el.textIO.value = '';
         }
       }
     },
@@ -332,13 +332,13 @@ PenciltestUI = (function() {
         var importJSON, open;
         open = Utils.toggleClass(this.ui.el.textIO, 'active');
         if (open) {
-          return this.el.textIO.value = '';
+          return this.ui.el.textIO.value = '';
         } else {
-          importJSON = this.el.textIO.value;
+          importJSON = this.ui.el.textIO.value;
           try {
             this.setFilm(JSON.parse(importJSON));
           } catch (_error) {}
-          return this.el.textIO.value = '';
+          return this.ui.el.textIO.value = '';
         }
       }
     },
