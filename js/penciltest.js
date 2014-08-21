@@ -8292,104 +8292,56 @@ Utils.getDecimal = function(value, precision, type) {
   return output;
 };
 
-var PenciltestLegacy;
+var PenciltestUIComponent;
 
-PenciltestLegacy = {
-  index: ['0.0.3', '0.0.4', '0.0.5'],
-  workers: {
-    '0.0.3': null,
-    '0.0.4': function() {
-      var film, filmNamePattern, frame, frameIndex, i, newSegment, segment, segmentIndex, storageName, stroke, strokeIndex, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _results;
-      filmNamePattern = /^film:/;
-      _results = [];
-      for (storageName in window.localStorage) {
-        if (filmNamePattern.test(storageName)) {
-          film = JSON.parse(window.localStorage.getItem(storageName));
-          if (!film || !film.frames || !film.frames.length) {
-            continue;
-          }
-          _ref = film.frames;
-          for (frameIndex = _i = 0, _len = _ref.length; _i < _len; frameIndex = ++_i) {
-            frame = _ref[frameIndex];
-            _ref1 = frame.strokes;
-            for (strokeIndex = _j = 0, _len1 = _ref1.length; _j < _len1; strokeIndex = ++_j) {
-              stroke = _ref1[strokeIndex];
-              for (segmentIndex = _k = 0, _len2 = stroke.length; _k < _len2; segmentIndex = ++_k) {
-                segment = stroke[segmentIndex];
-                if (typeof segment === 'string') {
-                  newSegment = segment.replace(/[ML]/g, '').split(' ');
-                  if (newSegment.length !== 2) {
-                    throw new Error("bad stroke segment '" + segment + "': " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
-                  }
-                  if (isNaN(newSegment[0] || isNaN(newSegment[1]))) {
-                    throw new Error("NaN stroke segment '" + segment + "':  " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
-                  }
-                  for (i = _l = 0, _ref2 = newSegment.length; 0 <= _ref2 ? _l < _ref2 : _l > _ref2; i = 0 <= _ref2 ? ++_l : --_l) {
-                    newSegment[i] = Number(newSegment[i]);
-                  }
-                  film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment;
-                }
-              }
-            }
-          }
-          film.version = '0.0.4';
-          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
-        } else {
-          _results.push(void 0);
-        }
-      }
-      return _results;
-    },
-    '0.0.5': function() {
-      var film, filmNamePattern, storageName, _results;
-      filmNamePattern = /^film:/;
-      _results = [];
-      for (storageName in window.localStorage) {
-        if (filmNamePattern.test(storageName)) {
-          film = JSON.parse(window.localStorage.getItem(storageName));
-          if (!film || !film.frames || !film.frames.length) {
-            continue;
-          }
-          if (film.aspect == null) {
-            film.aspect = '16:9';
-          }
-          if (film.width == null) {
-            film.width = 720;
-          }
-          film.version = '0.0.5';
-          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
-        } else {
-          _results.push(void 0);
-        }
-      }
-      return _results;
-    }
-  },
-  update: function(pt, from, to) {
-    var at, confirmMessage, error, fromIndex, i, version, _i, _ref, _ref1, _ref2;
-    at = from;
-    fromIndex = this.index.indexOf(from);
-    if (fromIndex !== -1 && fromIndex < this.index.length - 1) {
-      confirmMessage = "You last used v" + from + ". Currently v" + to + ". Update your saved films to the new format now?";
-      if (Utils.confirm(confirmMessage)) {
-        try {
-          for (i = _i = _ref = fromIndex + 1, _ref1 = this.index.length; _ref <= _ref1 ? _i < _ref1 : _i > _ref1; i = _ref <= _ref1 ? ++_i : --_i) {
-            version = this.index[i];
-            if ((_ref2 = this.workers[version]) != null) {
-              _ref2.call(pt);
-            }
-            at = version;
-          }
-        } catch (_error) {
-          error = _error;
-          Utils.log(error);
-          Utils.alert("The conversion from " + at + " to " + version + " failed. Your data is still compatible with " + at);
-        }
-      }
-    }
-    return at;
+PenciltestUIComponent = (function() {
+  PenciltestUIComponent.prototype.options = {
+    tagName: 'div',
+    className: null,
+    id: null,
+    parent: document.body
+  };
+
+  function PenciltestUIComponent(options) {
+    this.options = Utils.inherit({}, options, PenciltestUIComponent.prototype.options);
+    this.createElement();
   }
-};
+
+  PenciltestUIComponent.prototype.createElement = function() {
+    this.el = {};
+    this.el.container = document.createElement(this.options.tagName);
+    if (this.options.className) {
+      this.el.container.className = this.options.className;
+    }
+    if (this.options.id) {
+      this.el.container.id = this.options.id;
+    }
+    return this.appendTo(this.options.parent);
+  };
+
+  PenciltestUIComponent.prototype.appendTo = function(parent) {
+    if (typeof parent.appendComponent === 'function') {
+      return parent.appendComponent(this);
+    } else {
+      return parent.appendChild(this.el.container);
+    }
+  };
+
+  PenciltestUIComponent.prototype.appendComponent = function(component) {
+    return this.el.container.appendChild(component.el.container);
+  };
+
+  PenciltestUIComponent.prototype.getElement = function() {
+    return this.el.container;
+  };
+
+  PenciltestUIComponent.prototype.setHTML = function(markup) {
+    return this.el.container.innerHTML = markup;
+  };
+
+  return PenciltestUIComponent;
+
+})();
 
 
 /*
@@ -8630,7 +8582,11 @@ PenciltestUI = (function(_super) {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
+<<<<<<< HEAD
     var componentInfo, name, options, _i, _len;
+=======
+    var componentInfo, name, options;
+>>>>>>> refactor UI to use components
     this.components = {};
     componentInfo = {
       toolbar: {
@@ -8677,6 +8633,7 @@ PenciltestUI = (function(_super) {
         parent: 'toolbar'
       }
     };
+<<<<<<< HEAD
     for (options = _i = 0, _len = componentInfo.length; _i < _len; options = ++_i) {
       name = componentInfo[options];
       if (typeof options.parent === 'string') {
@@ -8685,6 +8642,16 @@ PenciltestUI = (function(_super) {
       this.components[name] = new PencilTestUIComponent(options);
     }
     return this.components.menu.setHTML = this.menuWalker(this.menuOptions);
+=======
+    for (name in componentInfo) {
+      options = componentInfo[name];
+      if (typeof options.parent === 'string') {
+        options.parent = this.components[options.parent];
+      }
+      this.components[name] = new PenciltestUIComponent(options);
+    }
+    return this.components.menu.setHTML(this.menuWalker(this.menuOptions));
+>>>>>>> refactor UI to use components
   };
 
   PenciltestUI.prototype.appActions = {
@@ -8914,7 +8881,11 @@ PenciltestUI = (function(_super) {
         });
       },
       action: function() {
+<<<<<<< HEAD
         return Utils.toggleClass(this.ui.components.statusBar, 'hidden', !this.options.showStatus);
+=======
+        return Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus);
+>>>>>>> refactor UI to use components
       }
     },
     loop: {
@@ -9173,8 +9144,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.addMenuListeners = function() {
     var menuOptionListener, option, self, _i, _len, _ref, _results;
     self = this;
-    this.menuElement = this.controller.container.querySelector('.menu');
-    this.menuItems = this.menuElement.querySelectorAll('LI');
+    this.menuItems = this.components.menu.getElement().querySelectorAll('LI');
     menuOptionListener = function(event) {
       var optionName;
       if (/\bgroup\b/.test(this.className)) {
@@ -9297,7 +9267,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.showMenu = function(coords) {
-    var maxBottom, maxRight, option, _i, _len, _ref, _results;
+    var maxBottom, maxRight, menuElement, option, _i, _len, _ref, _results;
     if (coords == null) {
       coords = {
         x: 10,
@@ -9306,22 +9276,28 @@ PenciltestUI = (function(_super) {
     }
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
+<<<<<<< HEAD
       Utils.toggleClass(this.el.container, 'menu-visible', true);
       maxRight = this.components.toggleMenu.getElement().offsetWidth;
+=======
+      menuElement = this.components.menu.getElement();
+      Utils.toggleClass(menuElement, 'active', true);
+      maxRight = this.components.menu.getElement().offsetWidth;
+>>>>>>> refactor UI to use components
       maxBottom = 0;
-      if (coords.x > document.body.offsetWidth - maxRight - this.menuElement.offsetWidth) {
-        this.menuElement.style.right = "" + maxRight + "px";
-        this.menuElement.style.left = "auto";
+      if (coords.x > document.body.offsetWidth - maxRight - menuElement.offsetWidth) {
+        menuElement.style.right = "" + maxRight + "px";
+        menuElement.style.left = "auto";
       } else {
-        this.menuElement.style.left = "" + (coords.x + 1) + "px";
-        this.menuElement.style.right = "auto";
+        menuElement.style.left = "" + (coords.x + 1) + "px";
+        menuElement.style.right = "auto";
       }
-      if (coords.y > document.body.offsetHeight - maxBottom - this.menuElement.offsetHeight) {
-        this.menuElement.style.top = "auto";
-        this.menuElement.style.bottom = maxBottom;
+      if (coords.y > document.body.offsetHeight - maxBottom - menuElement.offsetHeight) {
+        menuElement.style.top = "auto";
+        menuElement.style.bottom = maxBottom;
       } else {
-        this.menuElement.style.top = "" + coords.y + "px";
-        this.menuElement.style.bottom = "auto";
+        menuElement.style.top = "" + coords.y + "px";
+        menuElement.style.bottom = "auto";
       }
       _ref = this.menuItems;
       _results = [];
@@ -9340,7 +9316,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.hideMenu = function() {
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
-      return Utils.toggleClass(this.el.container, 'menu-visible', false);
+      return Utils.toggleClass(this.components.menu.getElement(), 'active', false);
     }
   };
 
@@ -9966,3 +9942,102 @@ Penciltest = (function() {
   return Penciltest;
 
 })();
+
+var PenciltestLegacy;
+
+PenciltestLegacy = {
+  index: ['0.0.3', '0.0.4', '0.0.5'],
+  workers: {
+    '0.0.3': null,
+    '0.0.4': function() {
+      var film, filmNamePattern, frame, frameIndex, i, newSegment, segment, segmentIndex, storageName, stroke, strokeIndex, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _results;
+      filmNamePattern = /^film:/;
+      _results = [];
+      for (storageName in window.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          film = JSON.parse(window.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) {
+            continue;
+          }
+          _ref = film.frames;
+          for (frameIndex = _i = 0, _len = _ref.length; _i < _len; frameIndex = ++_i) {
+            frame = _ref[frameIndex];
+            _ref1 = frame.strokes;
+            for (strokeIndex = _j = 0, _len1 = _ref1.length; _j < _len1; strokeIndex = ++_j) {
+              stroke = _ref1[strokeIndex];
+              for (segmentIndex = _k = 0, _len2 = stroke.length; _k < _len2; segmentIndex = ++_k) {
+                segment = stroke[segmentIndex];
+                if (typeof segment === 'string') {
+                  newSegment = segment.replace(/[ML]/g, '').split(' ');
+                  if (newSegment.length !== 2) {
+                    throw new Error("bad stroke segment '" + segment + "': " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
+                  }
+                  if (isNaN(newSegment[0] || isNaN(newSegment[1]))) {
+                    throw new Error("NaN stroke segment '" + segment + "':  " + storageName + ":f" + frameIndex + ":p" + strokeIndex + ":s" + segmentIndex);
+                  }
+                  for (i = _l = 0, _ref2 = newSegment.length; 0 <= _ref2 ? _l < _ref2 : _l > _ref2; i = 0 <= _ref2 ? ++_l : --_l) {
+                    newSegment[i] = Number(newSegment[i]);
+                  }
+                  film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment;
+                }
+              }
+            }
+          }
+          film.version = '0.0.4';
+          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    },
+    '0.0.5': function() {
+      var film, filmNamePattern, storageName, _results;
+      filmNamePattern = /^film:/;
+      _results = [];
+      for (storageName in window.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          film = JSON.parse(window.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) {
+            continue;
+          }
+          if (film.aspect == null) {
+            film.aspect = '16:9';
+          }
+          if (film.width == null) {
+            film.width = 720;
+          }
+          film.version = '0.0.5';
+          _results.push(window.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    }
+  },
+  update: function(pt, from, to) {
+    var at, confirmMessage, error, fromIndex, i, version, _i, _ref, _ref1, _ref2;
+    at = from;
+    fromIndex = this.index.indexOf(from);
+    if (fromIndex !== -1 && fromIndex < this.index.length - 1) {
+      confirmMessage = "You last used v" + from + ". Currently v" + to + ". Update your saved films to the new format now?";
+      if (Utils.confirm(confirmMessage)) {
+        try {
+          for (i = _i = _ref = fromIndex + 1, _ref1 = this.index.length; _ref <= _ref1 ? _i < _ref1 : _i > _ref1; i = _ref <= _ref1 ? ++_i : --_i) {
+            version = this.index[i];
+            if ((_ref2 = this.workers[version]) != null) {
+              _ref2.call(pt);
+            }
+            at = version;
+          }
+        } catch (_error) {
+          error = _error;
+          Utils.log(error);
+          Utils.alert("The conversion from " + at + " to " + version + " failed. Your data is still compatible with " + at);
+        }
+      }
+    }
+    return at;
+  }
+};
