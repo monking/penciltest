@@ -4,7 +4,7 @@ global: window, document
  */
 window.addEventListener('load', function() {
   var penciltest;
-  penciltest = new PencilTest({
+  penciltest = new Penciltest({
     container: '#penciltest'
   });
   return window.addEventListener('resize', function() {

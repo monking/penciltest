@@ -1,4 +1,4 @@
-PencilTestLegacy =
+PenciltestLegacy =
 
   index: [
     '0.0.3'

@@ -1,6 +1,6 @@
-var PencilTestLegacy;
+var PenciltestLegacy;
 
-PencilTestLegacy = {
+PenciltestLegacy = {
   index: ['0.0.3', '0.0.4', '0.0.5'],
   workers: {
     '0.0.3': null,

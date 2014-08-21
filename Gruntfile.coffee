@@ -32,9 +32,10 @@ module.exports = (grunt) ->
           'public/js/penciltest.js':[
             'src/vendor/*.js',
             'src/utils.js',
-            'src/legacy.js'
+            'src/penciltest-legacy.js'
             'src/renderer-interface.js',
             'src/*-renderer.js',
+            'src/penciltest-ui.js',
             'src/penciltest.js',
           ]
           'public/js/app.js':[
