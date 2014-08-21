@@ -10,44 +10,38 @@ class PenciltestUI
     @addOtherListeners()
 
   markupDOMElements: ->
-    @el = {}
-
-    createElement = (selector, parent) ->
-
-      selectorParts = selector.split '.'
-      tagName = selectorParts[0]
-      className = selectorParts.slice(1).join ' '
-
-      element = document.createElement tagName
-      element.className = className
-      parent.appendChild element
-
-      element
+    @components = {}
 
     # container
-    @el.container = createElement 'div.penciltest-ui', @controller.container
+    @components.container = new PencilTestUIComponent(
+      className: 'penciltest-ui'
+      parent: @controller.container
+    )
 
     # toolbar
-    @el.toolbar = createElement 'div.toolbar', @el.container
+    @components.toolbar = new PencilTestUIComponent(
+      className: 'toolbar'
+      parent: @components.container
+    )
 
     # status & buttons
-    @el.statusBar = createElement 'div.status', @el.toolbar
-    @el.statusLeft = createElement 'div.status-left', @el.statusBar
-    @el.statusRight = createElement 'div.status-right', @el.statusBar
+    @components.statusBar = createElement 'div.status', @components.toolbar
+    @components.statusLeft = createElement 'div.status-left', @components.statusBar
+    @components.statusRight = createElement 'div.status-right', @components.statusBar
 
-    @el.appStatus = createElement 'div.app-status', @el.statusLeft
+    @components.appStatus = createElement 'div.app-status', @components.statusLeft
 
-    @el.filmStatus = createElement 'div.film-status', @el.statusRight
-    @el.toggleTimeline = createElement 'button.toggle-timeline.fa.fa-table', @el.statusRight
-    @el.toggleMenu = createElement 'button.toggle-menu.fa.fa-cog', @el.statusRight
+    @components.filmStatus = createElement 'div.film-status', @components.statusRight
+    @components.toggleTimeline = createElement 'button.toggle-timeline.fa.fa-table', @components.statusRight
+    @components.toggleMenu = createElement 'button.toggle-menu.fa.fa-cog', @components.statusRight
 
     # menu
-    @el.menu = createElement 'ul.menu', @el.container
-    @el.menu.innerHTML = @menuWalker @menuOptions
+    @components.menu = createElement 'ul.menu', @components.container
+    @components.menu.innerHTML = @menuWalker @menuOptions
 
     # text input/output
-    @el.textIO = document.createElement 'textarea'
-    @el.toolbar.appendChild @el.textIO
+    @components.textIO = document.createElement 'textarea'
+    @components.toolbar.appendChild @components.textIO
 
   # action and listener functions are called in controller scope
   appActions:
@@ -192,7 +186,7 @@ class PenciltestUI
       label: "Show Status"
       title: "hide the film status bar"
       listener: -> @setOptions showStatus: not @options.showStatus
-      action: -> Utils.toggleClass @ui.el.statusBar, 'hidden', not @options.showStatus
+      action: -> Utils.toggleClass @ui.components.statusBar, 'hidden', not @options.showStatus
     loop:
       label: "Loop"
       hotkey: ['L']
@@ -221,24 +215,24 @@ class PenciltestUI
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.el.textIO, 'active'
+        open = Utils.toggleClass @ui.components.textIO, 'active'
         if open
-          @ui.el.textIO.value = JSON.stringify @film
+          @ui.components.textIO.value = JSON.stringify @film
         else
-          @ui.el.textIO.value = ''
+          @ui.components.textIO.value = ''
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.el.textIO, 'active'
+        open = Utils.toggleClass @ui.components.textIO, 'active'
         if open
-          @ui.el.textIO.value = ''
+          @ui.components.textIO.value = ''
         else
-          importJSON = @ui.el.textIO.value
+          importJSON = @ui.components.textIO.value
           try
             @setFilm JSON.parse importJSON
-          @ui.el.textIO.value = ''
+          @ui.components.textIO.value = ''
     importAudio:
       label: "Import Audio"
       hotkey: ['Alt+A']
@@ -402,7 +396,7 @@ class PenciltestUI
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
-    @el.toggleMenu.addEventListener 'click', contextMenuListener
+    @components.toggleMenu.addEventListener 'click', contextMenuListener
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value
@@ -428,7 +422,7 @@ class PenciltestUI
       # option.addEventListener 'touchend', menuOptionListener
       option.addEventListener 'contextmenu', menuOptionListener
 
-    @el.textIO = @controller.container.querySelector 'textarea'
+    @components.textIO = @controller.container.querySelector 'textarea'
 
   addKeyboardListeners: ->
     self = @
@@ -476,7 +470,7 @@ class PenciltestUI
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
   describeKeyboardShortcuts: ->
-    open = Utils.toggleClass @el.textIO, 'active'
+    open = Utils.toggleClass @components.textIO, 'active'
     if open
       helpDoc = 'Keyboard Shortcuts:\n'
 
@@ -490,16 +484,16 @@ class PenciltestUI
           helpDoc += " - #{action.title}"
         helpDoc += '\n'
 
-      @el.textIO.value = helpDoc
+      @components.textIO.value = helpDoc
     else
-      @el.textIO.value = ''
+      @components.textIO.value = ''
 
   updateStatus: ->
     if @controller.options.showStatus
       appStatusMarkup = "v#{Penciltest.prototype.state.version}"
       appStatusMarkup += " Smoothing: #{@controller.options.smoothing}"
 
-      @el.appStatus.innerHTML = appStatusMarkup
+      @components.appStatus.innerHTML = appStatusMarkup
 
       filmStatusMarkup = "<div class=\"frame\">"
       filmStatusMarkup += "#{@controller.options.frameRate} FPS"
@@ -510,14 +504,14 @@ class PenciltestUI
         filmStatusMarkup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
       filmStatusMarkup += "</div>"
 
-      @el.filmStatus.innerHTML = filmStatusMarkup
+      @components.filmStatus.innerHTML = filmStatusMarkup
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
       @menuIsVisible = true
-      Utils.toggleClass @el.container, 'menu-visible', true
+      Utils.toggleClass @components.container, 'menu-visible', true
 
-      maxRight = @el.toggleMenu.offsetWidth
+      maxRight = @components.toggleMenu.offsetWidth
       maxBottom = 0
 
       if coords.x > document.body.offsetWidth - maxRight - @menuElement.offsetWidth
@@ -540,7 +534,7 @@ class PenciltestUI
   hideMenu: ->
     if @menuIsVisible
       @menuIsVisible = false
-      Utils.toggleClass @el.container, 'menu-visible', false
+      Utils.toggleClass @components.container, 'menu-visible', false
 
   toggleMenu: (coords) ->
     if @menuIsVisible then @hideMenu() else @showMenu coords

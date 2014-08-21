@@ -11,31 +11,26 @@ PenciltestUI = (function() {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
-    var createElement;
-    this.el = {};
-    createElement = function(selector, parent) {
-      var className, element, selectorParts, tagName;
-      selectorParts = selector.split('.');
-      tagName = selectorParts[0];
-      className = selectorParts.slice(1).join(' ');
-      element = document.createElement(tagName);
-      element.className = className;
-      parent.appendChild(element);
-      return element;
-    };
-    this.el.container = createElement('div.penciltest-ui', this.controller.container);
-    this.el.toolbar = createElement('div.toolbar', this.el.container);
-    this.el.statusBar = createElement('div.status', this.el.toolbar);
-    this.el.statusLeft = createElement('div.status-left', this.el.statusBar);
-    this.el.statusRight = createElement('div.status-right', this.el.statusBar);
-    this.el.appStatus = createElement('div.app-status', this.el.statusLeft);
-    this.el.filmStatus = createElement('div.film-status', this.el.statusRight);
-    this.el.toggleTimeline = createElement('button.toggle-timeline.fa.fa-table', this.el.statusRight);
-    this.el.toggleMenu = createElement('button.toggle-menu.fa.fa-cog', this.el.statusRight);
-    this.el.menu = createElement('ul.menu', this.el.container);
-    this.el.menu.innerHTML = this.menuWalker(this.menuOptions);
-    this.el.textIO = document.createElement('textarea');
-    return this.el.toolbar.appendChild(this.el.textIO);
+    this.components = {};
+    this.components.container = new PencilTestUIComponent({
+      className: 'penciltest-ui',
+      parent: this.controller.container
+    });
+    this.components.toolbar = new PencilTestUIComponent({
+      className: 'toolbar',
+      parent: this.components.container
+    });
+    this.components.statusBar = createElement('div.status', this.components.toolbar);
+    this.components.statusLeft = createElement('div.status-left', this.components.statusBar);
+    this.components.statusRight = createElement('div.status-right', this.components.statusBar);
+    this.components.appStatus = createElement('div.app-status', this.components.statusLeft);
+    this.components.filmStatus = createElement('div.film-status', this.components.statusRight);
+    this.components.toggleTimeline = createElement('button.toggle-timeline.fa.fa-table', this.components.statusRight);
+    this.components.toggleMenu = createElement('button.toggle-menu.fa.fa-cog', this.components.statusRight);
+    this.components.menu = createElement('ul.menu', this.components.container);
+    this.components.menu.innerHTML = this.menuWalker(this.menuOptions);
+    this.components.textIO = document.createElement('textarea');
+    return this.components.toolbar.appendChild(this.components.textIO);
   };
 
   PenciltestUI.prototype.appActions = {
@@ -265,7 +260,7 @@ PenciltestUI = (function() {
         });
       },
       action: function() {
-        return Utils.toggleClass(this.ui.el.statusBar, 'hidden', !this.options.showStatus);
+        return Utils.toggleClass(this.ui.components.statusBar, 'hidden', !this.options.showStatus);
       }
     },
     loop: {
@@ -316,11 +311,11 @@ PenciltestUI = (function() {
       cancelComplement: true,
       listener: function() {
         var open;
-        open = Utils.toggleClass(this.ui.el.textIO, 'active');
+        open = Utils.toggleClass(this.ui.components.textIO, 'active');
         if (open) {
-          return this.ui.el.textIO.value = JSON.stringify(this.film);
+          return this.ui.components.textIO.value = JSON.stringify(this.film);
         } else {
-          return this.ui.el.textIO.value = '';
+          return this.ui.components.textIO.value = '';
         }
       }
     },
@@ -330,15 +325,15 @@ PenciltestUI = (function() {
       cancelComplement: true,
       listener: function() {
         var importJSON, open;
-        open = Utils.toggleClass(this.ui.el.textIO, 'active');
+        open = Utils.toggleClass(this.ui.components.textIO, 'active');
         if (open) {
-          return this.ui.el.textIO.value = '';
+          return this.ui.components.textIO.value = '';
         } else {
-          importJSON = this.ui.el.textIO.value;
+          importJSON = this.ui.components.textIO.value;
           try {
             this.setFilm(JSON.parse(importJSON));
           } catch (_error) {}
-          return this.ui.el.textIO.value = '';
+          return this.ui.components.textIO.value = '';
         }
       }
     },
@@ -510,7 +505,7 @@ PenciltestUI = (function() {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    return this.el.toggleMenu.addEventListener('click', contextMenuListener);
+    return this.components.toggleMenu.addEventListener('click', contextMenuListener);
   };
 
   PenciltestUI.prototype.updateMenuOption = function(optionElement) {
@@ -543,7 +538,7 @@ PenciltestUI = (function() {
       option.addEventListener('mouseup', menuOptionListener);
       option.addEventListener('contextmenu', menuOptionListener);
     }
-    return this.el.textIO = this.controller.container.querySelector('textarea');
+    return this.components.textIO = this.controller.container.querySelector('textarea');
   };
 
   PenciltestUI.prototype.addKeyboardListeners = function() {
@@ -603,7 +598,7 @@ PenciltestUI = (function() {
 
   PenciltestUI.prototype.describeKeyboardShortcuts = function() {
     var action, helpDoc, name, open, _ref;
-    open = Utils.toggleClass(this.el.textIO, 'active');
+    open = Utils.toggleClass(this.components.textIO, 'active');
     if (open) {
       helpDoc = 'Keyboard Shortcuts:\n';
       _ref = this.appActions;
@@ -621,9 +616,9 @@ PenciltestUI = (function() {
         }
         helpDoc += '\n';
       }
-      return this.el.textIO.value = helpDoc;
+      return this.components.textIO.value = helpDoc;
     } else {
-      return this.el.textIO.value = '';
+      return this.components.textIO.value = '';
     }
   };
 
@@ -632,7 +627,7 @@ PenciltestUI = (function() {
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
-      this.el.appStatus.innerHTML = appStatusMarkup;
+      this.components.appStatus.innerHTML = appStatusMarkup;
       filmStatusMarkup = "<div class=\"frame\">";
       filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
       filmStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
@@ -642,7 +637,7 @@ PenciltestUI = (function() {
         filmStatusMarkup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
       }
       filmStatusMarkup += "</div>";
-      return this.el.filmStatus.innerHTML = filmStatusMarkup;
+      return this.components.filmStatus.innerHTML = filmStatusMarkup;
     }
   };
 
@@ -656,8 +651,8 @@ PenciltestUI = (function() {
     }
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
-      Utils.toggleClass(this.el.container, 'menu-visible', true);
-      maxRight = this.el.toggleMenu.offsetWidth;
+      Utils.toggleClass(this.components.container, 'menu-visible', true);
+      maxRight = this.components.toggleMenu.offsetWidth;
       maxBottom = 0;
       if (coords.x > document.body.offsetWidth - maxRight - this.menuElement.offsetWidth) {
         this.menuElement.style.right = "" + maxRight + "px";
@@ -690,7 +685,7 @@ PenciltestUI = (function() {
   PenciltestUI.prototype.hideMenu = function() {
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
-      return Utils.toggleClass(this.el.container, 'menu-visible', false);
+      return Utils.toggleClass(this.components.container, 'menu-visible', false);
     }
   };
 
