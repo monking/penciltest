@@ -24,17 +24,9 @@
 
 .penciltest-ui .toolbar {
   position: fixed;
-  top: 100%;
+  bottom: 0;
   left: 0;
   width: 100%;
-  min-height: 2em;
-  margin-top: -2em;
-  height: 2em;
-}
-.penciltest-ui .toolbar.open {
-  top: auto;
-  height: auto;
-  bottom: 0;
 }
 .penciltest-ui .toolbar .status {
   font-family: monospace;
@@ -50,20 +42,27 @@
 .penciltest-ui .toolbar .status .status-right {
   float: right;
 }
-.penciltest-ui .toolbar .status .status-left, .penciltest-ui .toolbar .status .status-right {
-  margin: 0 0.5em;
-}
 .penciltest-ui .toolbar .status .status-left > *, .penciltest-ui .toolbar .status .status-right > * {
   display: inline-block;
   vertical-align: middle;
+}
+.penciltest-ui .toolbar .status .app-status, .penciltest-ui .toolbar .status .film-status {
   margin: 0 0.5em;
 }
 .penciltest-ui .toolbar .status button {
   background-color: transparent;
   color: inherit;
   border-width: 0;
-  padding: 0 0.3em;
+  padding: 0 0.5em;
   font-size: 1.2em;
+}
+.penciltest-ui .toolbar .timeline {
+  height: 0;
+  overflow: auto;
+  max-height: 100%;
+}
+.penciltest-ui .toolbar.open .timeline {
+  height: auto;
 }
 .penciltest-ui .menu {
   display: none;
@@ -75,6 +74,9 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .penciltest-ui .menu ul, .penciltest-ui .menu li {
   list-style: inherit;
