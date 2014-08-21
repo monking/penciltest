@@ -32,8 +32,14 @@ class PenciltestUI
 
     # status & buttons
     @el.statusBar = createElement 'div.status', @el.toolbar
+    @el.statusLeft = createElement 'div.status-left', @el.statusBar
+    @el.statusRight = createElement 'div.status-right', @el.statusBar
 
-    @el.toggleTimeline = createElement 'div.fa fa-table', @el.statusBar
+    @el.appStatus = createElement 'div.app-status', @el.statusLeft
+
+    @el.filmStatus = createElement 'div.film-status', @el.statusRight
+    @el.toggleTimeline = createElement 'button.toggle-timeline.fa.fa-table', @el.statusRight
+    @el.toggleMenu = createElement 'button.toggle-menu.fa.fa-cog', @el.statusRight
 
     # menu
     @el.menu = createElement 'ul.menu', @el.container
@@ -393,6 +399,9 @@ class PenciltestUI
       event.preventDefault()
       self.toggleMenu getEventPageXY event
 
+    @el.toggleMenu.addEventListener 'click', ->
+      self.toggleMenu {x: 0, y: 0}
+
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
@@ -489,19 +498,21 @@ class PenciltestUI
 
   updateStatus: ->
     if @controller.options.showStatus
-      markup = "<div class=\"settings\">"
-      markup += "v#{Penciltest.prototype.state.version}"
-      markup += " Smoothing: #{@controller.options.smoothing}"
-      markup += "</div>"
-      markup += "<div class=\"frame\">"
-      markup += "#{@controller.options.frameRate} FPS"
-      markup += " | (hold #{@controller.getCurrentFrame().hold})"
-      markup += " | #{@controller.current.frameNumber + 1}/#{@controller.film.frames.length}"
-      markup += " | #{Utils.getDecimal @controller.current.frameIndex[@controller.current.frameNumber].time, 1, String}"
+      appStatusMarkup = "v#{Penciltest.prototype.state.version}"
+      appStatusMarkup += " Smoothing: #{@controller.options.smoothing}"
+
+      @el.appStatus.innerHTML = appStatusMarkup
+
+      filmStatusMarkup = "<div class=\"frame\">"
+      filmStatusMarkup += "#{@controller.options.frameRate} FPS"
+      filmStatusMarkup += " | (hold #{@controller.getCurrentFrame().hold})"
+      filmStatusMarkup += " | #{@controller.current.frameNumber + 1}/#{@controller.film.frames.length}"
+      filmStatusMarkup += " | #{Utils.getDecimal @controller.current.frameIndex[@controller.current.frameNumber].time, 1, String}"
       if @controller.film.audio?.offset
-        markup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
-      markup += "</div>"
-      @el.statusBar.innerHTML = markup
+        filmStatusMarkup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
+      filmStatusMarkup += "</div>"
+
+      @el.filmStatus.innerHTML = filmStatusMarkup
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible

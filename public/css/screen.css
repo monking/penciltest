@@ -39,15 +39,31 @@
 .penciltest-ui .toolbar .status {
   font-family: monospace;
   color: white;
+  line-height: 2em;
 }
 .penciltest-ui .toolbar .status.hidden {
   display: none;
 }
-.penciltest-ui .toolbar .status .settings {
+.penciltest-ui .toolbar .status .status-left {
   float: left;
 }
-.penciltest-ui .toolbar .status .frame {
+.penciltest-ui .toolbar .status .status-right {
   float: right;
+}
+.penciltest-ui .toolbar .status .status-left, .penciltest-ui .toolbar .status .status-right {
+  margin: 0 0.5em;
+}
+.penciltest-ui .toolbar .status .status-left > *, .penciltest-ui .toolbar .status .status-right > * {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 0.5em;
+}
+.penciltest-ui .toolbar .status button {
+  background-color: transparent;
+  color: inherit;
+  border-width: 0;
+  padding: 0 0.3em;
+  font-size: 1.2em;
 }
 .penciltest-ui .menu {
   display: none;

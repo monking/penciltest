@@ -26,7 +26,12 @@ PenciltestUI = (function() {
     this.el.container = createElement('div.penciltest-ui', this.controller.container);
     this.el.toolbar = createElement('div.toolbar', this.el.container);
     this.el.statusBar = createElement('div.status', this.el.toolbar);
-    this.el.toggleTimeline = createElement('div.fa fa-table', this.el.statusBar);
+    this.el.statusLeft = createElement('div.status-left', this.el.statusBar);
+    this.el.statusRight = createElement('div.status-right', this.el.statusBar);
+    this.el.appStatus = createElement('div.app-status', this.el.statusLeft);
+    this.el.filmStatus = createElement('div.film-status', this.el.statusRight);
+    this.el.toggleTimeline = createElement('button.toggle-timeline.fa.fa-table', this.el.statusRight);
+    this.el.toggleMenu = createElement('button.toggle-menu.fa.fa-cog', this.el.statusRight);
     this.el.menu = createElement('ul.menu', this.el.container);
     this.el.menu.innerHTML = this.menuWalker(this.menuOptions);
     this.el.textIO = document.createElement('textarea');
@@ -502,6 +507,12 @@ PenciltestUI = (function() {
       event.preventDefault();
       return self.toggleMenu(getEventPageXY(event));
     };
+    this.el.toggleMenu.addEventListener('click', function() {
+      return self.toggleMenu({
+        x: 0,
+        y: 0
+      });
+    });
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     return this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
@@ -623,22 +634,21 @@ PenciltestUI = (function() {
   };
 
   PenciltestUI.prototype.updateStatus = function() {
-    var markup, _ref;
+    var appStatusMarkup, filmStatusMarkup, _ref;
     if (this.controller.options.showStatus) {
-      markup = "<div class=\"settings\">";
-      markup += "v" + Penciltest.prototype.state.version;
-      markup += " Smoothing: " + this.controller.options.smoothing;
-      markup += "</div>";
-      markup += "<div class=\"frame\">";
-      markup += "" + this.controller.options.frameRate + " FPS";
-      markup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
-      markup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.film.frames.length;
-      markup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
+      appStatusMarkup = "v" + Penciltest.prototype.state.version;
+      appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
+      this.el.appStatus.innerHTML = appStatusMarkup;
+      filmStatusMarkup = "<div class=\"frame\">";
+      filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
+      filmStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
+      filmStatusMarkup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.film.frames.length;
+      filmStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
       if ((_ref = this.controller.film.audio) != null ? _ref.offset : void 0) {
-        markup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
+        filmStatusMarkup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
       }
-      markup += "</div>";
-      return this.el.statusBar.innerHTML = markup;
+      filmStatusMarkup += "</div>";
+      return this.el.filmStatus.innerHTML = filmStatusMarkup;
     }
   };
 

@@ -18,17 +18,36 @@
     .status {
       font-family: monospace;
       color: $white;
+      line-height: $toolbarMinHeight;
 
       &.hidden {
         display: none;
       }
 
-      .settings {
+      .status-left {
         float: left;
       }
 
-      .frame {
+      .status-right {
         float: right;
+      }
+
+      .status-left, .status-right {
+        margin: 0 0.5em;
+
+        > * {
+          display: inline-block;
+          vertical-align: middle;
+          margin: 0 0.5em;
+        }
+      }
+
+      button {
+        background-color: transparent;
+        color: inherit;
+        border-width: 0;
+        padding: 0 0.3em;
+        font-size: 1.2em;
       }
     }
   }
