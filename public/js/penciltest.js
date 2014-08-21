@@ -8622,20 +8622,24 @@ PenciltestUI = (function() {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
+    var createElement;
     this.el = {};
-    this.el.container = document.createElement('div');
-    this.el.container.className = 'penciltest-ui';
-    this.controller.container.appendChild(this.el.container);
-    this.el.toolbar = document.createElement('div');
-    this.el.toolbar.className = 'toolbar';
-    this.el.container.appendChild(this.el.toolbar);
-    this.el.statusBar = document.createElement('div');
-    this.el.statusBar.className = 'status';
-    this.el.toolbar.appendChild(this.el.statusBar);
-    this.el.menu = document.createElement('ul');
-    this.el.menu.className = 'menu';
+    createElement = function(selector, parent) {
+      var className, element, selectorParts, tagName;
+      selectorParts = selector.split('.');
+      tagName = selectorParts[0];
+      className = selectorParts.slice(1).join(' ');
+      element = document.createElement(tagName);
+      element.className = className;
+      parent.appendChild(element);
+      return element;
+    };
+    this.el.container = createElement('div.penciltest-ui', this.controller.container);
+    this.el.toolbar = createElement('div.toolbar', this.el.container);
+    this.el.statusBar = createElement('div.status', this.el.toolbar);
+    this.el.toggleTimeline = createElement('div.fa fa-table', this.el.statusBar);
+    this.el.menu = createElement('ul.menu', this.el.container);
     this.el.menu.innerHTML = this.menuWalker(this.menuOptions);
-    this.el.container.appendChild(this.el.menu);
     this.el.textIO = document.createElement('textarea');
     return this.el.toolbar.appendChild(this.el.textIO);
   };
@@ -8861,7 +8865,6 @@ PenciltestUI = (function() {
     showStatus: {
       label: "Show Status",
       title: "hide the film status bar",
-      hotkey: ['S'],
       listener: function() {
         return this.setOptions({
           showStatus: !this.options.showStatus
@@ -9011,7 +9014,7 @@ PenciltestUI = (function() {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop'],
-      Tools: ['hideCursor', 'onionSkin', 'showStatus', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
+      Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
       Settings: ['renderer', 'describeKeyboardShortcuts', 'reset']
     }
@@ -9136,7 +9139,7 @@ PenciltestUI = (function() {
         event.preventDefault();
         optionName = this.attributes.rel.value;
         self.doAppAction(optionName);
-        return self.controller.hideMenu();
+        return self.hideMenu();
       }
     };
     _ref = this.menuItems;
@@ -9270,7 +9273,7 @@ PenciltestUI = (function() {
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         option = _ref[_i];
         if (option.attributes.rel) {
-          _results.push(this.ui.updateMenuOption(option));
+          _results.push(this.updateMenuOption(option));
         } else {
           _results.push(void 0);
         }

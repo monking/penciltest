@@ -21,24 +21,35 @@
   width: 100%;
   height: 100%;
 }
-.penciltest-app .field-container .status {
-  position: absolute;
-  bottom: -2em;
-  right: 0;
+
+.penciltest-ui .toolbar {
+  position: fixed;
+  top: 100%;
+  left: 0;
   width: 100%;
+  min-height: 2em;
+  margin-top: -2em;
+  height: 2em;
+}
+.penciltest-ui .toolbar.open {
+  top: auto;
+  height: auto;
+  bottom: 0;
+}
+.penciltest-ui .toolbar .status {
   font-family: monospace;
   color: white;
 }
-.penciltest-app .field-container .status.hidden {
+.penciltest-ui .toolbar .status.hidden {
   display: none;
 }
-.penciltest-app .field-container .status .settings {
+.penciltest-ui .toolbar .status .settings {
   float: left;
 }
-.penciltest-app .field-container .status .frame {
+.penciltest-ui .toolbar .status .frame {
   float: right;
 }
-.penciltest-app .menu {
+.penciltest-ui .menu {
   display: none;
   position: absolute;
   top: 1em;
@@ -49,24 +60,24 @@
   padding: 0;
   margin: 0;
 }
-.penciltest-app .menu ul, .penciltest-app .menu li {
+.penciltest-ui .menu ul, .penciltest-ui .menu li {
   list-style: inherit;
 }
-.penciltest-app .menu li {
+.penciltest-ui .menu li {
   position: relative;
 }
-.penciltest-app .menu li label {
+.penciltest-ui .menu li label {
   display: block;
   padding: 0 0.5em 0 1.5em;
   line-height: 2.0em;
   color: #666666;
   cursor: pointer;
 }
-.penciltest-app .menu li:hover > label {
+.penciltest-ui .menu li:hover > label {
   color: black;
   background-color: #fff;
 }
-.penciltest-app .menu li.enabled label::before {
+.penciltest-ui .menu li.enabled label::before {
   content: '\2713';
   position: absolute;
   left: 0;
@@ -74,16 +85,16 @@
   width: 1em;
   text-align: center;
 }
-.penciltest-app .menu li.group {
+.penciltest-ui .menu li.group {
   position: relative;
 }
-.penciltest-app .menu li.group > ul {
+.penciltest-ui .menu li.group > ul {
   padding-left: 1em;
 }
-.penciltest-app .menu li.group > label {
+.penciltest-ui .menu li.group > label {
   padding-right: 2em;
 }
-.penciltest-app .menu li.group > label::after {
+.penciltest-ui .menu li.group > label::after {
   content: '\25bc';
   position: absolute;
   font-size: 0.6em;
@@ -102,47 +113,47 @@
   -o-transition-duration: 0.1s;
   transition-duration: 0.1s;
 }
-.penciltest-app .menu li.group.collapsed label::after {
+.penciltest-ui .menu li.group.collapsed label::after {
   -webkit-transform: rotate(-90deg);
   -moz-transform: rotate(-90deg);
   -ms-transform: rotate(-90deg);
   -o-transform: rotate(-90deg);
   transform: rotate(-90deg);
 }
-.penciltest-app .menu li.group.collapsed > ul {
+.penciltest-ui .menu li.group.collapsed > ul {
   display: none;
 }
-.penciltest-app .menu li.icons ul {
+.penciltest-ui .menu li.icons ul {
   padding: 0;
 }
-.penciltest-app .menu li.icons li {
+.penciltest-ui .menu li.icons li {
   display: inline-block;
   text-align: center;
   width: 2em;
   font-family: 'fontawesome';
 }
-.penciltest-app .menu li.icons li label {
+.penciltest-ui .menu li.icons li label {
   display: none;
 }
-.penciltest-app .menu li.icons li[rel="playPause"]::before {
+.penciltest-ui .menu li.icons li[rel="playPause"]::before {
   content: '\f04b';
 }
-.penciltest-app .menu li.icons li[rel="firstFrame"]::before {
+.penciltest-ui .menu li.icons li[rel="firstFrame"]::before {
   content: '\f049';
 }
-.penciltest-app .menu li.icons li[rel="lastFrame"]::before {
+.penciltest-ui .menu li.icons li[rel="lastFrame"]::before {
   content: '\f050';
 }
-.penciltest-app .menu li.icons li[rel="nextFrame"]::before {
+.penciltest-ui .menu li.icons li[rel="nextFrame"]::before {
   content: '\f051';
 }
-.penciltest-app .menu li.icons li[rel="prevFrame"]::before {
+.penciltest-ui .menu li.icons li[rel="prevFrame"]::before {
   content: '\f048';
 }
-.penciltest-app.menu-visible .menu {
+.penciltest-ui.menu-visible .menu {
   display: block;
 }
-.penciltest-app textarea {
+.penciltest-ui textarea {
   position: fixed;
   width: 70%;
   height: 100%;
@@ -162,6 +173,6 @@
   -o-transition-duration: 0.3s;
   transition-duration: 0.3s;
 }
-.penciltest-app textarea.active {
+.penciltest-ui textarea.active {
   right: 0%;
 }

@@ -1,0 +1,173 @@
+.penciltest-ui {
+  .toolbar {
+    $toolbarMinHeight: 2em;
+    position: fixed;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    min-height: $toolbarMinHeight;
+    margin-top: -$toolbarMinHeight;
+    height: $toolbarMinHeight;
+
+    &.open {
+      top: auto;
+      height: auto;
+      bottom: 0;
+    }
+
+    .status {
+      font-family: monospace;
+      color: $white;
+
+      &.hidden {
+        display: none;
+      }
+
+      .settings {
+        float: left;
+      }
+
+      .frame {
+        float: right;
+      }
+    }
+  }
+
+  .menu {
+    display: none;
+    position: absolute;
+    top: 1em;
+    left: 1em;
+    box-shadow: 0 0.5em 2em rgba(0, 0, 0, 0.5);
+    background-color: #eee;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+
+    ul, li {
+      list-style: inherit;
+    }
+
+    li {
+      position: relative;
+
+      label {
+        display: block;
+        padding: 0 0.5em 0 1.5em;
+        line-height: 2.0em;
+        color: $gray;
+        cursor: pointer;
+      }
+
+      &:hover > label {
+        color: black;
+        background-color: #fff;
+      }
+
+      &.enabled label::before {
+        content: '\2713';
+        position: absolute;
+        left: 0;
+        display: block;
+        width: 1em;
+        text-align: center;
+      }
+
+      &.group {
+        position: relative;
+
+        > ul {
+          padding-left: 1em;
+        }
+
+        > label {
+          padding-right: 2em;
+
+          &::after {
+            content: '\25bc';
+            position: absolute;
+            font-size: 0.6em;
+            top: 0;
+            right: 0;
+            width: 1.5rem;
+            height: 2.0rem;
+            line-height: 2.0rem;
+            text-align: center;
+            @include transition-property(all);
+            @include transition-duration(0.1s);
+          }
+        }
+
+        &.collapsed {
+          label::after {
+            @include transform(rotate(-90deg));
+          }
+
+          > ul {
+            display: none;
+          }
+        }
+      }
+
+      &.icons {
+        ul {
+          padding: 0;
+        }
+        li {
+          display: inline-block;
+          text-align: center;
+          width: 2em;
+          font-family: 'fontawesome';
+
+          label {
+            display: none;
+          }
+
+          &[rel="playPause"]::before {
+            content: '\f04b';
+          }
+
+          &[rel="firstFrame"]::before {
+            content: '\f049';
+          }
+
+          &[rel="lastFrame"]::before {
+            content: '\f050';
+          }
+
+          &[rel="nextFrame"]::before {
+            content: '\f051';
+          }
+
+          &[rel="prevFrame"]::before {
+            content: '\f048';
+          }
+        }
+      }
+    }
+  }
+
+  &.menu-visible .menu {
+    display: block;
+  }
+
+  textarea {
+    $width: 70%;
+    position: fixed;
+    width: $width;
+    height: 100%;
+    top: 0;
+    right: -$width;
+    color: #EEE;
+    background-color: rgba(0,0,0,0.7);
+    border: none;
+    font-size: 0.9em;
+    line-height: 1.7em;
+    @include transition-property(right);
+    @include transition-duration(0.3s);
+
+    &.active {
+      right: 0%;
+    }
+  }
+}

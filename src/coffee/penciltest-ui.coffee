@@ -12,26 +12,32 @@ class PenciltestUI
   markupDOMElements: ->
     @el = {}
 
+    createElement = (selector, parent) ->
+
+      selectorParts = selector.split '.'
+      tagName = selectorParts[0]
+      className = selectorParts.slice(1).join ' '
+
+      element = document.createElement tagName
+      element.className = className
+      parent.appendChild element
+
+      element
+
     # container
-    @el.container = document.createElement 'div'
-    @el.container.className = 'penciltest-ui'
-    @controller.container.appendChild @el.container
+    @el.container = createElement 'div.penciltest-ui', @controller.container
 
     # toolbar
-    @el.toolbar = document.createElement 'div'
-    @el.toolbar.className = 'toolbar'
-    @el.container.appendChild @el.toolbar
+    @el.toolbar = createElement 'div.toolbar', @el.container
 
-    # status bar
-    @el.statusBar = document.createElement 'div'
-    @el.statusBar.className = 'status'
-    @el.toolbar.appendChild @el.statusBar
+    # status & buttons
+    @el.statusBar = createElement 'div.status', @el.toolbar
+
+    @el.toggleTimeline = createElement 'div.fa fa-table', @el.statusBar
 
     # menu
-    @el.menu = document.createElement 'ul'
-    @el.menu.className = 'menu'
+    @el.menu = createElement 'ul.menu', @el.container
     @el.menu.innerHTML = @menuWalker @menuOptions
-    @el.container.appendChild @el.menu
 
     # text input/output
     @el.textIO = document.createElement 'textarea'
@@ -179,7 +185,6 @@ class PenciltestUI
     showStatus:
       label: "Show Status"
       title: "hide the film status bar"
-      hotkey: ['S']
       listener: -> @setOptions showStatus: not @options.showStatus
       action: -> Utils.toggleClass @ui.el.statusBar, 'hidden', not @options.showStatus
     loop:
@@ -291,7 +296,6 @@ class PenciltestUI
     Tools: [
       'hideCursor'
       'onionSkin'
-      'showStatus'
       'smoothing'
       'smoothFrame'
       'smoothFilm'
@@ -410,7 +414,7 @@ class PenciltestUI
         event.preventDefault()
         optionName = @attributes.rel.value
         self.doAppAction optionName
-        self.controller.hideMenu()
+        self.hideMenu()
 
     for option in @menuItems
       option.addEventListener 'mouseup', menuOptionListener
@@ -508,7 +512,7 @@ class PenciltestUI
       @menuElement.style.left = "#{coords.x + 1}px"
       @menuElement.style.top = "#{coords.y}px"
       for option in @menuItems
-        @ui.updateMenuOption option if option.attributes.rel
+        @updateMenuOption option if option.attributes.rel
 
   hideMenu: ->
     if @menuIsVisible
