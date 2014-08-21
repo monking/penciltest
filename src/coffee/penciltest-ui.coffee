@@ -1,21 +1,41 @@
 class PenciltestUI
 
   constructor: (@controller) ->
-    @container = document.createElement 'div'
-    @container.innerHTML = '<textarea></textarea>' +
-      '<ul class="menu">' +
-      @menuWalker(@menuOptions) +
-      '</ul>'
 
-    @controller.container.appendChild @container
-
-    @textElement = @controller.container.querySelector 'textarea'
-    @statusElement = @controller.container.querySelector '.status'
+    @markupDOMElements()
 
     @addInputListeners()
     @addMenuListeners()
     @addKeyboardListeners()
     @addOtherListeners()
+
+  markupDOMElements: ->
+    @el = {}
+
+    # container
+    @el.container = document.createElement 'div'
+    @el.container.className = 'penciltest-ui'
+    @controller.container.appendChild @el.container
+
+    # toolbar
+    @el.toolbar = document.createElement 'div'
+    @el.toolbar.className = 'toolbar'
+    @el.container.appendChild @el.toolbar
+
+    # status bar
+    @el.statusBar = document.createElement 'div'
+    @el.statusBar.className = 'status'
+    @el.toolbar.appendChild @el.statusBar
+
+    # menu
+    @el.menu = document.createElement 'ul'
+    @el.menu.className = 'menu'
+    @el.menu.innerHTML = @menuWalker @menuOptions
+    @el.container.appendChild @el.menu
+
+    # text input/output
+    @el.textIO = document.createElement 'textarea'
+    @el.toolbar.appendChild @el.textIO
 
   # action and listener functions are called in controller scope
   appActions:
@@ -161,7 +181,7 @@ class PenciltestUI
       title: "hide the film status bar"
       hotkey: ['S']
       listener: -> @setOptions showStatus: not @options.showStatus
-      action: -> Utils.toggleClass @ui.statusElement, 'hidden', not @options.showStatus
+      action: -> Utils.toggleClass @ui.el.statusBar, 'hidden', not @options.showStatus
     loop:
       label: "Loop"
       hotkey: ['L']
@@ -190,24 +210,24 @@ class PenciltestUI
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.textElement, 'active'
+        open = Utils.toggleClass @ui.el.textIO, 'active'
         if open
-          @textElement.value = JSON.stringify @film
+          @el.textIO.value = JSON.stringify @film
         else
-          @textElement.value = ''
+          @el.textIO.value = ''
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.textElement, 'active'
+        open = Utils.toggleClass @ui.el.textIO, 'active'
         if open
-          @textElement.value = ''
+          @el.textIO.value = ''
         else
-          importJSON = @textElement.value
+          importJSON = @el.textIO.value
           try
             @setFilm JSON.parse importJSON
-          @textElement.value = ''
+          @el.textIO.value = ''
     importAudio:
       label: "Import Audio"
       hotkey: ['Alt+A']
@@ -397,7 +417,7 @@ class PenciltestUI
       option.addEventListener 'touchend', menuOptionListener
       option.addEventListener 'contextmenu', menuOptionListener
 
-    @textElement = @controller.container.querySelector 'textarea'
+    @el.textIO = @controller.container.querySelector 'textarea'
 
   addKeyboardListeners: ->
     self = @
@@ -445,7 +465,7 @@ class PenciltestUI
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
   describeKeyboardShortcuts: ->
-    open = Utils.toggleClass @textElement, 'active'
+    open = Utils.toggleClass @el.textIO, 'active'
     if open
       helpDoc = 'Keyboard Shortcuts:\n'
 
@@ -459,9 +479,9 @@ class PenciltestUI
           helpDoc += " - #{action.title}"
         helpDoc += '\n'
 
-      @textElement.value = helpDoc
+      @el.textIO.value = helpDoc
     else
-      @textElement.value = ''
+      @el.textIO.value = ''
 
   updateStatus: ->
     if @controller.options.showStatus
@@ -477,12 +497,12 @@ class PenciltestUI
       if @controller.film.audio?.offset
         markup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
       markup += "</div>"
-      @statusElement.innerHTML = markup
+      @el.statusBar.innerHTML = markup
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible
       @menuIsVisible = true
-      Utils.toggleClass @container, 'menu-visible', true
+      Utils.toggleClass @el.container, 'menu-visible', true
       coords.x = Math.min document.body.offsetWidth - @menuElement.offsetWidth, coords.x
       coords.y = Math.min document.body.offsetHeight - @menuElement.offsetHeight, coords.y
       @menuElement.style.left = "#{coords.x + 1}px"
@@ -493,7 +513,7 @@ class PenciltestUI
   hideMenu: ->
     if @menuIsVisible
       @menuIsVisible = false
-      Utils.toggleClass @container, 'menu-visible', false
+      Utils.toggleClass @el.container, 'menu-visible', false
 
   toggleMenu: (coords) ->
     if @menuIsVisible then @hideMenu() else @showMenu coords

@@ -75,7 +75,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.buildContainer = function() {
     var markup;
-    markup = '<div class="field-container">' + '<div class="field"></div>' + '<div class="status"></div>' + '</div>';
+    markup = '<div class="field-container">' + '<div class="field"></div>' + '</div>';
     this.container.innerHTML = markup;
     this.fieldContainer = this.container.querySelector('.field-container');
     return this.fieldElement = this.container.querySelector('.field');

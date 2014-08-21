@@ -3,16 +3,31 @@ var PenciltestUI;
 PenciltestUI = (function() {
   function PenciltestUI(controller) {
     this.controller = controller;
-    this.container = document.createElement('div');
-    this.container.innerHTML = '<textarea></textarea>' + '<ul class="menu">' + this.menuWalker(this.menuOptions) + '</ul>';
-    this.controller.container.appendChild(this.container);
-    this.textElement = this.controller.container.querySelector('textarea');
-    this.statusElement = this.controller.container.querySelector('.status');
+    this.markupDOMElements();
     this.addInputListeners();
     this.addMenuListeners();
     this.addKeyboardListeners();
     this.addOtherListeners();
   }
+
+  PenciltestUI.prototype.markupDOMElements = function() {
+    this.el = {};
+    this.el.container = document.createElement('div');
+    this.el.container.className = 'penciltest-ui';
+    this.controller.container.appendChild(this.el.container);
+    this.el.toolbar = document.createElement('div');
+    this.el.toolbar.className = 'toolbar';
+    this.el.container.appendChild(this.el.toolbar);
+    this.el.statusBar = document.createElement('div');
+    this.el.statusBar.className = 'status';
+    this.el.toolbar.appendChild(this.el.statusBar);
+    this.el.menu = document.createElement('ul');
+    this.el.menu.className = 'menu';
+    this.el.menu.innerHTML = this.menuWalker(this.menuOptions);
+    this.el.container.appendChild(this.el.menu);
+    this.el.textIO = document.createElement('textarea');
+    return this.el.toolbar.appendChild(this.el.textIO);
+  };
 
   PenciltestUI.prototype.appActions = {
     renderer: {
@@ -242,7 +257,7 @@ PenciltestUI = (function() {
         });
       },
       action: function() {
-        return Utils.toggleClass(this.ui.statusElement, 'hidden', !this.options.showStatus);
+        return Utils.toggleClass(this.ui.el.statusBar, 'hidden', !this.options.showStatus);
       }
     },
     loop: {
@@ -293,11 +308,11 @@ PenciltestUI = (function() {
       cancelComplement: true,
       listener: function() {
         var open;
-        open = Utils.toggleClass(this.ui.textElement, 'active');
+        open = Utils.toggleClass(this.ui.el.textIO, 'active');
         if (open) {
-          return this.textElement.value = JSON.stringify(this.film);
+          return this.el.textIO.value = JSON.stringify(this.film);
         } else {
-          return this.textElement.value = '';
+          return this.el.textIO.value = '';
         }
       }
     },
@@ -307,15 +322,15 @@ PenciltestUI = (function() {
       cancelComplement: true,
       listener: function() {
         var importJSON, open;
-        open = Utils.toggleClass(this.ui.textElement, 'active');
+        open = Utils.toggleClass(this.ui.el.textIO, 'active');
         if (open) {
-          return this.textElement.value = '';
+          return this.el.textIO.value = '';
         } else {
-          importJSON = this.textElement.value;
+          importJSON = this.el.textIO.value;
           try {
             this.setFilm(JSON.parse(importJSON));
           } catch (_error) {}
-          return this.textElement.value = '';
+          return this.el.textIO.value = '';
         }
       }
     },
@@ -520,7 +535,7 @@ PenciltestUI = (function() {
       option.addEventListener('touchend', menuOptionListener);
       option.addEventListener('contextmenu', menuOptionListener);
     }
-    return this.textElement = this.controller.container.querySelector('textarea');
+    return this.el.textIO = this.controller.container.querySelector('textarea');
   };
 
   PenciltestUI.prototype.addKeyboardListeners = function() {
@@ -580,7 +595,7 @@ PenciltestUI = (function() {
 
   PenciltestUI.prototype.describeKeyboardShortcuts = function() {
     var action, helpDoc, name, open, _ref;
-    open = Utils.toggleClass(this.textElement, 'active');
+    open = Utils.toggleClass(this.el.textIO, 'active');
     if (open) {
       helpDoc = 'Keyboard Shortcuts:\n';
       _ref = this.appActions;
@@ -598,9 +613,9 @@ PenciltestUI = (function() {
         }
         helpDoc += '\n';
       }
-      return this.textElement.value = helpDoc;
+      return this.el.textIO.value = helpDoc;
     } else {
-      return this.textElement.value = '';
+      return this.el.textIO.value = '';
     }
   };
 
@@ -620,7 +635,7 @@ PenciltestUI = (function() {
         markup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
       }
       markup += "</div>";
-      return this.statusElement.innerHTML = markup;
+      return this.el.statusBar.innerHTML = markup;
     }
   };
 
@@ -634,7 +649,7 @@ PenciltestUI = (function() {
     }
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
-      Utils.toggleClass(this.container, 'menu-visible', true);
+      Utils.toggleClass(this.el.container, 'menu-visible', true);
       coords.x = Math.min(document.body.offsetWidth - this.menuElement.offsetWidth, coords.x);
       coords.y = Math.min(document.body.offsetHeight - this.menuElement.offsetHeight, coords.y);
       this.menuElement.style.left = "" + (coords.x + 1) + "px";
@@ -656,7 +671,7 @@ PenciltestUI = (function() {
   PenciltestUI.prototype.hideMenu = function() {
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
-      return Utils.toggleClass(this.container, 'menu-visible', false);
+      return Utils.toggleClass(this.el.container, 'menu-visible', false);
     }
   };
 

@@ -80,7 +80,6 @@ class Penciltest
   buildContainer: ->
     markup = '<div class="field-container">' +
       '<div class="field"></div>' +
-      '<div class="status"></div>' +
     '</div>'
 
     @container.innerHTML = markup
