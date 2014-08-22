@@ -174,8 +174,8 @@
 .penciltest-ui textarea {
   position: fixed;
   width: 70%;
-  height: 100%;
   top: 0;
+  bottom: 2em;
   right: -70%;
   color: #EEE;
   background-color: rgba(0, 0, 0, 0.7);
