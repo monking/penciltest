@@ -179,8 +179,8 @@
     $width: 70%;
     position: fixed;
     width: $width;
-    height: 100%;
     top: 0;
+    bottom: 2em;
     right: -$width;
     color: #EEE;
     background-color: rgba(0,0,0,0.7);

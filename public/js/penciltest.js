@@ -8582,11 +8582,7 @@ PenciltestUI = (function(_super) {
   }
 
   PenciltestUI.prototype.markupDOMElements = function() {
-<<<<<<< HEAD
-    var componentInfo, name, options, _i, _len;
-=======
     var componentInfo, name, options;
->>>>>>> refactor UI to use components
     this.components = {};
     componentInfo = {
       toolbar: {
@@ -8623,6 +8619,11 @@ PenciltestUI = (function(_super) {
         className: 'toggle-menu fa fa-cog',
         parent: 'statusRight'
       },
+      toggleHelp: {
+        tagName: 'button',
+        className: 'toggle-help fa fa-question-circle',
+        parent: 'statusRight'
+      },
       menu: {
         tagName: 'ul',
         className: 'menu',
@@ -8633,16 +8634,6 @@ PenciltestUI = (function(_super) {
         parent: 'toolbar'
       }
     };
-<<<<<<< HEAD
-    for (options = _i = 0, _len = componentInfo.length; _i < _len; options = ++_i) {
-      name = componentInfo[options];
-      if (typeof options.parent === 'string') {
-        options.parent = this.components[name];
-      }
-      this.components[name] = new PencilTestUIComponent(options);
-    }
-    return this.components.menu.setHTML = this.menuWalker(this.menuOptions);
-=======
     for (name in componentInfo) {
       options = componentInfo[name];
       if (typeof options.parent === 'string') {
@@ -8651,7 +8642,6 @@ PenciltestUI = (function(_super) {
       this.components[name] = new PenciltestUIComponent(options);
     }
     return this.components.menu.setHTML(this.menuWalker(this.menuOptions));
->>>>>>> refactor UI to use components
   };
 
   PenciltestUI.prototype.appActions = {
@@ -8881,11 +8871,7 @@ PenciltestUI = (function(_super) {
         });
       },
       action: function() {
-<<<<<<< HEAD
-        return Utils.toggleClass(this.ui.components.statusBar, 'hidden', !this.options.showStatus);
-=======
         return Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus);
->>>>>>> refactor UI to use components
       }
     },
     loop: {
@@ -9130,7 +9116,10 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    return this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
+    this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
+    return this.components.toggleHelp.getElement().addEventListener('click', function() {
+      return self.doAppAction('describeKeyboardShortcuts');
+    });
   };
 
   PenciltestUI.prototype.updateMenuOption = function(optionElement) {
@@ -9223,7 +9212,7 @@ PenciltestUI = (function(_super) {
 
   PenciltestUI.prototype.describeKeyboardShortcuts = function() {
     var action, helpDoc, name, open, _ref;
-    open = Utils.toggleClass(this.components.textIO.getElement, 'active');
+    open = Utils.toggleClass(this.components.textIO.getElement(), 'active');
     if (open) {
       helpDoc = 'Keyboard Shortcuts:\n';
       _ref = this.appActions;
@@ -9276,14 +9265,9 @@ PenciltestUI = (function(_super) {
     }
     if (!this.menuIsVisible) {
       this.menuIsVisible = true;
-<<<<<<< HEAD
-      Utils.toggleClass(this.el.container, 'menu-visible', true);
-      maxRight = this.components.toggleMenu.getElement().offsetWidth;
-=======
       menuElement = this.components.menu.getElement();
       Utils.toggleClass(menuElement, 'active', true);
       maxRight = this.components.menu.getElement().offsetWidth;
->>>>>>> refactor UI to use components
       maxBottom = 0;
       if (coords.x > document.body.offsetWidth - maxRight - menuElement.offsetWidth) {
         menuElement.style.right = "" + maxRight + "px";

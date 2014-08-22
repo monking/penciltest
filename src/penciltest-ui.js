@@ -56,6 +56,11 @@ PenciltestUI = (function(_super) {
         className: 'toggle-menu fa fa-cog',
         parent: 'statusRight'
       },
+      toggleHelp: {
+        tagName: 'button',
+        className: 'toggle-help fa fa-question-circle',
+        parent: 'statusRight'
+      },
       menu: {
         tagName: 'ul',
         className: 'menu',
@@ -548,7 +553,10 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    return this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
+    this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
+    return this.components.toggleHelp.getElement().addEventListener('click', function() {
+      return self.doAppAction('describeKeyboardShortcuts');
+    });
   };
 
   PenciltestUI.prototype.updateMenuOption = function(optionElement) {
@@ -641,7 +649,7 @@ PenciltestUI = (function(_super) {
 
   PenciltestUI.prototype.describeKeyboardShortcuts = function() {
     var action, helpDoc, name, open, _ref;
-    open = Utils.toggleClass(this.components.textIO.getElement, 'active');
+    open = Utils.toggleClass(this.components.textIO.getElement(), 'active');
     if (open) {
       helpDoc = 'Keyboard Shortcuts:\n';
       _ref = this.appActions;

@@ -41,6 +41,10 @@ class PenciltestUI extends PenciltestUIComponent
         tagName: 'button'
         className: 'toggle-menu fa fa-cog'
         parent: 'statusRight'
+      toggleHelp:
+        tagName: 'button'
+        className: 'toggle-help fa fa-question-circle'
+        parent: 'statusRight'
       menu:
         tagName: 'ul'
         className: 'menu'
@@ -410,6 +414,7 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
+    @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value
@@ -480,7 +485,7 @@ class PenciltestUI extends PenciltestUIComponent
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
   describeKeyboardShortcuts: ->
-    open = Utils.toggleClass @components.textIO.getElement, 'active'
+    open = Utils.toggleClass @components.textIO.getElement(), 'active'
     if open
       helpDoc = 'Keyboard Shortcuts:\n'
 
