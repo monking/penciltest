@@ -24,6 +24,7 @@ module.exports = (grunt) ->
           cssDir      : 'public/css'
           environment : 'production'
           outputStyle : 'expanded'
+          config      : 'style/config.rb'
           force       : true
 
     concat:
