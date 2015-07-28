@@ -167,7 +167,7 @@ class PenciltestUI extends PenciltestUIComponent
       title: "show previous and next frames in red and blue"
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
-        @drawCurrentFrame()
+        @resize() # FIXME: should either not redraw, or redraw fine without this
     dropFrame:
       label: "Drop Frame"
       hotkey: ['X','Backspace']
@@ -207,7 +207,9 @@ class PenciltestUI extends PenciltestUIComponent
     loop:
       label: "Loop"
       hotkey: ['L']
-      listener: -> @setOptions loop: not @options.loop
+      listener: ->
+        @setOptions loop: not @options.loop
+        @resize() # FIXME: should either not redraw, or redraw fine without this
     saveFilm:
       label: "Save"
       hotkey: ['Alt+S']

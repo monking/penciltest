@@ -243,7 +243,7 @@ PenciltestUI = (function(_super) {
         this.setOptions({
           onionSkin: !this.options.onionSkin
         });
-        return this.drawCurrentFrame();
+        return this.resize();
       }
     },
     dropFrame: {
@@ -315,9 +315,10 @@ PenciltestUI = (function(_super) {
       label: "Loop",
       hotkey: ['L'],
       listener: function() {
-        return this.setOptions({
+        this.setOptions({
           loop: !this.options.loop
         });
+        return this.resize();
       }
     },
     saveFilm: {
