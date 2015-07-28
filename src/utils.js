@@ -161,35 +161,35 @@ Utils = {
     return this.currentGesture = null;
   },
   describePosition: function(coordinates, bounds) {
-    var descriptors, positionDescription, positionDescriptors, positionRatio, _i, _len;
-    positionDescriptors = [
-      {
-        minRatio: 0.00,
+    var descriptors, minRatio, positionDescription, positionDescriptors, positionRatio;
+    positionDescriptors = {
+      '0.00': {
         x: 'left',
-        y: 'top',
-        minRatio: 0.33,
+        y: 'top'
+      },
+      '0.33': {
         x: 'center',
-        y: 'middle',
-        minRatio: 0.67,
+        y: 'middle'
+      },
+      '0.67': {
         x: 'right',
         y: 'bottom'
       }
-    ];
+    };
     positionRatio = {
       x: (coordinates.x - bounds.x) / bounds.width,
       y: (coordinates.y - bounds.y) / bounds.height
     };
     positionDescription = {};
-    for (_i = 0, _len = positionDescriptors.length; _i < _len; _i++) {
-      descriptors = positionDescriptors[_i];
-      if (positionRatio.x > descriptors.minRatio) {
+    for (minRatio in positionDescriptors) {
+      descriptors = positionDescriptors[minRatio];
+      if (positionRatio.x > Number(minRatio)) {
         positionDescription.x = descriptors.x;
       }
-      if (positionRatio.y > descriptors.minRatio) {
+      if (positionRatio.y > Number(minRatio)) {
         positionDescription.y = descriptors.y;
       }
     }
-    console.log(coordinates, bounds, positionDescription);
     return positionDescription.x + ' ' + positionDescription.y;
   },
   describeMotion: function(startCoordinates, endCoordinates) {

@@ -124,22 +124,19 @@ Utils =
     @currentGesture = null
 
   describePosition: (coordinates, bounds) ->
-    positionDescriptors = [
-      minRatio: 0.00 , x: 'left'   , y: 'top'
-      minRatio: 0.33 , x: 'center' , y: 'middle'
-      minRatio: 0.67 , x: 'right'  , y: 'bottom'
-    ]
+    positionDescriptors =
+      '0.00': x: 'left'   , y: 'top'
+      '0.33': x: 'center' , y: 'middle'
+      '0.67': x: 'right'  , y: 'bottom'
 
     positionRatio =
       x: (coordinates.x - bounds.x) / bounds.width
       y: (coordinates.y - bounds.y) / bounds.height
 
     positionDescription = {}
-    for descriptors in positionDescriptors
-      if positionRatio.x > descriptors.minRatio then positionDescription.x = descriptors.x
-      if positionRatio.y > descriptors.minRatio then positionDescription.y = descriptors.y
-
-    console.log coordinates, bounds, positionDescription # XXX
+    for minRatio, descriptors of positionDescriptors
+      if positionRatio.x > Number(minRatio) then positionDescription.x = descriptors.x
+      if positionRatio.y > Number(minRatio) then positionDescription.y = descriptors.y
 
     positionDescription.x + ' ' + positionDescription.y
 

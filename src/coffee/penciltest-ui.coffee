@@ -77,6 +77,7 @@ class PenciltestUI extends PenciltestUIComponent
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
+      gesture: /2 still from center bottom/
       cancelComplement: true
       listener: ->
         @playDirection = 1
@@ -91,6 +92,7 @@ class PenciltestUI extends PenciltestUIComponent
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
+      gesture: /2 still from right bottom/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber + 1
@@ -99,6 +101,7 @@ class PenciltestUI extends PenciltestUIComponent
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
+      gesture: /2 still from left bottom/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber - 1
@@ -107,6 +110,7 @@ class PenciltestUI extends PenciltestUIComponent
     firstFrame:
       label: "First Frame"
       hotkey: ['0','Home','PgUp']
+      gesture: /2 left from .* bottom/
       cancelComplement: true
       listener: ->
         @goToFrame 0
@@ -114,6 +118,7 @@ class PenciltestUI extends PenciltestUIComponent
     lastFrame:
       label: "Last Frame"
       hotkey: ['$','End','PgDn']
+      gesture: /2 right from .* bottom/
       cancelComplement: true
       listener: ->
         @goToFrame @film.frames.length - 1
@@ -121,7 +126,7 @@ class PenciltestUI extends PenciltestUIComponent
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
-      gesture: touches: 2, region: 'left'
+      gesture: /2 still from left top/
       listener: ->
         newIndex = @current.frameNumber
         @newFrame newIndex
@@ -129,7 +134,7 @@ class PenciltestUI extends PenciltestUIComponent
     insertFrameAfter:
       label: "Insert Frame After"
       hotkey: ['I']
-      gesture: touches: 2, region: 'right'
+      gesture: /2 still from right top/
       listener: ->
         newIndex = @current.frameNumber + 1
         @newFrame newIndex
@@ -166,6 +171,7 @@ class PenciltestUI extends PenciltestUIComponent
     onionSkin:
       label: "Onion Skin"
       hotkey: ['O']
+      gesture: /2 down from center middle/
       title: "show previous and next frames in red and blue"
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
@@ -173,6 +179,7 @@ class PenciltestUI extends PenciltestUIComponent
     dropFrame:
       label: "Drop Frame"
       hotkey: ['X','Backspace']
+      gesture: /3 down from center top/
       cancelComplement: true
       listener: -> @dropFrame()
     smoothing:
@@ -209,17 +216,20 @@ class PenciltestUI extends PenciltestUIComponent
     loop:
       label: "Loop"
       hotkey: ['L']
+      gesture: /2 up from center middle/
       listener: ->
         @setOptions loop: not @options.loop
         @resize() # FIXME: should either not redraw, or redraw fine without this
     saveFilm:
       label: "Save"
       hotkey: ['Alt+S']
+      gesture: /3 still from center bottom/
       repeat: true
       listener: -> @saveFilm()
     loadFilm:
       label: "Load"
       hotkey: ['Alt+O']
+      gesture: /3 up from center bottom/
       repeat: true
       listener: -> @loadFilm()
     newFilm:
@@ -379,12 +389,16 @@ class PenciltestUI extends PenciltestUIComponent
     mouseDownListener = (event) ->
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        self.controller.lift()
+        self.controller.lift() #FIXME: I'm trying to kill the current strokoe, but it's not working
         self.fieldBounds =
           x: 0
           y: 0
           width: self.controller.width
           height: self.controller.height
+        if not Utils.currentGesture
+          self.doAppAction 'undo'
+        Utils.clearGesture()
+        Utils.recordGesture event
       else
         if event.button is 2
           return true # allow context menu
@@ -398,9 +412,10 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', mouseUpListener
 
     mouseMoveListener = (event) ->
-      if event.type is 'touchmove'
+      if event.type is 'touchmove' and event.touches.length > 1
         Utils.recordGesture event
         Utils.describeGesture self.fieldBounds
+        # TODO: support continuous gestures, like scrubbing the timeline
       event.preventDefault()
       trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
@@ -408,8 +423,8 @@ class PenciltestUI extends PenciltestUIComponent
       if event.type is 'mouseup' and event.button is 2
         return true # allow context menu
       else
-        if event.type is 'touchend'
-          console.log Utils.describeGesture self.fieldBounds, 'final'
+        if event.type is 'touchend' and Utils.currentGesture
+          self.doGesture Utils.describeGesture self.fieldBounds, 'final'
           Utils.clearGesture event
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
@@ -426,6 +441,11 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
     @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
+
+  doGesture: (gestureDescription) ->
+    for name, action of @appActions
+      if action.gesture and action.gesture.test gestureDescription
+        return @doAppAction name
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value
