@@ -8279,35 +8279,35 @@ Utils = {
     return this.currentGesture = null;
   },
   describePosition: function(coordinates, bounds) {
-    var descriptors, positionDescription, positionDescriptors, positionRatio, _i, _len;
-    positionDescriptors = [
-      {
-        minRatio: 0.00,
+    var descriptors, minRatio, positionDescription, positionDescriptors, positionRatio;
+    positionDescriptors = {
+      '0.00': {
         x: 'left',
-        y: 'top',
-        minRatio: 0.33,
+        y: 'top'
+      },
+      '0.33': {
         x: 'center',
-        y: 'middle',
-        minRatio: 0.67,
+        y: 'middle'
+      },
+      '0.67': {
         x: 'right',
         y: 'bottom'
       }
-    ];
+    };
     positionRatio = {
       x: (coordinates.x - bounds.x) / bounds.width,
       y: (coordinates.y - bounds.y) / bounds.height
     };
     positionDescription = {};
-    for (_i = 0, _len = positionDescriptors.length; _i < _len; _i++) {
-      descriptors = positionDescriptors[_i];
-      if (positionRatio.x > descriptors.minRatio) {
+    for (minRatio in positionDescriptors) {
+      descriptors = positionDescriptors[minRatio];
+      if (positionRatio.x > Number(minRatio)) {
         positionDescription.x = descriptors.x;
       }
-      if (positionRatio.y > descriptors.minRatio) {
+      if (positionRatio.y > Number(minRatio)) {
         positionDescription.y = descriptors.y;
       }
     }
-    console.log(coordinates, bounds, positionDescription);
     return positionDescription.x + ' ' + positionDescription.y;
   },
   describeMotion: function(startCoordinates, endCoordinates) {
@@ -8761,6 +8761,7 @@ PenciltestUI = (function(_super) {
     playPause: {
       label: "Play/Pause",
       hotkey: ['Space'],
+      gesture: /2 still from center bottom/,
       cancelComplement: true,
       listener: function() {
         this.playDirection = 1;
@@ -8779,6 +8780,7 @@ PenciltestUI = (function(_super) {
     nextFrame: {
       label: "Next Frame",
       hotkey: ['Right', '.'],
+      gesture: /2 still from right bottom/,
       repeat: true,
       listener: function() {
         this.goToFrame(this.current.frameNumber + 1);
@@ -8791,6 +8793,7 @@ PenciltestUI = (function(_super) {
     prevFrame: {
       label: "Previous Frame",
       hotkey: ['Left', ','],
+      gesture: /2 still from left bottom/,
       repeat: true,
       listener: function() {
         this.goToFrame(this.current.frameNumber - 1);
@@ -8803,6 +8806,7 @@ PenciltestUI = (function(_super) {
     firstFrame: {
       label: "First Frame",
       hotkey: ['0', 'Home', 'PgUp'],
+      gesture: /2 left from .* bottom/,
       cancelComplement: true,
       listener: function() {
         this.goToFrame(0);
@@ -8812,6 +8816,7 @@ PenciltestUI = (function(_super) {
     lastFrame: {
       label: "Last Frame",
       hotkey: ['$', 'End', 'PgDn'],
+      gesture: /2 right from .* bottom/,
       cancelComplement: true,
       listener: function() {
         this.goToFrame(this.film.frames.length - 1);
@@ -8821,10 +8826,7 @@ PenciltestUI = (function(_super) {
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
-      gesture: {
-        touches: 2,
-        region: 'left'
-      },
+      gesture: /2 still from left top/,
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber;
@@ -8835,10 +8837,7 @@ PenciltestUI = (function(_super) {
     insertFrameAfter: {
       label: "Insert Frame After",
       hotkey: ['I'],
-      gesture: {
-        touches: 2,
-        region: 'right'
-      },
+      gesture: /2 still from right top/,
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber + 1;
@@ -8899,6 +8898,7 @@ PenciltestUI = (function(_super) {
     onionSkin: {
       label: "Onion Skin",
       hotkey: ['O'],
+      gesture: /2 down from center middle/,
       title: "show previous and next frames in red and blue",
       listener: function() {
         this.setOptions({
@@ -8910,6 +8910,7 @@ PenciltestUI = (function(_super) {
     dropFrame: {
       label: "Drop Frame",
       hotkey: ['X', 'Backspace'],
+      gesture: /3 down from center top/,
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
@@ -8975,6 +8976,7 @@ PenciltestUI = (function(_super) {
     loop: {
       label: "Loop",
       hotkey: ['L'],
+      gesture: /2 up from center middle/,
       listener: function() {
         this.setOptions({
           loop: !this.options.loop
@@ -8985,6 +8987,7 @@ PenciltestUI = (function(_super) {
     saveFilm: {
       label: "Save",
       hotkey: ['Alt+S'],
+      gesture: /3 still from center bottom/,
       repeat: true,
       listener: function() {
         return this.saveFilm();
@@ -8993,6 +8996,7 @@ PenciltestUI = (function(_super) {
     loadFilm: {
       label: "Load",
       hotkey: ['Alt+O'],
+      gesture: /3 up from center bottom/,
       repeat: true,
       listener: function() {
         return this.loadFilm();
@@ -9173,12 +9177,17 @@ PenciltestUI = (function(_super) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
         self.controller.lift();
-        return self.fieldBounds = {
+        self.fieldBounds = {
           x: 0,
           y: 0,
           width: self.controller.width,
           height: self.controller.height
         };
+        if (!Utils.currentGesture) {
+          self.doAppAction('undo');
+        }
+        Utils.clearGesture();
+        return Utils.recordGesture(event);
       } else {
         if (event.button === 2) {
           return true;
@@ -9193,7 +9202,7 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
-      if (event.type === 'touchmove') {
+      if (event.type === 'touchmove' && event.touches.length > 1) {
         Utils.recordGesture(event);
         Utils.describeGesture(self.fieldBounds);
       }
@@ -9206,8 +9215,8 @@ PenciltestUI = (function(_super) {
       if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
-        if (event.type === 'touchend') {
-          console.log(Utils.describeGesture(self.fieldBounds, 'final'));
+        if (event.type === 'touchend' && Utils.currentGesture) {
+          self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
           Utils.clearGesture(event);
         }
         document.body.removeEventListener('mousemove', mouseMoveListener);
@@ -9228,6 +9237,17 @@ PenciltestUI = (function(_super) {
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
       return self.doAppAction('describeKeyboardShortcuts');
     });
+  };
+
+  PenciltestUI.prototype.doGesture = function(gestureDescription) {
+    var action, name, _ref;
+    _ref = this.appActions;
+    for (name in _ref) {
+      action = _ref[name];
+      if (action.gesture && action.gesture.test(gestureDescription)) {
+        return this.doAppAction(name);
+      }
+    }
   };
 
   PenciltestUI.prototype.updateMenuOption = function(optionElement) {
