@@ -8250,7 +8250,7 @@ Utils = {
     }
     return combo.join('+');
   },
-  averagePoints: function(event) {
+  averageTouches: function(event) {
     var point, sumPoints, _i, _len, _ref;
     sumPoints = {
       x: 0,
@@ -8259,8 +8259,8 @@ Utils = {
     _ref = event.targetTouches;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       point = _ref[_i];
-      sumPoints.x += point.x;
-      sumPoints.y += point.y;
+      sumPoints.x += point.clientX;
+      sumPoints.y += point.clientY;
     }
     sumPoints.x /= event.targetTouches.length;
     sumPoints.y /= event.targetTouches.length;
@@ -8270,42 +8270,44 @@ Utils = {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
-        origin: Utils.averagePoints(event),
-        origin: Utils.averagePoints(event)
+        origin: Utils.averageTouches(event)
       };
     }
-    return this.currentGesture.last = Utils.averagePoints(event);
+    return this.currentGesture.last = Utils.averageTouches(event);
+  },
+  clearGesture: function(event) {
+    return this.currentGesture = null;
   },
   describePosition: function(coordinates, bounds) {
-    var descriptors, minRatio, positionDescription, positionDescriptors, positionRatio, _i, _len;
-    positionDescriptors = {
-      0.00: {
+    var descriptors, positionDescription, positionDescriptors, positionRatio, _i, _len;
+    positionDescriptors = [
+      {
+        minRatio: 0.00,
         x: 'left',
-        y: 'top'
-      },
-      0.33: {
+        y: 'top',
+        minRatio: 0.33,
         x: 'center',
-        y: 'middle'
-      },
-      0.67: {
+        y: 'middle',
+        minRatio: 0.67,
         x: 'right',
         y: 'bottom'
       }
-    };
+    ];
     positionRatio = {
-      x: coordinates.x / bounds.width,
-      y: coordinates.y / bounds.height
+      x: (coordinates.x - bounds.x) / bounds.width,
+      y: (coordinates.y - bounds.y) / bounds.height
     };
     positionDescription = {};
-    for (minRatio = _i = 0, _len = positionDescriptors.length; _i < _len; minRatio = ++_i) {
-      descriptors = positionDescriptors[minRatio];
-      if (positionRatio.x > minRatio) {
+    for (_i = 0, _len = positionDescriptors.length; _i < _len; _i++) {
+      descriptors = positionDescriptors[_i];
+      if (positionRatio.x > descriptors.minRatio) {
         positionDescription.x = descriptors.x;
       }
-      if (positionRatio.y > minRatio) {
+      if (positionRatio.y > descriptors.minRatio) {
         positionDescription.y = descriptors.y;
       }
     }
+    console.log(coordinates, bounds, positionDescription);
     return positionDescription.x + ' ' + positionDescription.y;
   },
   describeMotion: function(startCoordinates, endCoordinates) {
@@ -8318,16 +8320,26 @@ Utils = {
     delta.absX = Math.abs(delta.x);
     delta.absY = Math.abs(delta.y);
     if (delta.absX + delta.absY < motionThreshold) {
-      return description = 'still';
+      description = 'still';
     } else if (delta.absX > delta.absY) {
-      return description = delta.x > 0 ? 'right' : 'left';
+      description = delta.x > 0 ? 'right' : 'left';
     } else {
-      return description = delta.y > 0 ? 'down' : 'up';
+      description = delta.y > 0 ? 'down' : 'up';
     }
+    return description;
   },
-  describeGesture: function(gestureBounds) {
-    describeMotion(this.currentGesture.origin, this.currentGesture.last);
-    return +' from ' + Utils.describePosition(this.currentGesture.origin, gestureBounds);
+  describeGesture: function(gestureBounds, extra) {
+    var description;
+    if (extra == null) {
+      extra = '';
+    }
+    description = this.currentGesture.touches;
+    description += ' ' + Utils.describeMotion(this.currentGesture.origin, this.currentGesture.last);
+    description += ' from ' + Utils.describePosition(this.currentGesture.origin, gestureBounds);
+    if (extra) {
+      description += " " + extra;
+    }
+    return description;
   },
   getDecimal: function(value, precision, type) {
     var factor, output, parts;
@@ -9160,12 +9172,13 @@ PenciltestUI = (function(_super) {
     mouseDownListener = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
-        mouseUpListener();
-        if (event.touches.length === 3) {
-          return self.showMenu();
-        } else {
-          return self.hideMenu();
-        }
+        self.controller.lift();
+        return self.fieldBounds = {
+          x: 0,
+          y: 0,
+          width: self.controller.width,
+          height: self.controller.height
+        };
       } else {
         if (event.button === 2) {
           return true;
@@ -9180,17 +9193,23 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
-      console.log(event);
+      if (event.type === 'touchmove') {
+        Utils.recordGesture(event);
+        Utils.describeGesture(self.fieldBounds);
+      }
       event.preventDefault();
       if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
     mouseUpListener = function(event) {
-      console.log(event.type);
       if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
+        if (event.type === 'touchend') {
+          console.log(Utils.describeGesture(self.fieldBounds, 'final'));
+          Utils.clearGesture(event);
+        }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
         document.body.removeEventListener('mouseup', mouseUpListener);
