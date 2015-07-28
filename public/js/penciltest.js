@@ -8735,6 +8735,13 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.appActions = {
+    showMenu: {
+      label: "Show Menu",
+      gesture: /4 still/,
+      listener: function() {
+        return this.showMenu(0, 0);
+      }
+    },
     renderer: {
       label: "Set Renderer",
       listener: function() {
@@ -8863,24 +8870,26 @@ PenciltestUI = (function(_super) {
       label: "Undo",
       title: "Remove the last line drawn",
       hotkey: ['U', 'Alt+Z'],
+      gesture: /3 still from left/,
       repeat: true,
       listener: function() {
         return this.undo();
-      }
-    },
-    frameRate: {
-      label: "Frame Rate",
-      action: function() {
-        return this.singleFrameDuration = 1 / this.options.frameRate;
       }
     },
     redo: {
       label: "Redo",
       title: "Put back a line removed by 'Undo'",
       hotkey: ['R', 'Alt+Shift+Z'],
+      gesture: /3 still from right/,
       repeat: true,
       listener: function() {
         return this.redo();
+      }
+    },
+    frameRate: {
+      label: "Frame Rate",
+      action: function() {
+        return this.singleFrameDuration = 1 / this.options.frameRate;
       }
     },
     hideCursor: {
@@ -9176,7 +9185,7 @@ PenciltestUI = (function(_super) {
     mouseDownListener = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
-        self.controller.lift();
+        self.controller.cancelStroke();
         self.fieldBounds = {
           x: 0,
           y: 0,
@@ -9245,6 +9254,7 @@ PenciltestUI = (function(_super) {
     for (name in _ref) {
       action = _ref[name];
       if (action.gesture && action.gesture.test(gestureDescription)) {
+        this.showFeedback(action.label);
         return this.doAppAction(name);
       }
     }
@@ -9438,6 +9448,27 @@ PenciltestUI = (function(_super) {
     } else {
       return this.showMenu(coords);
     }
+  };
+
+  PenciltestUI.prototype.showFeedback = function(message, duration) {
+    var hideFeedback, self;
+    if (duration == null) {
+      duration = 2000;
+    }
+    self = this;
+    if (!this.feedbackElement) {
+      this.feedbackElement = new PenciltestUIComponent({
+        id: 'pt-feedback',
+        parent: this
+      });
+    }
+    this.feedbackElement.setHTML(message);
+    this.feedbackElement.getElement().style.opacity = 1;
+    clearTimeout(this.feedbackTimeout);
+    hideFeedback = function() {
+      return self.feedbackElement.getElement().style.opacity = 0;
+    };
+    return this.feedbackTimeout = setTimeout(hideFeedback, duration);
   };
 
   return PenciltestUI;
@@ -9733,6 +9764,11 @@ Penciltest = (function() {
     newCoords = [coords[0] * factor, coords[1] * factor];
     newCoords.push(coords.slice(2));
     return newCoords;
+  };
+
+  Penciltest.prototype.cancelStroke = function() {
+    this.markBuffer = [];
+    return this.currentStrokeIndex = null;
   };
 
   Penciltest.prototype.lift = function() {

@@ -251,6 +251,10 @@ class Penciltest
     newCoords.push  coords.slice 2
     newCoords
 
+  cancelStroke: ->
+    @markBuffer = []
+    @currentStrokeIndex = null
+
   lift: ->
     if @markBuffer && @markBuffer.length
       last = @markBuffer.pop()

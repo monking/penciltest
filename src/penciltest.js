@@ -289,6 +289,11 @@ Penciltest = (function() {
     return newCoords;
   };
 
+  Penciltest.prototype.cancelStroke = function() {
+    this.markBuffer = [];
+    return this.currentStrokeIndex = null;
+  };
+
   Penciltest.prototype.lift = function() {
     var last;
     if (this.markBuffer && this.markBuffer.length) {

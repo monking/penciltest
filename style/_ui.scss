@@ -54,6 +54,21 @@
     }
   }
 
+  #pt-feedback {
+    background-color: black;
+    padding: 0.5em;
+    color: white;
+    font-weight: bold;
+    position: absolute;
+    transform: translateX(-50%);
+    top: 0;
+    left: 50%;
+    transition-property: opacity;
+    transition-duration: 0.3s;
+    opacity: 0;
+    user-select: none;
+  }
+
   .menu {
     display: none;
     position: absolute;

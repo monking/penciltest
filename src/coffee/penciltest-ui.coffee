@@ -62,6 +62,10 @@ class PenciltestUI extends PenciltestUIComponent
 
   # action and listener functions are called in controller scope
   appActions:
+    showMenu:
+      label: "Show Menu"
+      gesture: /4 still/
+      listener: -> @showMenu 0, 0
     renderer:
       label: "Set Renderer"
       listener: ->
@@ -152,17 +156,19 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Undo"
       title: "Remove the last line drawn"
       hotkey: ['U','Alt+Z']
+      gesture: /3 still from left/
       repeat: true
       listener: -> @undo()
-    frameRate:
-      label: "Frame Rate"
-      action: -> @singleFrameDuration = 1 / @options.frameRate
     redo:
       label: "Redo"
       title: "Put back a line removed by 'Undo'"
       hotkey: ['R','Alt+Shift+Z']
+      gesture: /3 still from right/
       repeat: true
       listener: -> @redo()
+    frameRate:
+      label: "Frame Rate"
+      action: -> @singleFrameDuration = 1 / @options.frameRate
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['C']
@@ -389,7 +395,7 @@ class PenciltestUI extends PenciltestUIComponent
     mouseDownListener = (event) ->
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        self.controller.lift() #FIXME: I'm trying to kill the current strokoe, but it's not working
+        self.controller.cancelStroke() #FIXME: I'm trying to kill the current strokoe, but it's not working
         self.fieldBounds =
           x: 0
           y: 0
@@ -445,6 +451,7 @@ class PenciltestUI extends PenciltestUIComponent
   doGesture: (gestureDescription) ->
     for name, action of @appActions
       if action.gesture and action.gesture.test gestureDescription
+        @showFeedback action.label
         return @doAppAction name
 
   updateMenuOption: (optionElement) ->
@@ -585,3 +592,15 @@ class PenciltestUI extends PenciltestUIComponent
 
   toggleMenu: (coords) ->
     if @menuIsVisible then @hideMenu() else @showMenu coords
+
+  showFeedback: (message, duration = 2000) ->
+    self = @
+    if not @feedbackElement
+      @feedbackElement = new PenciltestUIComponent id: 'pt-feedback', parent: @
+    @feedbackElement.setHTML message
+    @feedbackElement.getElement().style.opacity = 1
+
+    clearTimeout @feedbackTimeout
+    hideFeedback = () ->
+      self.feedbackElement.getElement().style.opacity = 0
+    @feedbackTimeout = setTimeout hideFeedback, duration
