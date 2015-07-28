@@ -8249,6 +8249,104 @@ Utils = {
       combo.push(keyName);
     }
     return combo.join('+');
+  },
+  averagePoints: function(event) {
+    var point, sumPoints, _i, _len, _ref;
+    sumPoints = {
+      x: 0,
+      y: 0
+    };
+    _ref = event.targetTouches;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      point = _ref[_i];
+      sumPoints.x += point.x;
+      sumPoints.y += point.y;
+    }
+    sumPoints.x /= event.targetTouches.length;
+    sumPoints.y /= event.targetTouches.length;
+    return sumPoints;
+  },
+  recordGesture: function(event) {
+    if (!this.currentGesture) {
+      this.currentGesture = {
+        touches: event.targetTouches.length,
+        origin: Utils.averagePoints(event),
+        origin: Utils.averagePoints(event)
+      };
+    }
+    return this.currentGesture.last = Utils.averagePoints(event);
+  },
+  describePosition: function(coordinates, bounds) {
+    var descriptors, minRatio, positionDescription, positionDescriptors, positionRatio, _i, _len;
+    positionDescriptors = {
+      0.00: {
+        x: 'left',
+        y: 'top'
+      },
+      0.33: {
+        x: 'center',
+        y: 'middle'
+      },
+      0.67: {
+        x: 'right',
+        y: 'bottom'
+      }
+    };
+    positionRatio = {
+      x: coordinates.x / bounds.width,
+      y: coordinates.y / bounds.height
+    };
+    positionDescription = {};
+    for (minRatio = _i = 0, _len = positionDescriptors.length; _i < _len; minRatio = ++_i) {
+      descriptors = positionDescriptors[minRatio];
+      if (positionRatio.x > minRatio) {
+        positionDescription.x = descriptors.x;
+      }
+      if (positionRatio.y > minRatio) {
+        positionDescription.y = descriptors.y;
+      }
+    }
+    return positionDescription.x + ' ' + positionDescription.y;
+  },
+  describeMotion: function(startCoordinates, endCoordinates) {
+    var delta, description, motionThreshold;
+    motionThreshold = 10;
+    delta = {
+      x: endCoordinates.x - startCoordinates.x,
+      y: endCoordinates.y - startCoordinates.y
+    };
+    delta.absX = Math.abs(delta.x);
+    delta.absY = Math.abs(delta.y);
+    if (delta.absX + delta.absY < motionThreshold) {
+      return description = 'still';
+    } else if (delta.absX > delta.absY) {
+      return description = delta.x > 0 ? 'right' : 'left';
+    } else {
+      return description = delta.y > 0 ? 'down' : 'up';
+    }
+  },
+  describeGesture: function(gestureBounds) {
+    describeMotion(this.currentGesture.origin, this.currentGesture.last);
+    return +' from ' + Utils.describePosition(this.currentGesture.origin, gestureBounds);
+  },
+  getDecimal: function(value, precision, type) {
+    var factor, output, parts;
+    if (type == null) {
+      type = Number;
+    }
+    factor = Math.pow(10, precision);
+    output = Math.round(value * factor) / factor;
+    if (type === String) {
+      parts = output.toString().split('.');
+      if (parts.length === 1) {
+        parts.push('0');
+      }
+      while (parts[1].length < precision) {
+        parts[1] += '0';
+      }
+      output = parts.join('.');
+    }
+    return output;
   }
 };
 
@@ -8271,26 +8369,6 @@ for (name in _ref) {
   code = _ref[name];
   Utils.shiftKeyCodes[code] = name;
 }
-
-Utils.getDecimal = function(value, precision, type) {
-  var factor, output, parts;
-  if (type == null) {
-    type = Number;
-  }
-  factor = Math.pow(10, precision);
-  output = Math.round(value * factor) / factor;
-  if (type === String) {
-    parts = output.toString().split('.');
-    if (parts.length === 1) {
-      parts.push('0');
-    }
-    while (parts[1].length < precision) {
-      parts[1] += '0';
-    }
-    output = parts.join('.');
-  }
-  return output;
-};
 
 var PenciltestUIComponent;
 
@@ -8731,6 +8809,10 @@ PenciltestUI = (function(_super) {
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
+      gesture: {
+        touches: 2,
+        region: 'left'
+      },
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber;
@@ -8741,6 +8823,10 @@ PenciltestUI = (function(_super) {
     insertFrameAfter: {
       label: "Insert Frame After",
       hotkey: ['I'],
+      gesture: {
+        touches: 2,
+        region: 'right'
+      },
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber + 1;
@@ -9094,13 +9180,15 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      console.log(event);
       event.preventDefault();
       if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
     mouseUpListener = function(event) {
-      if (event.button === 2) {
+      console.log(event.type);
+      if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
         document.body.removeEventListener('mousemove', mouseMoveListener);

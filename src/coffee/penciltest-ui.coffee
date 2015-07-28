@@ -121,6 +121,7 @@ class PenciltestUI extends PenciltestUIComponent
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
+      gesture: touches: 2, region: 'left'
       listener: ->
         newIndex = @current.frameNumber
         @newFrame newIndex
@@ -128,6 +129,7 @@ class PenciltestUI extends PenciltestUIComponent
     insertFrameAfter:
       label: "Insert Frame After"
       hotkey: ['I']
+      gesture: touches: 2, region: 'right'
       listener: ->
         newIndex = @current.frameNumber + 1
         @newFrame newIndex
@@ -395,11 +397,13 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', mouseUpListener
 
     mouseMoveListener = (event) ->
+      console.log event # XXX
       event.preventDefault()
       trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
-      if event.button is 2
+      console.log event.type # XXX
+      if event.type is 'mouseup' and event.button is 2
         return true # allow context menu
       else
         document.body.removeEventListener 'mousemove', mouseMoveListener

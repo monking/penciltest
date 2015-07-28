@@ -168,6 +168,10 @@ PenciltestUI = (function(_super) {
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
+      gesture: {
+        touches: 2,
+        region: 'left'
+      },
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber;
@@ -178,6 +182,10 @@ PenciltestUI = (function(_super) {
     insertFrameAfter: {
       label: "Insert Frame After",
       hotkey: ['I'],
+      gesture: {
+        touches: 2,
+        region: 'right'
+      },
       listener: function() {
         var newIndex;
         newIndex = this.current.frameNumber + 1;
@@ -531,13 +539,15 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      console.log(event);
       event.preventDefault();
       if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
     mouseUpListener = function(event) {
-      if (event.button === 2) {
+      console.log(event.type);
+      if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
         document.body.removeEventListener('mousemove', mouseMoveListener);
