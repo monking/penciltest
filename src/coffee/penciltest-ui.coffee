@@ -96,7 +96,7 @@ class PenciltestUI extends PenciltestUIComponent
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
-      gesture: /2 still from right (bottom|middle)/
+      gesture: /2 still from right bottom/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber + 1
@@ -105,7 +105,7 @@ class PenciltestUI extends PenciltestUIComponent
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
-      gesture: /2 still from left (bottom|middle)/
+      gesture: /2 still from left bottom/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber - 1
@@ -207,11 +207,13 @@ class PenciltestUI extends PenciltestUIComponent
     lessHold:
       label: "Shorter Frame Hold"
       hotkey: ['Down', '-']
+      gesture: /2 still from left middle/
       repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold - 1
     moreHold:
       label: "Longer Frame Hold"
       hotkey: ['Up', '+', '=']
+      gesture: /2 still from right middle/
       repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold + 1
     showStatus:

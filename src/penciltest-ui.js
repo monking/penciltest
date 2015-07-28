@@ -137,7 +137,7 @@ PenciltestUI = (function(_super) {
     nextFrame: {
       label: "Next Frame",
       hotkey: ['Right', '.'],
-      gesture: /2 still from right (bottom|middle)/,
+      gesture: /2 still from right bottom/,
       repeat: true,
       listener: function() {
         this.goToFrame(this.current.frameNumber + 1);
@@ -150,7 +150,7 @@ PenciltestUI = (function(_super) {
     prevFrame: {
       label: "Previous Frame",
       hotkey: ['Left', ','],
-      gesture: /2 still from left (bottom|middle)/,
+      gesture: /2 still from left bottom/,
       repeat: true,
       listener: function() {
         this.goToFrame(this.current.frameNumber - 1);
@@ -307,6 +307,7 @@ PenciltestUI = (function(_super) {
     lessHold: {
       label: "Shorter Frame Hold",
       hotkey: ['Down', '-'],
+      gesture: /2 still from left middle/,
       repeat: true,
       listener: function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
@@ -315,6 +316,7 @@ PenciltestUI = (function(_super) {
     moreHold: {
       label: "Longer Frame Hold",
       hotkey: ['Up', '+', '='],
+      gesture: /2 still from right middle/,
       repeat: true,
       listener: function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
