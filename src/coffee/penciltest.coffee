@@ -399,6 +399,7 @@ class Penciltest
     @goToFrame 0
     @ui.updateStatus()
     @unsavedChanges = false
+    @resize() # FIXME
 
   loadFilm: ->
     if name = @selectFilmName 'Choose a film to load'

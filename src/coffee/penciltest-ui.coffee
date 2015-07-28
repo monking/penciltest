@@ -65,7 +65,7 @@ class PenciltestUI extends PenciltestUIComponent
     showMenu:
       label: "Show Menu"
       gesture: /4 still/
-      listener: -> @showMenu 0, 0
+      listener: -> @ui.toggleMenu x: 0, y: 0
     renderer:
       label: "Set Renderer"
       listener: ->
@@ -81,7 +81,7 @@ class PenciltestUI extends PenciltestUIComponent
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
-      gesture: /2 still from center bottom/
+      gesture: /2 still from center (bottom|middle)/
       cancelComplement: true
       listener: ->
         @playDirection = 1
@@ -96,7 +96,7 @@ class PenciltestUI extends PenciltestUIComponent
     nextFrame:
       label: "Next Frame"
       hotkey: ['Right','.']
-      gesture: /2 still from right bottom/
+      gesture: /2 still from right (bottom|middle)/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber + 1
@@ -105,7 +105,7 @@ class PenciltestUI extends PenciltestUIComponent
     prevFrame:
       label: "Previous Frame"
       hotkey: ['Left',',']
-      gesture: /2 still from left bottom/
+      gesture: /2 still from left (bottom|middle)/
       repeat: true
       listener: ->
         @goToFrame @current.frameNumber - 1
@@ -114,7 +114,7 @@ class PenciltestUI extends PenciltestUIComponent
     firstFrame:
       label: "First Frame"
       hotkey: ['0','Home','PgUp']
-      gesture: /2 left from .* bottom/
+      gesture: /2 left from .* (bottom|middle)/
       cancelComplement: true
       listener: ->
         @goToFrame 0
@@ -122,7 +122,7 @@ class PenciltestUI extends PenciltestUIComponent
     lastFrame:
       label: "Last Frame"
       hotkey: ['$','End','PgDn']
-      gesture: /2 right from .* bottom/
+      gesture: /2 right from .* (bottom|middle)/
       cancelComplement: true
       listener: ->
         @goToFrame @film.frames.length - 1
@@ -177,7 +177,7 @@ class PenciltestUI extends PenciltestUIComponent
     onionSkin:
       label: "Onion Skin"
       hotkey: ['O']
-      gesture: /2 down from center middle/
+      gesture: /2 down from center (bottom|middle)/
       title: "show previous and next frames in red and blue"
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
@@ -222,20 +222,20 @@ class PenciltestUI extends PenciltestUIComponent
     loop:
       label: "Loop"
       hotkey: ['L']
-      gesture: /2 up from center middle/
+      gesture: /2 up from center (bottom|middle)/
       listener: ->
         @setOptions loop: not @options.loop
         @resize() # FIXME: should either not redraw, or redraw fine without this
     saveFilm:
       label: "Save"
       hotkey: ['Alt+S']
-      gesture: /3 still from center bottom/
+      gesture: /3 still from center (bottom|middle)/
       repeat: true
       listener: -> @saveFilm()
     loadFilm:
       label: "Load"
       hotkey: ['Alt+O']
-      gesture: /3 up from center bottom/
+      gesture: /3 up from center (bottom|middle)/
       repeat: true
       listener: -> @loadFilm()
     newFilm:
@@ -395,7 +395,7 @@ class PenciltestUI extends PenciltestUIComponent
     mouseDownListener = (event) ->
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        self.controller.cancelStroke() #FIXME: I'm trying to kill the current strokoe, but it's not working
+        self.controller.cancelStroke()
         self.fieldBounds =
           x: 0
           y: 0
@@ -418,12 +418,13 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', mouseUpListener
 
     mouseMoveListener = (event) ->
+      event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
         Utils.recordGesture event
         Utils.describeGesture self.fieldBounds
         # TODO: support continuous gestures, like scrubbing the timeline
-      event.preventDefault()
-      trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
+      else
+        trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
       if event.type is 'mouseup' and event.button is 2

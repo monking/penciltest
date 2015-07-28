@@ -488,7 +488,8 @@ Penciltest = (function() {
     }
     this.goToFrame(0);
     this.ui.updateStatus();
-    return this.unsavedChanges = false;
+    this.unsavedChanges = false;
+    return this.resize();
   };
 
   Penciltest.prototype.loadFilm = function() {
