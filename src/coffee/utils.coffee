@@ -101,11 +101,11 @@ Utils =
 
     combo.join '+'
 
-  averagePoints: (event) ->
+  averageTouches: (event) ->
     sumPoints = x: 0, y: 0
     for point in event.targetTouches
-      sumPoints.x += point.x
-      sumPoints.y += point.y
+      sumPoints.x += point.clientX
+      sumPoints.y += point.clientY
 
     sumPoints.x /= event.targetTouches.length
     sumPoints.y /= event.targetTouches.length
@@ -116,25 +116,30 @@ Utils =
     if not @currentGesture
       @currentGesture =
         touches: event.targetTouches.length
-        origin: Utils.averagePoints event
-        origin: Utils.averagePoints event
+        origin: Utils.averageTouches event
 
-    @currentGesture.last = Utils.averagePoints event
+    @currentGesture.last = Utils.averageTouches event
+
+  clearGesture: (event) ->
+    @currentGesture = null
 
   describePosition: (coordinates, bounds) ->
-    positionDescriptors =
-      0.00: x: 'left', y: 'top'
-      0.33: x: 'center', y: 'middle'
-      0.67: x: 'right', y: 'bottom'
+    positionDescriptors = [
+      minRatio: 0.00 , x: 'left'   , y: 'top'
+      minRatio: 0.33 , x: 'center' , y: 'middle'
+      minRatio: 0.67 , x: 'right'  , y: 'bottom'
+    ]
 
     positionRatio =
-      x: coordinates.x / bounds.width
-      y: coordinates.y / bounds.height
+      x: (coordinates.x - bounds.x) / bounds.width
+      y: (coordinates.y - bounds.y) / bounds.height
 
     positionDescription = {}
-    for descriptors, minRatio in positionDescriptors
-      if positionRatio.x > minRatio then positionDescription.x = descriptors.x
-      if positionRatio.y > minRatio then positionDescription.y = descriptors.y
+    for descriptors in positionDescriptors
+      if positionRatio.x > descriptors.minRatio then positionDescription.x = descriptors.x
+      if positionRatio.y > descriptors.minRatio then positionDescription.y = descriptors.y
+
+    console.log coordinates, bounds, positionDescription # XXX
 
     positionDescription.x + ' ' + positionDescription.y
 
@@ -155,9 +160,15 @@ Utils =
     else
       description = if delta.y > 0 then 'down' else 'up'
 
-  describeGesture: (gestureBounds) ->
-    describeMotion( @currentGesture.origin, @currentGesture.last )
-    + ' from ' + Utils.describePosition( @currentGesture.origin, gestureBounds )
+    description
+
+  describeGesture: (gestureBounds, extra = '') ->
+    description = @currentGesture.touches
+    description += ' ' + Utils.describeMotion( @currentGesture.origin, @currentGesture.last )
+    description += ' from ' + Utils.describePosition( @currentGesture.origin, gestureBounds )
+    if extra then description += " #{extra}"
+
+    description
 
   getDecimal: (value, precision, type = Number) ->
     factor = Math.pow 10, precision

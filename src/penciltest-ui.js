@@ -519,12 +519,13 @@ PenciltestUI = (function(_super) {
     mouseDownListener = function(event) {
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
-        mouseUpListener();
-        if (event.touches.length === 3) {
-          return self.showMenu();
-        } else {
-          return self.hideMenu();
-        }
+        self.controller.lift();
+        return self.fieldBounds = {
+          x: 0,
+          y: 0,
+          width: self.controller.width,
+          height: self.controller.height
+        };
       } else {
         if (event.button === 2) {
           return true;
@@ -539,17 +540,23 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
-      console.log(event);
+      if (event.type === 'touchmove') {
+        Utils.recordGesture(event);
+        Utils.describeGesture(self.fieldBounds);
+      }
       event.preventDefault();
       if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
         return trackFromEvent(event);
       }
     };
     mouseUpListener = function(event) {
-      console.log(event.type);
       if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
+        if (event.type === 'touchend') {
+          console.log(Utils.describeGesture(self.fieldBounds, 'final'));
+          Utils.clearGesture(event);
+        }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
         document.body.removeEventListener('mouseup', mouseUpListener);

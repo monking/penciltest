@@ -379,11 +379,12 @@ class PenciltestUI extends PenciltestUIComponent
     mouseDownListener = (event) ->
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        mouseUpListener()
-        if event.touches.length is 3
-          self.showMenu()
-        else
-          self.hideMenu()
+        self.controller.lift()
+        self.fieldBounds =
+          x: 0
+          y: 0
+          width: self.controller.width
+          height: self.controller.height
       else
         if event.button is 2
           return true # allow context menu
@@ -397,15 +398,19 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', mouseUpListener
 
     mouseMoveListener = (event) ->
-      console.log event # XXX
+      if event.type is 'touchmove'
+        Utils.recordGesture event
+        Utils.describeGesture self.fieldBounds
       event.preventDefault()
       trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
-      console.log event.type # XXX
       if event.type is 'mouseup' and event.button is 2
         return true # allow context menu
       else
+        if event.type is 'touchend'
+          console.log Utils.describeGesture self.fieldBounds, 'final'
+          Utils.clearGesture event
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
         document.body.removeEventListener 'mouseup', mouseUpListener
