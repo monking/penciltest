@@ -22,3 +22,7 @@ body:before {
   color: white;
   text-align: center;
 }
+
+body {
+  padding-bottom: 300px;
+}
