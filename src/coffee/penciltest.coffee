@@ -27,7 +27,7 @@ class Penciltest
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.0.5'
+    version: '0.0.6'
     mode: Penciltest.prototype.modes.DRAWING
 
   # metadata generated while interpreting the film data
