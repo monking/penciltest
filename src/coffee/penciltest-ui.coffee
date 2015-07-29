@@ -168,7 +168,23 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @redo()
     frameRate:
       label: "Frame Rate"
+      listener: ->
+        rate = Utils.prompt 'frames per second: ', @options.frameRate
+        if rate then @setOptions frameRate: Number rate
       action: -> @singleFrameDuration = 1 / @options.frameRate
+    frameHold:
+      label: "Default Frame Hold"
+      listener: ->
+        hold = Utils.prompt 'default exposures per drawing: ', @options.frameHold
+        update = Utils.confirm 'update hold for existing frames in proportion to new setting??: '
+        if hold
+          oldHold = @options.frameHold
+          @setOptions frameHold: Number hold
+          if update
+            magnitudeDelta = @options.frameHold / oldHold
+            for frame in @film.frames
+              frame.hold = Math.round frame.hold * magnitudeDelta
+            @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['C']
@@ -331,6 +347,7 @@ class PenciltestUI extends PenciltestUIComponent
     ]
     Playback: [
       'loop'
+      'frameRate'
     ]
     Tools: [
       'hideCursor'
@@ -348,6 +365,7 @@ class PenciltestUI extends PenciltestUIComponent
       'exportFilm'
     ]
     Settings: [
+      'frameHold'
       'renderer'
       'describeKeyboardShortcuts'
       'reset'

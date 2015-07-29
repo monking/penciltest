@@ -21,7 +21,8 @@ Penciltest = (function() {
     hideCursor: false,
     loop: true,
     showStatus: true,
-    frameRate: 12,
+    frameRate: 24,
+    frameHold: 2,
     onionSkin: true,
     smoothing: 3,
     onionSkinRange: 4,
@@ -87,7 +88,7 @@ Penciltest = (function() {
       index = null;
     }
     frame = {
-      hold: 1,
+      hold: this.options.frameHold,
       strokes: []
     };
     if (index === null) {

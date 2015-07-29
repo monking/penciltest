@@ -238,8 +238,40 @@ PenciltestUI = (function(_super) {
     },
     frameRate: {
       label: "Frame Rate",
+      listener: function() {
+        var rate;
+        rate = Utils.prompt('frames per second: ', this.options.frameRate);
+        if (rate) {
+          return this.setOptions({
+            frameRate: Number(rate)
+          });
+        }
+      },
       action: function() {
         return this.singleFrameDuration = 1 / this.options.frameRate;
+      }
+    },
+    frameHold: {
+      label: "Default Frame Hold",
+      listener: function() {
+        var frame, hold, magnitudeDelta, oldHold, update, _i, _len, _ref;
+        hold = Utils.prompt('default exposures per drawing: ', this.options.frameHold);
+        update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
+        if (hold) {
+          oldHold = this.options.frameHold;
+          this.setOptions({
+            frameHold: Number(hold)
+          });
+          if (update) {
+            magnitudeDelta = this.options.frameHold / oldHold;
+            _ref = this.film.frames;
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              frame = _ref[_i];
+              frame.hold = Math.round(frame.hold * magnitudeDelta);
+            }
+            return this.drawCurrentFrame();
+          }
+        }
       }
     },
     hideCursor: {
@@ -477,10 +509,10 @@ PenciltestUI = (function(_super) {
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
-      Playback: ['loop'],
+      Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
-      Settings: ['renderer', 'describeKeyboardShortcuts', 'reset']
+      Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
   ];
 

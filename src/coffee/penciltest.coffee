@@ -18,7 +18,8 @@ class Penciltest
     hideCursor: false
     loop: true
     showStatus: true
-    frameRate: 12
+    frameRate: 24
+    frameHold: 2
     onionSkin: true
     smoothing: 3
     onionSkinRange: 4
@@ -89,7 +90,7 @@ class Penciltest
 
   newFrame: (index = null) ->
     frame =
-      hold: 1
+      hold: @options.frameHold
       strokes: []
 
     if index is null
