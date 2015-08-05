@@ -371,20 +371,13 @@ class Penciltest
       @putStoredData 'film', name, @film
       @unsavedChanges = false
 
-  selectFilmName: (message) ->
+  selectFilmName: (message, callback) ->
     filmNames = @getFilmNames()
     if filmNames.length
-      message ?= 'Choose a film'
-      selectedFilmName = window.prompt "#{message}:\n\n#{filmNames.join '\n'}"
-
-      if selectedFilmName and filmNames.indexOf selectedFilmName is -1
-        for filmName in filmNames
-          selectedFilmName = filmName if RegExp(selectedFilmName).test filmName
-
-      if selectedFilmName and filmNames.indexOf( selectedFilmName ) isnt -1
-        return selectedFilmName
-      else
-        Utils.alert "No film by that name."
+      @ui.prompt
+        message: message or 'Choose a film'
+        select: filmNames
+        then: (selectedFilmName) -> callback selectedFilmName
     else
       Utils.alert "You don't have any saved films yet."
 
@@ -403,12 +396,14 @@ class Penciltest
     @resize() # FIXME
 
   loadFilm: ->
-    if name = @selectFilmName 'Choose a film to load'
-      @setFilm @getStoredData 'film', name
+    self = @
+    @selectFilmName 'Choose a film to load', (name) ->
+      self.setFilm self.getStoredData 'film', name
 
   deleteFilm: ->
-    if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'
-      window.localStorage.removeItem @encodeStorageReference 'film', filmName
+    self = @
+    @selectFilmName 'Choose a film to DELETE...FOREVER', (filmName) ->
+      window.localStorage.removeItem self.encodeStorageReference 'film', filmName
 
   buildFilmMeta: ->
     @current.frameIndex = []
@@ -435,9 +430,9 @@ class Penciltest
   loadAudio: (audioURL) ->
     @state.audioURL = audioURL
     if not @audioElement
-      @audioElement = document.createElement 'audio'
-      @fieldElement.insertBefore @audioElement
-      @audioElement.preload = true
+      audioReferenceNode = document.createElement 'audio'
+      audioReferenceNode.preload = true
+      @audioElement = @fieldContainer.insertBefore audioReferenceNode, @fieldElement
     else
       @pauseAudio()
     @audioElement.src = @state.audioURL

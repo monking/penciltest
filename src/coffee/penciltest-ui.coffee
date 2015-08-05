@@ -625,3 +625,15 @@ class PenciltestUI extends PenciltestUIComponent
     hideFeedback = () ->
       self.feedbackElement.getElement().style.opacity = 0
     @feedbackTimeout = setTimeout hideFeedback, duration
+
+  prompt: (options) ->
+    selection = window.prompt "#{options.message}:\n\n#{options.select.join '\n'}"
+    if selection and options.select.indexOf selection is -1
+      for filmName in options.select
+        selection = filmName if RegExp(selection).test filmName
+
+    if selection and options.select.indexOf( selection ) isnt -1
+      options.then selection
+    else
+      Utils.alert "sorry, that is not a valid options"
+      options.then null

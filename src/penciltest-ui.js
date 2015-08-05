@@ -856,6 +856,26 @@ PenciltestUI = (function(_super) {
     return this.feedbackTimeout = setTimeout(hideFeedback, duration);
   };
 
+  PenciltestUI.prototype.prompt = function(options) {
+    var filmName, selection, _i, _len, _ref;
+    selection = window.prompt("" + options.message + ":\n\n" + (options.select.join('\n')));
+    if (selection && options.select.indexOf(selection === -1)) {
+      _ref = options.select;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        filmName = _ref[_i];
+        if (RegExp(selection).test(filmName)) {
+          selection = filmName;
+        }
+      }
+    }
+    if (selection && options.select.indexOf(selection) !== -1) {
+      return options.then(selection);
+    } else {
+      Utils.alert("sorry, that is not a valid options");
+      return options.then(null);
+    }
+  };
+
   return PenciltestUI;
 
 })(PenciltestUIComponent);

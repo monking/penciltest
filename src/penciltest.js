@@ -452,27 +452,17 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.selectFilmName = function(message) {
-    var filmName, filmNames, selectedFilmName, _i, _len;
+  Penciltest.prototype.selectFilmName = function(message, callback) {
+    var filmNames;
     filmNames = this.getFilmNames();
     if (filmNames.length) {
-      if (message == null) {
-        message = 'Choose a film';
-      }
-      selectedFilmName = window.prompt("" + message + ":\n\n" + (filmNames.join('\n')));
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
-        for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
-          filmName = filmNames[_i];
-          if (RegExp(selectedFilmName).test(filmName)) {
-            selectedFilmName = filmName;
-          }
+      this.ui.prompt({
+        message: message || 'Choose a film',
+        select: filmNames,
+        then: function(selectedFilmName) {
+          return callback(selectedFilmName);
         }
-      }
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName) !== -1) {
-        return selectedFilmName;
-      } else {
-        Utils.alert("No film by that name.");
-      }
+      });
     } else {
       Utils.alert("You don't have any saved films yet.");
     }
@@ -494,17 +484,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.loadFilm = function() {
-    var name;
-    if (name = this.selectFilmName('Choose a film to load')) {
-      return this.setFilm(this.getStoredData('film', name));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to load', function(name) {
+      return self.setFilm(self.getStoredData('film', name));
+    });
   };
 
   Penciltest.prototype.deleteFilm = function() {
-    var filmName;
-    if (filmName = this.selectFilmName('Choose a film to DELETE...FOREVER')) {
-      return window.localStorage.removeItem(this.encodeStorageReference('film', filmName));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to DELETE...FOREVER', function(filmName) {
+      return window.localStorage.removeItem(self.encodeStorageReference('film', filmName));
+    });
   };
 
   Penciltest.prototype.buildFilmMeta = function() {
@@ -539,11 +531,12 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.loadAudio = function(audioURL) {
+    var audioReferenceNode;
     this.state.audioURL = audioURL;
     if (!this.audioElement) {
-      this.audioElement = document.createElement('audio');
-      this.fieldElement.insertBefore(this.audioElement);
-      this.audioElement.preload = true;
+      audioReferenceNode = document.createElement('audio');
+      audioReferenceNode.preload = true;
+      this.audioElement = this.fieldContainer.insertBefore(audioReferenceNode, this.fieldElement);
     } else {
       this.pauseAudio();
     }
