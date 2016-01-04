@@ -7,7 +7,7 @@
 .penciltest-app .field-container {
   width: 960px;
   height: 540px;
-  background-color: #FFF;
+  background-color: white;
   display: block;
   margin: 0 auto;
   box-shadow: 0 1em 4em rgba(0, 0, 0, 0.8);
@@ -30,7 +30,7 @@
 }
 .penciltest-ui .toolbar .status {
   font-family: monospace;
-  color: #FFF;
+  color: white;
   line-height: 2em;
 }
 .penciltest-ui .toolbar .status.hidden {
@@ -102,7 +102,7 @@
   display: block;
   padding: 0 0.5em 0 1.5em;
   line-height: 2.0em;
-  color: #666;
+  color: #666666;
   cursor: pointer;
 }
 .penciltest-ui .menu li:hover > label {
@@ -136,19 +136,20 @@
   height: 2.0rem;
   line-height: 2.0rem;
   text-align: center;
+  -webkit-transition-property: all;
   -moz-transition-property: all;
   -o-transition-property: all;
-  -webkit-transition-property: all;
   transition-property: all;
+  -webkit-transition-duration: 0.1s;
   -moz-transition-duration: 0.1s;
   -o-transition-duration: 0.1s;
-  -webkit-transition-duration: 0.1s;
   transition-duration: 0.1s;
 }
 .penciltest-ui .menu li.group.collapsed label::after {
+  -webkit-transform: rotate(-90deg);
   -moz-transform: rotate(-90deg);
   -ms-transform: rotate(-90deg);
-  -webkit-transform: rotate(-90deg);
+  -o-transform: rotate(-90deg);
   transform: rotate(-90deg);
 }
 .penciltest-ui .menu li.group.collapsed > ul {
@@ -195,13 +196,13 @@
   border: none;
   font-size: 0.9em;
   line-height: 1.7em;
+  -webkit-transition-property: right;
   -moz-transition-property: right;
   -o-transition-property: right;
-  -webkit-transition-property: right;
   transition-property: right;
+  -webkit-transition-duration: 0.3s;
   -moz-transition-duration: 0.3s;
   -o-transition-duration: 0.3s;
-  -webkit-transition-duration: 0.3s;
   transition-duration: 0.3s;
 }
 .penciltest-ui textarea.active {
