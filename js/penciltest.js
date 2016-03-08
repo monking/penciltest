@@ -9071,11 +9071,11 @@ PenciltestUI = (function(_super) {
       cancelComplement: true,
       listener: function() {
         var open;
-        open = Utils.toggleClass(this.ui.components.textIO, 'active');
+        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
         if (open) {
-          return this.ui.components.textIO.value = JSON.stringify(this.film);
+          return this.ui.components.textIO.getElement().value = JSON.stringify(this.film);
         } else {
-          return this.ui.components.textIO.value = '';
+          return this.ui.components.textIO.getElement().value = '';
         }
       }
     },
@@ -9085,15 +9085,15 @@ PenciltestUI = (function(_super) {
       cancelComplement: true,
       listener: function() {
         var importJSON, open;
-        open = Utils.toggleClass(this.ui.components.textIO, 'active');
+        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
         if (open) {
-          return this.ui.components.textIO.value = '';
+          return this.ui.components.textIO.getElement().value = '';
         } else {
-          importJSON = this.ui.components.textIO.value;
+          importJSON = this.ui.components.textIO.getElement().value;
           try {
             this.setFilm(JSON.parse(importJSON));
           } catch (_error) {}
-          return this.ui.components.textIO.value = '';
+          return this.ui.components.textIO.getElement().value = '';
         }
       }
     },
