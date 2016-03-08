@@ -9673,15 +9673,16 @@ Penciltest = (function() {
     this.current.frameNumber = newIndex;
     this.current.frame = this.film.frames[this.current.frameNumber];
     if (this.state.mode !== Penciltest.prototype.modes.PLAYING) {
-      this.seekToAudioAtExposure(newIndex);
+      this.seekAudioToFrame(newIndex);
     }
     return this.drawCurrentFrame();
   };
 
-  Penciltest.prototype.seekToAudioAtExposure = function(frameNumber) {
+  Penciltest.prototype.seekAudioToFrame = function(frameNumber) {
     var seekTime;
     if (this.film.audio) {
-      seekTime = (this.current.frameIndex[frameNumber].time - this.film.audio.offset) * this.singleFrameDuration;
+      Utils.log(this.current.frameIndex[frameNumber]);
+      seekTime = this.current.frameIndex[frameNumber].time - this.film.audio.offset;
       return this.seekAudio(seekTime);
     }
   };
@@ -9708,7 +9709,8 @@ Penciltest = (function() {
         if (newIndex >= self.film.frames.length || newIndex < 0) {
           if (self.options.loop) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
-            return self.goToFrame(newIndex);
+            self.goToFrame(newIndex);
+            return self.seekAudioToFrame(0);
           } else {
             return self.stop();
           }
@@ -10090,7 +10092,6 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.seekAudio = function(time) {
-    console.log(time);
     if (this.audioElement) {
       return this.audioElement.currentTime = time;
     }
@@ -10098,15 +10099,14 @@ Penciltest = (function() {
 
   Penciltest.prototype.scrubAudio = function() {
     var self;
-    Utils.log('scrubAudio');
     self = this;
-    console.log(this.current);
-    this.seekToAudioAtExposure(this.current.frameNumber);
+    Utils.log('scrubAudio', this.current.frameNumber);
+    this.seekAudioToFrame(this.current.frameNumber);
     clearTimeout(this.scrubAudioTimeout);
     this.playAudio();
     return this.scrubAudioTimeout = setTimeout(function() {
       return self.pauseAudio();
-    }, Math.max(this.getFrameDuration(this.current.frameNumber) * 1000, 100));
+    }, Math.max(this.getFrameDuration * 1000, 100));
   };
 
   Penciltest.prototype.resize = function() {
