@@ -159,12 +159,13 @@ class Penciltest
     @current.frame = @film.frames[@current.frameNumber]
 
     if @state.mode isnt Penciltest.prototype.modes.PLAYING
-      @seekToAudioAtExposure newIndex
+      @seekAudioToFrame newIndex
     @drawCurrentFrame()
 
-  seekToAudioAtExposure: (frameNumber) ->
+  seekAudioToFrame: (frameNumber) ->
     if @film.audio
-      seekTime = ( @current.frameIndex[frameNumber].time - @film.audio.offset ) * @singleFrameDuration
+      Utils.log(@current.frameIndex[frameNumber])
+      seekTime = @current.frameIndex[frameNumber].time - @film.audio.offset
       @seekAudio seekTime
 
   play: ->
@@ -186,6 +187,7 @@ class Penciltest
           if self.options.loop
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
             self.goToFrame newIndex
+            self.seekAudioToFrame 0
           else
             self.stop()
         else
@@ -460,19 +462,17 @@ class Penciltest
     @audioElement.play() if @audioElement and @audioElement.paused
 
   seekAudio: (time) ->
-    console.log(time)
     ( @audioElement.currentTime = time ) if @audioElement
 
   scrubAudio: ->
-    Utils.log 'scrubAudio'
     self = @
-    console.log @current # XXX
-    @seekToAudioAtExposure @current.frameNumber
+    Utils.log 'scrubAudio', @current.frameNumber
+    @seekAudioToFrame @current.frameNumber
     clearTimeout @scrubAudioTimeout
     @playAudio()
     @scrubAudioTimeout = setTimeout(
       -> self.pauseAudio()
-      Math.max @getFrameDuration( @current.frameNumber ) * 1000, 100
+      Math.max @getFrameDuration * 1000, 100
     )
 
   resize: ->
