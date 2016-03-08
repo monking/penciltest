@@ -448,14 +448,9 @@ PenciltestUI = (function(_super) {
       label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
-        var audioURL, _base;
+        var audioURL;
         audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
         if (audioURL != null) {
-          if ((_base = this.film).audio == null) {
-            _base.audio = {};
-          }
-          this.film.audio.url = audioURL;
-          this.unsavedChanges = true;
           return this.loadAudio(audioURL);
         }
       }

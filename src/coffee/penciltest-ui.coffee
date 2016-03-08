@@ -294,9 +294,6 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
         if audioURL?
-          @film.audio ?= {}
-          @film.audio.url = audioURL
-          @unsavedChanges = true
           @loadAudio audioURL
     unloadAudio:
       label: "Unload Audio"
