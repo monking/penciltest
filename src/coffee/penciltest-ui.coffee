@@ -288,8 +288,8 @@ class PenciltestUI extends PenciltestUIComponent
           try
             @setFilm JSON.parse importJSON
           @ui.components.textIO.getElement().value = ''
-    importAudio:
-      label: "Import Audio"
+    linkAudio:
+      label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
         audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
@@ -355,7 +355,7 @@ class PenciltestUI extends PenciltestUIComponent
       'smoothing'
       'smoothFrame'
       'smoothFilm'
-      'importAudio'
+      'linkAudio'
     ]
     Film: [
       'saveFilm'

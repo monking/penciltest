@@ -444,8 +444,8 @@ PenciltestUI = (function(_super) {
         }
       }
     },
-    importAudio: {
-      label: "Import Audio",
+    linkAudio: {
+      label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
         var audioURL, _base;
@@ -510,7 +510,7 @@ PenciltestUI = (function(_super) {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
-      Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'importAudio'],
+      Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
