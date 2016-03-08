@@ -270,24 +270,24 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO, 'active'
+        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
         if open
-          @ui.components.textIO.value = JSON.stringify @film
+          @ui.components.textIO.getElement().value = JSON.stringify @film
         else
-          @ui.components.textIO.value = ''
+          @ui.components.textIO.getElement().value = ''
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO, 'active'
+        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
         if open
-          @ui.components.textIO.value = ''
+          @ui.components.textIO.getElement().value = ''
         else
-          importJSON = @ui.components.textIO.value
+          importJSON = @ui.components.textIO.getElement().value
           try
             @setFilm JSON.parse importJSON
-          @ui.components.textIO.value = ''
+          @ui.components.textIO.getElement().value = ''
     importAudio:
       label: "Import Audio"
       hotkey: ['Alt+A']

@@ -53,5 +53,4 @@ module.exports = (grunt) ->
         files: ['style/**/*.{sass,scss}']
         tasks: ['compass']
 
-  grunt.registerTask 'default', ['compass', 'coffee', 'concat', 'watch']
-  grunt.registerTask 'compile', ['compass', 'coffee', 'concat']
+  grunt.registerTask 'default', ['compass', 'coffee', 'concat']
