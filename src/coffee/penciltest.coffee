@@ -165,7 +165,7 @@ class Penciltest
   seekToAudioAtExposure: (frameNumber) ->
     if @film.audio
       seekTime = ( @current.frameIndex[frameNumber].time - @film.audio.offset ) * @singleFrameDuration
-      @seekAudio 
+      @seekAudio seekTime
 
   play: ->
     self = @
@@ -433,16 +433,21 @@ class Penciltest
     frame.hold / @options.frameRate
 
   loadAudio: (audioURL) ->
-    @state.audioURL = audioURL
+    @film.audio ?= {}
+    @film.audio.url = audioURL
+    @film.audio.offset = 0
+    @unsavedChanges = true
     if not @audioElement
       @audioElement = document.createElement 'audio'
-      @fieldElement.insertBefore @audioElement
       @audioElement.preload = true
+      @fieldContainer.appendChild @audioElement
     else
       @pauseAudio()
-    @audioElement.src = @state.audioURL
+    @audioElement.src = audioURL
 
   destroyAudio: ->
+    if @film.audio
+      delete @film.audio
     if @audioElement
       @pauseAudio()
       @audioElement.remove()
@@ -455,11 +460,13 @@ class Penciltest
     @audioElement.play() if @audioElement and @audioElement.paused
 
   seekAudio: (time) ->
+    console.log(time)
     ( @audioElement.currentTime = time ) if @audioElement
 
   scrubAudio: ->
     Utils.log 'scrubAudio'
     self = @
+    console.log @current # XXX
     @seekToAudioAtExposure @current.frameNumber
     clearTimeout @scrubAudioTimeout
     @playAudio()
