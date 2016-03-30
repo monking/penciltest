@@ -9,11 +9,12 @@ A traditional animation tool in the browser
 
 ## usage
 
-Draw in the white box.
+  Draw in the white box.
 
-Spacebar to play.
+  Spacebar to play.
 
-Right-click for options.
+  Right-click for options.
+^^^ white-space only changes
 
 ## caveats
 
