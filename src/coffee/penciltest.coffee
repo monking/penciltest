@@ -390,18 +390,21 @@ class Penciltest
 
     # prepare encoder
     gifEncoder = new GIFEncoder()
-    gifEncoder.setRepeat(0);
+    gifEncoder.setRepeat 0
+    gifEncoder.setDelay baseFrameDelay
+    gifEncoder.start();
 
     # encode each frame with appropriate delay
-    for frameIndex in [0...(@film.frames.length - 1)]
+    for frameIndex in [0...@film.frames.length]
       @goToFrame frameIndex
+      console.log frameIndex # XXX
       currentFrame = @getCurrentFrame()
-      gifEncoder.setDelay currentFrame.frameHold * baseFrameDelay # FIXME
+      # gifEncoder.setDelay currentFrame.frameHold * baseFrameDelay # FIXME
       gifEncoder.addFrame @renderer.context
 
     gifEncoder.finish()
     binaryGif = gifEncoder.stream().getData()
-    dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+    dataUrl = 'data:image/gif;base64,' + encode64 binaryGif
 
     gifElementId = 'rendered-gif'
     gifElement = document.getElementById gifElementId
