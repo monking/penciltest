@@ -9985,10 +9985,12 @@ Penciltest = (function() {
     frameIndex = 0;
     gifEncoder = new GIFEncoder();
     gifEncoder.setRepeat(0);
-    for (frameIndex = _i = 0, _ref = this.film.frames.length - 1; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+    gifEncoder.setDelay(baseFrameDelay);
+    gifEncoder.start();
+    for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
+      console.log(frameIndex);
       currentFrame = this.getCurrentFrame();
-      gifEncoder.setDelay(currentFrame.frameHold * baseFrameDelay);
       gifEncoder.addFrame(this.renderer.context);
     }
     gifEncoder.finish();
