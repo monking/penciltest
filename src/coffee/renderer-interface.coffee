@@ -1,5 +1,5 @@
 ###
-global: document, window
+global: document
 ###
 
 class RendererInterface

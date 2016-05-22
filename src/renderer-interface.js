@@ -1,6 +1,6 @@
 
 /*
-global: document, window
+global: document
  */
 var RendererInterface;
 

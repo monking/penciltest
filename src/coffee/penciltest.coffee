@@ -439,7 +439,7 @@ class Penciltest
     @film.audio.url = audioURL
     @film.audio.offset = 0
     @unsavedChanges = true
-    if not @audioElement
+    if not @audioElement # TODO: abstract away from browser
       @audioElement = document.createElement 'audio'
       @audioElement.preload = true
       @fieldContainer.appendChild @audioElement
