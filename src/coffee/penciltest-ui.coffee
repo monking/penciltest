@@ -248,19 +248,20 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Save"
       hotkey: ['Alt+S']
       gesture: /3 still from center (bottom|middle)/
-      repeat: true
       listener: -> @saveFilm()
     loadFilm:
       label: "Load"
       hotkey: ['Alt+O']
       gesture: /3 up from center (bottom|middle)/
-      repeat: true
       listener: -> @loadFilm()
     newFilm:
       label: "New"
       hotkey: ['Alt+N']
-      repeat: true
       listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+    renderGif:
+      label: "Render GIF"
+      hotkey: ['Alt+G']
+      listener: -> @renderGif()
     deleteFilm:
       label: "Delete Film"
       hotkey: ['Alt+Backspace']
@@ -360,6 +361,7 @@ class PenciltestUI extends PenciltestUIComponent
       'newFilm'
       'importFilm'
       'exportFilm'
+      'renderGif'
     ]
     Settings: [
       'frameHold'

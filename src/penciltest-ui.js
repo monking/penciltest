@@ -381,7 +381,6 @@ PenciltestUI = (function(_super) {
       label: "Save",
       hotkey: ['Alt+S'],
       gesture: /3 still from center (bottom|middle)/,
-      repeat: true,
       listener: function() {
         return this.saveFilm();
       }
@@ -390,7 +389,6 @@ PenciltestUI = (function(_super) {
       label: "Load",
       hotkey: ['Alt+O'],
       gesture: /3 up from center (bottom|middle)/,
-      repeat: true,
       listener: function() {
         return this.loadFilm();
       }
@@ -398,11 +396,17 @@ PenciltestUI = (function(_super) {
     newFilm: {
       label: "New",
       hotkey: ['Alt+N'],
-      repeat: true,
       listener: function() {
         if (Utils.confirm("This will BURN your current animation.")) {
           return this.newFilm();
         }
+      }
+    },
+    renderGif: {
+      label: "Render GIF",
+      hotkey: ['Alt+G'],
+      listener: function() {
+        return this.renderGif();
       }
     },
     deleteFilm: {
@@ -506,7 +510,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
   ];

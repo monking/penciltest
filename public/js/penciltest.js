@@ -9034,7 +9034,6 @@ PenciltestUI = (function(_super) {
       label: "Save",
       hotkey: ['Alt+S'],
       gesture: /3 still from center (bottom|middle)/,
-      repeat: true,
       listener: function() {
         return this.saveFilm();
       }
@@ -9043,7 +9042,6 @@ PenciltestUI = (function(_super) {
       label: "Load",
       hotkey: ['Alt+O'],
       gesture: /3 up from center (bottom|middle)/,
-      repeat: true,
       listener: function() {
         return this.loadFilm();
       }
@@ -9051,11 +9049,17 @@ PenciltestUI = (function(_super) {
     newFilm: {
       label: "New",
       hotkey: ['Alt+N'],
-      repeat: true,
       listener: function() {
         if (Utils.confirm("This will BURN your current animation.")) {
           return this.newFilm();
         }
+      }
+    },
+    renderGif: {
+      label: "Render GIF",
+      hotkey: ['Alt+G'],
+      listener: function() {
+        return this.renderGif();
       }
     },
     deleteFilm: {
@@ -9159,7 +9163,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
   ];
@@ -9964,6 +9968,47 @@ Penciltest = (function() {
     }
   };
 
+  Penciltest.prototype.renderGif = function() {
+    var baseFrameDelay, binaryGif, currentFrame, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, _i, _ref;
+    dimensions = (Utils.prompt('WIDTHxHEIGHT', '160x90')).split('x');
+    this.forceDimensions = {
+      width: dimensions[0],
+      height: dimensions[1]
+    };
+    this.resize();
+    oldRendererType = this.options.renderer;
+    this.setOptions({
+      renderer: 'canvas'
+    });
+    this.ui.appActions.renderer.action();
+    baseFrameDelay = 1000 / this.options.frameRate;
+    frameIndex = 0;
+    gifEncoder = new GIFEncoder();
+    gifEncoder.setRepeat(0);
+    for (frameIndex = _i = 0, _ref = this.film.frames.length - 1; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+      this.goToFrame(frameIndex);
+      currentFrame = this.getCurrentFrame();
+      gifEncoder.setDelay(currentFrame.frameHold * baseFrameDelay);
+      gifEncoder.addFrame(this.renderer.context);
+    }
+    gifEncoder.finish();
+    binaryGif = gifEncoder.stream().getData();
+    dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+    gifElementId = 'rendered-gif';
+    gifElement = document.getElementById(gifElementId);
+    if (!gifElement) {
+      gifElement = document.createElement('img');
+      gifElement.id = gifElementId;
+      document.body.appendChild(gifElement);
+    }
+    gifElement.src = dataUrl;
+    this.setOptions({
+      renderer: oldRendererType
+    });
+    this.forceDimensions = null;
+    return this.resize();
+  };
+
   Penciltest.prototype.selectFilmName = function(message) {
     var filmName, filmNames, selectedFilmName, _i, _len;
     filmNames = this.getFilmNames();
@@ -10111,10 +10156,15 @@ Penciltest = (function() {
 
   Penciltest.prototype.resize = function() {
     var aspect, aspectNumber, aspectParts, containerAspect, containerHeight, containerWidth;
-    containerWidth = this.container.offsetWidth;
-    containerHeight = this.container.offsetHeight;
-    if (this.options.showStatus) {
-      containerHeight -= 36;
+    if (this.forceDimensions) {
+      containerWidth = this.forceDimensions.width;
+      containerHeight = this.forceDimensions.height;
+    } else {
+      containerWidth = this.container.offsetWidth;
+      containerHeight = this.container.offsetHeight;
+      if (this.options.showStatus) {
+        containerHeight -= 36;
+      }
     }
     aspect = this.film.aspect || '16:9';
     aspectParts = aspect.split(':');

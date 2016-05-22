@@ -373,6 +373,54 @@ class Penciltest
       @putStoredData 'film', name, @film
       @unsavedChanges = false
 
+  renderGif: ->
+    # configure for rendering
+    dimensions = (Utils.prompt 'WIDTHxHEIGHT', '160x90').split 'x'
+    @forceDimensions =
+      width: dimensions[0]
+      height: dimensions[1]
+    @resize()
+
+    oldRendererType = @options.renderer
+    @setOptions renderer: 'canvas'
+    @ui.appActions.renderer.action()
+
+    baseFrameDelay = 1000 / @options.frameRate
+    frameIndex = 0
+
+    # prepare encoder
+    gifEncoder = new GIFEncoder()
+    gifEncoder.setRepeat(0);
+
+    # encode each frame with appropriate delay
+    for frameIndex in [0...(@film.frames.length - 1)]
+      @goToFrame frameIndex
+      currentFrame = @getCurrentFrame()
+      gifEncoder.setDelay currentFrame.frameHold * baseFrameDelay # FIXME
+      gifEncoder.addFrame @renderer.context
+
+    gifEncoder.finish()
+    binaryGif = gifEncoder.stream().getData()
+    dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+
+    gifElementId = 'rendered-gif'
+    gifElement = document.getElementById gifElementId
+    if not gifElement
+      gifElement = document.createElement 'img'
+      gifElement.id = gifElementId
+      document.body.appendChild gifElement
+
+    gifElement.src = dataUrl
+
+    # TODO 1) render each frame small in canvas
+    # TODO 2) append with the corect duration to a GIF in memory
+    # TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
+
+    # reset to user's configuration
+    @setOptions renderer: oldRendererType
+    @forceDimensions = null
+    @resize()
+
   selectFilmName: (message) ->
     filmNames = @getFilmNames()
     if filmNames.length
@@ -476,10 +524,14 @@ class Penciltest
     )
 
   resize: ->
-    containerWidth = @container.offsetWidth
-    containerHeight = @container.offsetHeight
-    if @options.showStatus
-      containerHeight -= 36
+    if @forceDimensions
+      containerWidth = @forceDimensions.width
+      containerHeight = @forceDimensions.height
+    else
+      containerWidth = @container.offsetWidth
+      containerHeight = @container.offsetHeight
+      if @options.showStatus
+        containerHeight -= 36
     aspect = @film.aspect or '16:9'
     aspectParts = aspect.split ':'
     aspectNumber = aspectParts[0] / aspectParts[1]
