@@ -120,8 +120,7 @@ class Penciltest
     else
       @renderer.lineTo x, y
 
-    frameScale = @film.width / @width
-    @getCurrentStroke().push @scaleCoordinates [x, y], frameScale
+    @getCurrentStroke().push @scaleCoordinates [x, y], 1 / @zoomFactor
     if @state.mode is Penciltest.prototype.modes.DRAWING
       @renderer.render()
 
@@ -243,13 +242,11 @@ class Penciltest
     return if !@width or !@height
 
     @renderer.setLineOverrides overrides if overrides
-    frameScale = @width / @film.width
 
     for stroke in @film.frames[frameIndex].strokes
-      @renderer.path @scaleStroke stroke, frameScale
+      @renderer.path @scaleStroke stroke, @zoomFactor
 
     @renderer.clearLineOverrides()
-    @renderer.options.lineWeight = frameScale
 
   scaleStroke: (stroke, factor) ->
     @scaleCoordinates coords, factor for coords in stroke
@@ -338,7 +335,7 @@ class Penciltest
     @film =
       name: ''
       version: Penciltest.prototype.state.version
-      aspect: '16:9'
+      aspect: '1:1'
       width: 960
       frames: []
 
@@ -405,11 +402,13 @@ class Penciltest
     gifEncoder.start()
 
     # encode each frame with appropriate delay
+    oldLineWidth = @renderer.context.lineWidth
+    @renderer.context.lineWidth = 2
     for frameIndex in [0...@film.frames.length]
       @goToFrame frameIndex
       gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
       gifEncoder.addFrame @renderer.context
-      console.log @getCurrentFrame(), baseFrameDelay * @getCurrentFrame().hold
+    @renderer.context.lineWidth = oldLineWidth
 
     gifEncoder.finish()
     binaryGif = gifEncoder.stream().getData()
@@ -559,7 +558,7 @@ class Penciltest
       containerHeight = @container.offsetHeight
       if @options.showStatus
         containerHeight -= 36
-    aspect = @film.aspect or '16:9'
+    aspect = @film.aspect or '1:1'
     aspectParts = aspect.split ':'
     aspectNumber = aspectParts[0] / aspectParts[1]
     containerAspect = containerWidth / containerHeight
@@ -574,4 +573,6 @@ class Penciltest
     @fieldContainer.style.width = "#{@width}px"
     @fieldContainer.style.height = "#{@height}px"
     @renderer.resize @width, @height
+    @zoomFactor = @width / @film.width
+    @renderer.options.lineWeight = @zoomFactor
     @drawCurrentFrame()

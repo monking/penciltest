@@ -110,7 +110,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.mark = function(x, y) {
-    var frameScale, _base;
+    var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
     if (!this.currentStrokeIndex) {
@@ -123,8 +123,7 @@ Penciltest = (function() {
     } else {
       this.renderer.lineTo(x, y);
     }
-    frameScale = this.film.width / this.width;
-    this.getCurrentStroke().push(this.scaleCoordinates([x, y], frameScale));
+    this.getCurrentStroke().push(this.scaleCoordinates([x, y], 1 / this.zoomFactor));
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       this.renderer.render();
     }
@@ -266,21 +265,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
-    var frameScale, stroke, _i, _len, _ref;
+    var stroke, _i, _len, _ref;
     if (!this.width || !this.height) {
       return;
     }
     if (overrides) {
       this.renderer.setLineOverrides(overrides);
     }
-    frameScale = this.width / this.film.width;
     _ref = this.film.frames[frameIndex].strokes;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      this.renderer.path(this.scaleStroke(stroke, frameScale));
+      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
     }
-    this.renderer.clearLineOverrides();
-    return this.renderer.options.lineWeight = frameScale;
+    return this.renderer.clearLineOverrides();
   };
 
   Penciltest.prototype.scaleStroke = function(stroke, factor) {
@@ -403,7 +400,7 @@ Penciltest = (function() {
     this.film = {
       name: '',
       version: Penciltest.prototype.state.version,
-      aspect: '16:9',
+      aspect: '1:1',
       width: 960,
       frames: []
     };
@@ -463,7 +460,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, property, value, _i, _ref;
+    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldLineWidth, oldRendererType, property, value, _i, _ref;
     dimensions = (Utils.prompt('WIDTHxHEIGHT', '64x64')).split('x');
     this.forceDimensions = {
       width: dimensions[0],
@@ -481,12 +478,14 @@ Penciltest = (function() {
     gifEncoder.setRepeat(0);
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
+    oldLineWidth = this.renderer.context.lineWidth;
+    this.renderer.context.lineWidth = 2;
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
       gifEncoder.addFrame(this.renderer.context);
-      console.log(this.getCurrentFrame(), baseFrameDelay * this.getCurrentFrame().hold);
     }
+    this.renderer.context.lineWidth = oldLineWidth;
     gifEncoder.finish();
     binaryGif = gifEncoder.stream().getData();
     dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
@@ -702,7 +701,7 @@ Penciltest = (function() {
         containerHeight -= 36;
       }
     }
-    aspect = this.film.aspect || '16:9';
+    aspect = this.film.aspect || '1:1';
     aspectParts = aspect.split(':');
     aspectNumber = aspectParts[0] / aspectParts[1];
     containerAspect = containerWidth / containerHeight;
@@ -716,6 +715,8 @@ Penciltest = (function() {
     this.fieldContainer.style.width = "" + this.width + "px";
     this.fieldContainer.style.height = "" + this.height + "px";
     this.renderer.resize(this.width, this.height);
+    this.zoomFactor = this.width / this.film.width;
+    this.renderer.options.lineWeight = this.zoomFactor;
     return this.drawCurrentFrame();
   };
 
