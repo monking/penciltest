@@ -409,6 +409,52 @@ PenciltestUI = (function(_super) {
         return this.renderGif();
       }
     },
+    resizeFilm: {
+      label: "Resize Film",
+      hotkey: ['Alt+R'],
+      listener: function() {
+        var dimensions, dimensionsResponse;
+        dimensionsResponse = Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect);
+        dimensions = dimensionsResponse.split(' ');
+        this.film.width = Number(dimensions[0]);
+        this.film.aspect = dimensions[1];
+        return this.resize();
+      }
+    },
+    panFilm: {
+      label: "Pan Film",
+      hotkey: ['Alt+P'],
+      listener: function() {
+        var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
+        self = this;
+        oldMode = this.state.mode;
+        this.state.mode = Penciltest.prototype.modes.BUSY;
+        startPoint = endPoint = deltaPoint = [0, 0];
+        frameScale = this.width / this.film.width;
+        dragStart = function(event) {
+          startPoint = endPoint = [event.clientX, event.clientY];
+          deltaPoint = [0, 0];
+          self.fieldElement.addEventListener('mousemove', dragStep);
+          return self.fieldElement.addEventListener('mouseup', dragEnd);
+        };
+        dragStep = function(event) {
+          var immediateDeltaPoint;
+          deltaPoint = [endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]];
+          immediateDeltaPoint = [event.clientX - endPoint[0], event.clientY - endPoint[1]];
+          endPoint = [event.clientX, event.clientY];
+          self.pan([immediateDeltaPoint[0] / frameScale, immediateDeltaPoint[1] / frameScale]);
+          return self.drawCurrentFrame();
+        };
+        dragEnd = function(event) {
+          self.fieldElement.removeEventListener('mouseup', dragEnd);
+          self.fieldElement.removeEventListener('mousedown', dragStart);
+          self.fieldElement.removeEventListener('mousemove', dragStep);
+          return self.state.mode = oldMode;
+        };
+        this.fieldElement.addEventListener('mousedown', dragStart);
+        return this.resize();
+      }
+    },
     deleteFilm: {
       label: "Delete Film",
       hotkey: ['Alt+Backspace'],
@@ -510,7 +556,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif'],
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
   ];
@@ -566,6 +612,9 @@ PenciltestUI = (function(_super) {
       return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
     };
     mouseDownListener = function(event) {
+      if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
+        return;
+      }
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
         self.controller.cancelStroke();

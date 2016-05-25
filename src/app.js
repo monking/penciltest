@@ -7,6 +7,7 @@ window.addEventListener('load', function() {
   penciltest = new Penciltest({
     container: '#penciltest'
   });
+  window.p = penciltest;
   return window.addEventListener('resize', function() {
     return penciltest.resize();
   });

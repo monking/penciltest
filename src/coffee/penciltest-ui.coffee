@@ -262,6 +262,48 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Render GIF"
       hotkey: ['Alt+G']
       listener: -> @renderGif()
+    resizeFilm:
+      label: "Resize Film"
+      hotkey: ['Alt+R']
+      listener: ->
+        dimensionsResponse = Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}"
+        dimensions = dimensionsResponse.split ' '
+        @film.width = Number dimensions[0]
+        @film.aspect = dimensions[1]
+        @resize()
+    panFilm:
+      label: "Pan Film"
+      hotkey: ['Alt+P']
+      listener: ->
+        self = @
+        oldMode = @state.mode
+        @state.mode = Penciltest.prototype.modes.BUSY
+
+        startPoint = endPoint = deltaPoint = [0,0]
+        frameScale = @width / @film.width
+
+        dragStart = (event) ->
+          startPoint = endPoint = [event.clientX, event.clientY]
+          deltaPoint = [0, 0]
+          self.fieldElement.addEventListener 'mousemove', dragStep
+          self.fieldElement.addEventListener 'mouseup', dragEnd
+
+        dragStep = (event) ->
+          deltaPoint = [endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]]
+          immediateDeltaPoint =  [event.clientX - endPoint[0], event.clientY - endPoint[1]]
+          endPoint = [event.clientX, event.clientY]
+          self.pan [immediateDeltaPoint[0] / frameScale, immediateDeltaPoint[1] / frameScale]
+          self.drawCurrentFrame()
+
+        dragEnd = (event) ->
+          self.fieldElement.removeEventListener 'mouseup', dragEnd
+          self.fieldElement.removeEventListener 'mousedown', dragStart
+          self.fieldElement.removeEventListener 'mousemove', dragStep
+
+          self.state.mode = oldMode
+
+        @fieldElement.addEventListener 'mousedown', dragStart
+        @resize()
     deleteFilm:
       label: "Delete Film"
       hotkey: ['Alt+Backspace']
@@ -362,6 +404,8 @@ class PenciltestUI extends PenciltestUIComponent
       'importFilm'
       'exportFilm'
       'renderGif'
+      'resizeFilm'
+      'panFilm'
     ]
     Settings: [
       'frameHold'
@@ -412,6 +456,7 @@ class PenciltestUI extends PenciltestUIComponent
       )
 
     mouseDownListener = (event) ->
+      return if self.controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
         self.controller.cancelStroke()

@@ -27,7 +27,8 @@ Penciltest = (function() {
     smoothing: 3,
     onionSkinRange: 4,
     renderer: 'canvas',
-    onionSkinOpacity: 0.5
+    onionSkinOpacity: 0.5,
+    background: 'white'
   };
 
   Penciltest.prototype.state = {
@@ -50,6 +51,7 @@ Penciltest = (function() {
     this.container.className = 'penciltest-app';
     this.buildContainer();
     this.ui = new PenciltestUI(this);
+    this.options.background = Penciltest.prototype.options.background;
     this.setOptions(this.options);
     this.newFilm();
     if (this.state.version !== Penciltest.prototype.state.version) {
@@ -240,6 +242,9 @@ Penciltest = (function() {
   Penciltest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
     this.renderer.clear();
+    if (this.options.background) {
+      this.renderer.rect(0, 0, this.width, this.height, this.options.background);
+    }
     if (this.options.onionSkin) {
       for (i = _i = 1, _ref = this.options.onionSkinRange; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
         if (this.current.frameNumber >= i) {
@@ -262,6 +267,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
     var frameScale, stroke, _i, _len, _ref;
+    if (!this.width || !this.height) {
+      return;
+    }
     if (overrides) {
       this.renderer.setLineOverrides(overrides);
     }
@@ -455,7 +463,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, currentFrame, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, _i, _ref;
+    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, property, value, _i, _ref;
     dimensions = (Utils.prompt('WIDTHxHEIGHT', '160x90')).split('x');
     this.forceDimensions = {
       width: dimensions[0],
@@ -475,18 +483,29 @@ Penciltest = (function() {
     gifEncoder.start();
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
-      console.log(frameIndex);
-      currentFrame = this.getCurrentFrame();
+      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
       gifEncoder.addFrame(this.renderer.context);
+      console.log(this.getCurrentFrame(), baseFrameDelay * this.getCurrentFrame().hold);
     }
     gifEncoder.finish();
     binaryGif = gifEncoder.stream().getData();
     dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
-    gifElementId = 'rendered-gif';
+    gifElementId = 'rendered_gif';
     gifElement = document.getElementById(gifElementId);
     if (!gifElement) {
       gifElement = document.createElement('img');
       gifElement.id = gifElementId;
+      cssProperties = {
+        position: 'absolute',
+        top: '20%',
+        left: '0',
+        maxWidth: '80%',
+        maxHeight: '60%'
+      };
+      for (property in cssProperties) {
+        value = cssProperties[property];
+        gifElement.style[property] = value;
+      }
       document.body.appendChild(gifElement);
     }
     gifElement.src = dataUrl;
@@ -640,6 +659,35 @@ Penciltest = (function() {
     return this.scrubAudioTimeout = setTimeout(function() {
       return self.pauseAudio();
     }, Math.max(this.getFrameDuration * 1000, 100));
+  };
+
+  Penciltest.prototype.pan = function(deltaPoint) {
+    var frame, segment, stroke, _i, _len, _ref, _results;
+    _ref = this.film.frames;
+    _results = [];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      frame = _ref[_i];
+      _results.push((function() {
+        var _j, _len1, _ref1, _results1;
+        _ref1 = frame.strokes;
+        _results1 = [];
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          stroke = _ref1[_j];
+          _results1.push((function() {
+            var _k, _len2, _results2;
+            _results2 = [];
+            for (_k = 0, _len2 = stroke.length; _k < _len2; _k++) {
+              segment = stroke[_k];
+              segment[0] += deltaPoint[0];
+              _results2.push(segment[1] += deltaPoint[1]);
+            }
+            return _results2;
+          })());
+        }
+        return _results1;
+      })());
+    }
+    return _results;
   };
 
   Penciltest.prototype.resize = function() {

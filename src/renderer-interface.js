@@ -10,8 +10,8 @@ RendererInterface = (function() {
     lineColor: [0, 0, 0],
     lineWeight: 1,
     lineOpacity: 1,
-    width: 960,
-    height: 540
+    width: 64,
+    height: 64
   };
 
   function RendererInterface(options) {
@@ -35,6 +35,10 @@ RendererInterface = (function() {
   };
 
   RendererInterface.prototype.lineTo = function(x, y) {
+    return null;
+  };
+
+  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor) {
     return null;
   };
 

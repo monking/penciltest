@@ -9,8 +9,8 @@ class RendererInterface
     lineColor: [0, 0, 0]
     lineWeight: 1
     lineOpacity: 1
-    width: 960
-    height: 540
+    width: 64
+    height: 64
 
   constructor: (options) ->
     @options = Utils.inherit(
@@ -35,6 +35,9 @@ class RendererInterface
     null
 
   lineTo: (x, y) ->
+    null
+
+  rect: (x, y, width, height, backgroundColor) ->
     null
 
   setLineOverrides: ( options ) ->

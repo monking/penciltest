@@ -22,6 +22,13 @@ CanvasRenderer = (function(_super) {
     return this.context.lineTo(x, y);
   };
 
+  CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor) {
+    CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
+    this.context.fillStyle = backgroundColor;
+    this.context.rect(x, y, width, height);
+    return this.context.fill();
+  };
+
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
       this.context.lineWidth = this.currentLineOptions.lineWeight;

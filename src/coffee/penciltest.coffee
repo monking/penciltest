@@ -25,6 +25,7 @@ class Penciltest
     onionSkinRange: 4
     renderer: 'canvas'
     onionSkinOpacity: 0.5
+    background: 'white'
 
   state:
     version: '0.0.6'
@@ -56,6 +57,7 @@ class Penciltest
     @buildContainer()
 
     @ui = new PenciltestUI( this )
+    @options.background = Penciltest.prototype.options.background # until there's a UI to change it
 
     @setOptions @options # do all the option actions
 
@@ -212,6 +214,10 @@ class Penciltest
 
   drawCurrentFrame: ->
     @renderer.clear()
+
+    if @options.background
+      @renderer.rect 0, 0, @width, @height, @options.background
+
     if @options.onionSkin
       for i in [1..@options.onionSkinRange]
         if @current.frameNumber >= i
@@ -234,6 +240,8 @@ class Penciltest
     @ui.updateStatus()
 
   drawFrame: (frameIndex, overrides) ->
+    return if !@width or !@height
+
     @renderer.setLineOverrides overrides if overrides
     frameScale = @width / @film.width
 
@@ -390,27 +398,36 @@ class Penciltest
 
     # prepare encoder
     gifEncoder = new GIFEncoder()
+    # FIXME: gifEncoder only retrieves the image data from a box the size of the canvas when it was created, not the canvas that has been resized
+    # gifEncoder.setSize dimensions[0], dimensions[1] # gifEncoder no good trying to force it
     gifEncoder.setRepeat 0
     gifEncoder.setDelay baseFrameDelay
-    gifEncoder.start();
+    gifEncoder.start()
 
     # encode each frame with appropriate delay
     for frameIndex in [0...@film.frames.length]
       @goToFrame frameIndex
-      console.log frameIndex # XXX
-      currentFrame = @getCurrentFrame()
-      # gifEncoder.setDelay currentFrame.frameHold * baseFrameDelay # FIXME
+      gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
       gifEncoder.addFrame @renderer.context
+      console.log @getCurrentFrame(), baseFrameDelay * @getCurrentFrame().hold
 
     gifEncoder.finish()
     binaryGif = gifEncoder.stream().getData()
     dataUrl = 'data:image/gif;base64,' + encode64 binaryGif
 
-    gifElementId = 'rendered-gif'
+    gifElementId = 'rendered_gif'
     gifElement = document.getElementById gifElementId
     if not gifElement
       gifElement = document.createElement 'img'
       gifElement.id = gifElementId
+      cssProperties =
+        position: 'absolute'
+        top: '20%'
+        left: '0'
+        maxWidth: '80%'
+        maxHeight: '60%'
+      for property, value of cssProperties
+        gifElement.style[property] = value
       document.body.appendChild gifElement
 
     gifElement.src = dataUrl
@@ -525,6 +542,13 @@ class Penciltest
       -> self.pauseAudio()
       Math.max @getFrameDuration * 1000, 100
     )
+
+  pan: (deltaPoint) ->
+    for frame in @film.frames
+      for stroke in frame.strokes
+        for segment in stroke
+          segment[0] += deltaPoint[0]
+          segment[1] += deltaPoint[1]
 
   resize: ->
     if @forceDimensions

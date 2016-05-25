@@ -20,6 +20,12 @@ class CanvasRenderer extends RendererInterface
     super x, y
     @context.lineTo x, y
 
+  rect: (x, y, width, height, backgroundColor) ->
+    super x, y, width, height, backgroundColor
+    @context.fillStyle = backgroundColor
+    @context.rect x, y, width, height
+    @context.fill()
+
   updateStrokeStyle: ->
     if @context
       @context.lineWidth = @currentLineOptions.lineWeight
