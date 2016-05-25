@@ -383,7 +383,7 @@ class Penciltest
 
   renderGif: ->
     # configure for rendering
-    dimensions = (Utils.prompt 'WIDTHxHEIGHT', '160x90').split 'x'
+    dimensions = (Utils.prompt 'WIDTHxHEIGHT', '64x64').split 'x'
     @forceDimensions =
       width: dimensions[0]
       height: dimensions[1]
