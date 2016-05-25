@@ -423,7 +423,7 @@ PenciltestUI = (function(_super) {
     },
     panFilm: {
       label: "Pan Film",
-      hotkey: ['Alt+P'],
+      hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
         self = this;

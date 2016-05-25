@@ -273,7 +273,7 @@ class PenciltestUI extends PenciltestUIComponent
         @resize()
     panFilm:
       label: "Pan Film"
-      hotkey: ['Alt+P']
+      hotkey: ['P']
       listener: ->
         self = @
         oldMode = @state.mode
