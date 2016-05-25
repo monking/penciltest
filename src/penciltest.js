@@ -461,7 +461,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.renderGif = function() {
     var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldLineWidth, oldRendererType, property, value, _i, _ref;
-    dimensions = (Utils.prompt('WIDTHxHEIGHT', '64x64')).split('x');
+    dimensions = [64, 64];
     this.forceDimensions = {
       width: dimensions[0],
       height: dimensions[1]
