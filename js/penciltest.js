@@ -8445,8 +8445,8 @@ RendererInterface = (function() {
     lineColor: [0, 0, 0],
     lineWeight: 1,
     lineOpacity: 1,
-    width: 960,
-    height: 540
+    width: 64,
+    height: 64
   };
 
   function RendererInterface(options) {
@@ -8470,6 +8470,10 @@ RendererInterface = (function() {
   };
 
   RendererInterface.prototype.lineTo = function(x, y) {
+    return null;
+  };
+
+  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor) {
     return null;
   };
 
@@ -8542,6 +8546,13 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.lineTo = function(x, y) {
     CanvasRenderer.__super__.lineTo.call(this, x, y);
     return this.context.lineTo(x, y);
+  };
+
+  CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor) {
+    CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
+    this.context.fillStyle = backgroundColor;
+    this.context.rect(x, y, width, height);
+    return this.context.fill();
   };
 
   CanvasRenderer.prototype.updateStrokeStyle = function() {
@@ -9062,6 +9073,52 @@ PenciltestUI = (function(_super) {
         return this.renderGif();
       }
     },
+    resizeFilm: {
+      label: "Resize Film",
+      hotkey: ['Alt+R'],
+      listener: function() {
+        var dimensions, dimensionsResponse;
+        dimensionsResponse = Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect);
+        dimensions = dimensionsResponse.split(' ');
+        this.film.width = Number(dimensions[0]);
+        this.film.aspect = dimensions[1];
+        return this.resize();
+      }
+    },
+    panFilm: {
+      label: "Pan Film",
+      hotkey: ['Alt+P'],
+      listener: function() {
+        var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
+        self = this;
+        oldMode = this.state.mode;
+        this.state.mode = Penciltest.prototype.modes.BUSY;
+        startPoint = endPoint = deltaPoint = [0, 0];
+        frameScale = this.width / this.film.width;
+        dragStart = function(event) {
+          startPoint = endPoint = [event.clientX, event.clientY];
+          deltaPoint = [0, 0];
+          self.fieldElement.addEventListener('mousemove', dragStep);
+          return self.fieldElement.addEventListener('mouseup', dragEnd);
+        };
+        dragStep = function(event) {
+          var immediateDeltaPoint;
+          deltaPoint = [endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]];
+          immediateDeltaPoint = [event.clientX - endPoint[0], event.clientY - endPoint[1]];
+          endPoint = [event.clientX, event.clientY];
+          self.pan([immediateDeltaPoint[0] / frameScale, immediateDeltaPoint[1] / frameScale]);
+          return self.drawCurrentFrame();
+        };
+        dragEnd = function(event) {
+          self.fieldElement.removeEventListener('mouseup', dragEnd);
+          self.fieldElement.removeEventListener('mousedown', dragStart);
+          self.fieldElement.removeEventListener('mousemove', dragStep);
+          return self.state.mode = oldMode;
+        };
+        this.fieldElement.addEventListener('mousedown', dragStart);
+        return this.resize();
+      }
+    },
     deleteFilm: {
       label: "Delete Film",
       hotkey: ['Alt+Backspace'],
@@ -9163,7 +9220,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif'],
+      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
     }
   ];
@@ -9219,6 +9276,9 @@ PenciltestUI = (function(_super) {
       return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
     };
     mouseDownListener = function(event) {
+      if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
+        return;
+      }
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
         self.controller.cancelStroke();
@@ -9541,7 +9601,8 @@ Penciltest = (function() {
     smoothing: 3,
     onionSkinRange: 4,
     renderer: 'canvas',
-    onionSkinOpacity: 0.5
+    onionSkinOpacity: 0.5,
+    background: 'white'
   };
 
   Penciltest.prototype.state = {
@@ -9564,6 +9625,7 @@ Penciltest = (function() {
     this.container.className = 'penciltest-app';
     this.buildContainer();
     this.ui = new PenciltestUI(this);
+    this.options.background = Penciltest.prototype.options.background;
     this.setOptions(this.options);
     this.newFilm();
     if (this.state.version !== Penciltest.prototype.state.version) {
@@ -9754,6 +9816,9 @@ Penciltest = (function() {
   Penciltest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
     this.renderer.clear();
+    if (this.options.background) {
+      this.renderer.rect(0, 0, this.width, this.height, this.options.background);
+    }
     if (this.options.onionSkin) {
       for (i = _i = 1, _ref = this.options.onionSkinRange; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
         if (this.current.frameNumber >= i) {
@@ -9776,6 +9841,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
     var frameScale, stroke, _i, _len, _ref;
+    if (!this.width || !this.height) {
+      return;
+    }
     if (overrides) {
       this.renderer.setLineOverrides(overrides);
     }
@@ -9969,7 +10037,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, currentFrame, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, _i, _ref;
+    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldRendererType, property, value, _i, _ref;
     dimensions = (Utils.prompt('WIDTHxHEIGHT', '160x90')).split('x');
     this.forceDimensions = {
       width: dimensions[0],
@@ -9989,18 +10057,29 @@ Penciltest = (function() {
     gifEncoder.start();
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
-      console.log(frameIndex);
-      currentFrame = this.getCurrentFrame();
+      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
       gifEncoder.addFrame(this.renderer.context);
+      console.log(this.getCurrentFrame(), baseFrameDelay * this.getCurrentFrame().hold);
     }
     gifEncoder.finish();
     binaryGif = gifEncoder.stream().getData();
     dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
-    gifElementId = 'rendered-gif';
+    gifElementId = 'rendered_gif';
     gifElement = document.getElementById(gifElementId);
     if (!gifElement) {
       gifElement = document.createElement('img');
       gifElement.id = gifElementId;
+      cssProperties = {
+        position: 'absolute',
+        top: '20%',
+        left: '0',
+        maxWidth: '80%',
+        maxHeight: '60%'
+      };
+      for (property in cssProperties) {
+        value = cssProperties[property];
+        gifElement.style[property] = value;
+      }
       document.body.appendChild(gifElement);
     }
     gifElement.src = dataUrl;
@@ -10154,6 +10233,35 @@ Penciltest = (function() {
     return this.scrubAudioTimeout = setTimeout(function() {
       return self.pauseAudio();
     }, Math.max(this.getFrameDuration * 1000, 100));
+  };
+
+  Penciltest.prototype.pan = function(deltaPoint) {
+    var frame, segment, stroke, _i, _len, _ref, _results;
+    _ref = this.film.frames;
+    _results = [];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      frame = _ref[_i];
+      _results.push((function() {
+        var _j, _len1, _ref1, _results1;
+        _ref1 = frame.strokes;
+        _results1 = [];
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          stroke = _ref1[_j];
+          _results1.push((function() {
+            var _k, _len2, _results2;
+            _results2 = [];
+            for (_k = 0, _len2 = stroke.length; _k < _len2; _k++) {
+              segment = stroke[_k];
+              segment[0] += deltaPoint[0];
+              _results2.push(segment[1] += deltaPoint[1]);
+            }
+            return _results2;
+          })());
+        }
+        return _results1;
+      })());
+    }
+    return _results;
   };
 
   Penciltest.prototype.resize = function() {
