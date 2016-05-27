@@ -7,6 +7,7 @@ var Penciltest;
 Penciltest = (function() {
   Penciltest.prototype.modes = {
     DRAWING: 'drawing',
+    ERASING: 'erasing',
     BUSY: 'working',
     PLAYING: 'playing'
   };
@@ -33,7 +34,8 @@ Penciltest = (function() {
 
   Penciltest.prototype.state = {
     version: '0.0.6',
-    mode: Penciltest.prototype.modes.DRAWING
+    mode: Penciltest.prototype.modes.DRAWING,
+    toolStack: ['pencil', 'eraser']
   };
 
   Penciltest.prototype.current = {
@@ -295,6 +297,14 @@ Penciltest = (function() {
     newCoords = [coords[0] * factor, coords[1] * factor];
     newCoords.push(coords.slice(2));
     return newCoords;
+  };
+
+  Penciltest.prototype.useTool = function(toolName) {
+    var index;
+    index = this.state.toolStack.indexOf(toolName);
+    if (index > -1) {
+      return this.state.toolStack.unshift(this.state.toolStack.splice(index, 1)[0]);
+    }
   };
 
   Penciltest.prototype.cancelStroke = function() {

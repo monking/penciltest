@@ -6,6 +6,7 @@ class Penciltest
 
   modes:
     DRAWING: 'drawing'
+    ERASING: 'erasing'
     BUSY: 'working'
     PLAYING: 'playing'
 
@@ -30,6 +31,7 @@ class Penciltest
   state:
     version: '0.0.6'
     mode: Penciltest.prototype.modes.DRAWING
+    toolStack: ['pencil','eraser']
 
   # metadata generated while interpreting the film data
   current:
@@ -258,6 +260,11 @@ class Penciltest
     ]
     newCoords.push  coords.slice 2
     newCoords
+
+  useTool: (toolName) ->
+    index = @state.toolStack.indexOf(toolName)
+    if index > -1
+      @state.toolStack.unshift(@state.toolStack.splice(index, 1)[0])
 
   cancelStroke: ->
     @markBuffer = []

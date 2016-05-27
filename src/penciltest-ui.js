@@ -547,6 +547,14 @@ PenciltestUI = (function(_super) {
         this.state = Utils.inherit({}, Penciltest.prototype.state);
         return this.setOptions(Utils.inherit({}, Penciltest.prototype.options));
       }
+    },
+    eraser: {
+      label: "Eraser",
+      hotkey: ['E'],
+      listener: function() {
+        this.useTool(this.state.toolStack[0] === 'eraser' ? this.state.toolStack[1] : 'eraser');
+        return this.ui.updateStatus();
+      }
     }
   };
 
@@ -812,6 +820,7 @@ PenciltestUI = (function(_super) {
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
+      appStatusMarkup += " [" + this.controller.state.toolStack[0] + "]";
       this.components.appStatus.setHTML(appStatusMarkup);
       filmStatusMarkup = "<div class=\"frame\">";
       filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";

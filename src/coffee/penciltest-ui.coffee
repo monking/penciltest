@@ -366,6 +366,12 @@ class PenciltestUI extends PenciltestUIComponent
       action: ->
         @state = Utils.inherit {}, Penciltest.prototype.state
         @setOptions Utils.inherit {}, Penciltest.prototype.options
+    eraser:
+      label: "Eraser"
+      hotkey: ['E']
+      listener: ->
+        @useTool if @state.toolStack[0] == 'eraser' then @state.toolStack[1] else 'eraser'
+        @ui.updateStatus()
 
   menuOptions: [
     _icons: [
@@ -610,6 +616,7 @@ class PenciltestUI extends PenciltestUIComponent
     if @controller.options.showStatus
       appStatusMarkup = "v#{Penciltest.prototype.state.version}"
       appStatusMarkup += " Smoothing: #{@controller.options.smoothing}"
+      appStatusMarkup += " [#{@controller.state.toolStack[0]}]"
 
       @components.appStatus.setHTML appStatusMarkup
 
