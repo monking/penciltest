@@ -9211,6 +9211,14 @@ PenciltestUI = (function(_super) {
         this.state = Utils.inherit({}, Penciltest.prototype.state);
         return this.setOptions(Utils.inherit({}, Penciltest.prototype.options));
       }
+    },
+    eraser: {
+      label: "Eraser",
+      hotkey: ['E'],
+      listener: function() {
+        this.useTool(this.state.toolStack[0] === 'eraser' ? this.state.toolStack[1] : 'eraser');
+        return this.ui.updateStatus();
+      }
     }
   };
 
@@ -9476,6 +9484,7 @@ PenciltestUI = (function(_super) {
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
+      appStatusMarkup += " [" + this.controller.state.toolStack[0] + "]";
       this.components.appStatus.setHTML(appStatusMarkup);
       filmStatusMarkup = "<div class=\"frame\">";
       filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
@@ -9581,6 +9590,7 @@ var Penciltest;
 Penciltest = (function() {
   Penciltest.prototype.modes = {
     DRAWING: 'drawing',
+    ERASING: 'erasing',
     BUSY: 'working',
     PLAYING: 'playing'
   };
@@ -9607,7 +9617,8 @@ Penciltest = (function() {
 
   Penciltest.prototype.state = {
     version: '0.0.6',
-    mode: Penciltest.prototype.modes.DRAWING
+    mode: Penciltest.prototype.modes.DRAWING,
+    toolStack: ['pencil', 'eraser']
   };
 
   Penciltest.prototype.current = {
@@ -9869,6 +9880,14 @@ Penciltest = (function() {
     newCoords = [coords[0] * factor, coords[1] * factor];
     newCoords.push(coords.slice(2));
     return newCoords;
+  };
+
+  Penciltest.prototype.useTool = function(toolName) {
+    var index;
+    index = this.state.toolStack.indexOf(toolName);
+    if (index > -1) {
+      return this.state.toolStack.unshift(this.state.toolStack.splice(index, 1)[0]);
+    }
   };
 
   Penciltest.prototype.cancelStroke = function() {
