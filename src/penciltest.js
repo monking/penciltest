@@ -520,6 +520,7 @@ Penciltest = (function() {
     gifEncoder.start();
     oldLineWidth = this.renderer.context.lineWidth;
     this.renderer.context.lineWidth = 2;
+    this.renderer.context.lineJoin = 'round';
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);

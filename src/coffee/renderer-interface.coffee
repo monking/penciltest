@@ -9,6 +9,7 @@ class RendererInterface
     lineColor: [0, 0, 0]
     lineWeight: 1
     lineOpacity: 1
+    lineCorner: 'round'
     width: 64
     height: 64
 
@@ -51,6 +52,7 @@ class RendererInterface
   defaultLineOptions: ->
     color: @options.lineColor
     weight: @options.lineWeight
+    corner: @options.lineCorner
     opacity: @options.lineOpacity
 
   clearLineOverrides: ->

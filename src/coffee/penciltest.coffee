@@ -428,6 +428,7 @@ class Penciltest
     # encode each frame with appropriate delay
     oldLineWidth = @renderer.context.lineWidth
     @renderer.context.lineWidth = 2
+    @renderer.context.lineJoin = 'round'
     for frameIndex in [0...@film.frames.length]
       @goToFrame frameIndex
       gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
