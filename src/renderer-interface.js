@@ -39,7 +39,7 @@ RendererInterface = (function() {
     return null;
   };
 
-  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor) {
+  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
     return null;
   };
 

@@ -135,19 +135,22 @@ class Penciltest
       y: y
 
     if @state.toolStack[0] == 'eraser'
-      point = @scaleCoordinates [x, y], 1 / @zoomFactor
+      screenPoint = [x, y]
+      point = @scaleCoordinates screenPoint, 1 / @zoomFactor
       done = false
       currentFrame = @getCurrentFrame()
+      screenEraseRadius = 10
       @drawCurrentFrame()
       for stroke, strokeIndex in currentFrame.strokes
         for segment in stroke
-          realEraseRadius = 20 / @zoomFactor
+          realEraseRadius = screenEraseRadius / @zoomFactor
           if Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius
             currentFrame.strokes.splice strokeIndex, 1
             @drawCurrentFrame()
             done = true
           if done then break
         if done then break
+      @renderer.rect screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red'
 
     else
       makeMark = false
@@ -230,6 +233,8 @@ class Penciltest
       if @state.mode is Penciltest.prototype.modes.PLAYING then @stop() else @play()
 
   drawCurrentFrame: ->
+    return if not @film.frames.length
+
     @renderer.clear()
 
     if @options.background
@@ -292,6 +297,8 @@ class Penciltest
       @mark last.x, last.y
       @markBuffer = []
     @currentStrokeIndex = null
+    if @state.toolStack[0] == 'eraser'
+      @drawCurrentFrame()
 
   dropFrame: ->
     @film.frames.splice @current.frameNumber, 1
@@ -442,7 +449,6 @@ class Penciltest
     gifEncoder.start()
 
     for frameIndex in [0...@film.frames.length]
-      console.log @renderer.currentLineOptions # XXX
       @renderer.setLineOverrides renderLineOverrides
       @goToFrame frameIndex
       gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?

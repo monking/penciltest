@@ -33,9 +33,9 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatus:
         className: 'film-status'
         parent: 'statusRight'
-      toggleTimeline:
+      toggleTool:
         tagName: 'button'
-        className: 'toggle-timeline fa fa-table'
+        className: 'toggle-tool fa fa-pencil'
         parent: 'statusRight'
       toggleMenu:
         tagName: 'button'
@@ -511,6 +511,10 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.removeEventListener 'touchend', mouseUpListener
         self.controller.lift()
 
+    toggleToolListener = (event) ->
+      event.preventDefault()
+      self.appActions.eraser.listener.call self.controller
+
     contextMenuListener = (event) ->
       event.preventDefault()
       self.toggleMenu getEventPageXY event
@@ -518,6 +522,7 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
+    @components.toggleTool.getElement().addEventListener 'click', toggleToolListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
     @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
 
@@ -618,7 +623,6 @@ class PenciltestUI extends PenciltestUIComponent
     if @controller.options.showStatus
       appStatusMarkup = "v#{Penciltest.prototype.state.version}"
       appStatusMarkup += " Smoothing: #{@controller.options.smoothing}"
-      appStatusMarkup += " [#{@controller.state.toolStack[0]}]"
 
       @components.appStatus.setHTML appStatusMarkup
 
@@ -632,6 +636,7 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatusMarkup += "</div>"
 
       @components.filmStatus.setHTML filmStatusMarkup
+      @components.toggleTool.getElement().className = "toggle-tool fa fa-#{@controller.state.toolStack[0]}"# FIXME: use a helper to do this
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible

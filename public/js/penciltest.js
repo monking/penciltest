@@ -8474,7 +8474,7 @@ RendererInterface = (function() {
     return null;
   };
 
-  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor) {
+  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
     return null;
   };
 
@@ -8550,16 +8550,23 @@ CanvasRenderer = (function(_super) {
     return this.context.lineTo(x, y);
   };
 
-  CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor) {
+  CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
     CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
-    this.context.fillStyle = backgroundColor;
     this.context.rect(x, y, width, height);
-    this.context.fill();
-    return this.context.fillStyle = null;
+    if (backgroundColor) {
+      this.context.fillStyle = backgroundColor;
+      this.context.fill();
+    }
+    if (strokeColor) {
+      this.context.strokeStyle = strokeColor;
+      this.context.stroke();
+    }
+    return this.updateStrokeStyle();
   };
 
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
+      this.context.fillStyle = null;
       this.context.lineWidth = this.currentLineOptions.weight;
       this.context.lineJoin = this.currentLineOptions.corner;
       return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
@@ -8714,9 +8721,9 @@ PenciltestUI = (function(_super) {
         className: 'film-status',
         parent: 'statusRight'
       },
-      toggleTimeline: {
+      toggleTool: {
         tagName: 'button',
-        className: 'toggle-timeline fa fa-table',
+        className: 'toggle-tool fa fa-pencil',
         parent: 'statusRight'
       },
       toggleMenu: {
@@ -9270,7 +9277,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.addInputListeners = function() {
-    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, trackFromEvent;
+    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
     self = this;
     getEventPageXY = function(event) {
       var eventLocation;
@@ -9346,6 +9353,10 @@ PenciltestUI = (function(_super) {
         return self.controller.lift();
       }
     };
+    toggleToolListener = function(event) {
+      event.preventDefault();
+      return self.appActions.eraser.listener.call(self.controller);
+    };
     contextMenuListener = function(event) {
       event.preventDefault();
       return self.toggleMenu(getEventPageXY(event));
@@ -9353,6 +9364,7 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
+    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
       return self.doAppAction('describeKeyboardShortcuts');
@@ -9490,7 +9502,6 @@ PenciltestUI = (function(_super) {
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
-      appStatusMarkup += " [" + this.controller.state.toolStack[0] + "]";
       this.components.appStatus.setHTML(appStatusMarkup);
       filmStatusMarkup = "<div class=\"frame\">";
       filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
@@ -9501,7 +9512,8 @@ PenciltestUI = (function(_super) {
         filmStatusMarkup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
       }
       filmStatusMarkup += "</div>";
-      return this.components.filmStatus.setHTML(filmStatusMarkup);
+      this.components.filmStatus.setHTML(filmStatusMarkup);
+      return this.components.toggleTool.getElement().className = "toggle-tool fa fa-" + this.controller.state.toolStack[0];
     }
   };
 
@@ -9723,23 +9735,24 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.track = function(x, y) {
-    var coords, currentFrame, done, makeMark, point, realEraseRadius, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref, _results;
+    var coords, currentFrame, done, makeMark, point, realEraseRadius, screenEraseRadius, screenPoint, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref;
     coords = {
       x: x,
       y: y
     };
     if (this.state.toolStack[0] === 'eraser') {
-      point = this.scaleCoordinates([x, y], 1 / this.zoomFactor);
+      screenPoint = [x, y];
+      point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
       done = false;
       currentFrame = this.getCurrentFrame();
+      screenEraseRadius = 10;
       this.drawCurrentFrame();
       _ref = currentFrame.strokes;
-      _results = [];
       for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
         stroke = _ref[strokeIndex];
         for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
           segment = stroke[_j];
-          realEraseRadius = 20 / this.zoomFactor;
+          realEraseRadius = screenEraseRadius / this.zoomFactor;
           if (Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius) {
             currentFrame.strokes.splice(strokeIndex, 1);
             this.drawCurrentFrame();
@@ -9751,11 +9764,9 @@ Penciltest = (function() {
         }
         if (done) {
           break;
-        } else {
-          _results.push(void 0);
         }
       }
-      return _results;
+      return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
     } else {
       makeMark = false;
       if (this.currentStrokeIndex == null) {
@@ -9861,6 +9872,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
+    if (!this.film.frames.length) {
+      return;
+    }
     this.renderer.clear();
     if (this.options.background) {
       this.renderer.rect(0, 0, this.width, this.height, this.options.background);
@@ -9938,7 +9952,10 @@ Penciltest = (function() {
       this.mark(last.x, last.y);
       this.markBuffer = [];
     }
-    return this.currentStrokeIndex = null;
+    this.currentStrokeIndex = null;
+    if (this.state.toolStack[0] === 'eraser') {
+      return this.drawCurrentFrame();
+    }
   };
 
   Penciltest.prototype.dropFrame = function() {
@@ -10123,7 +10140,6 @@ Penciltest = (function() {
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-      console.log(this.renderer.currentLineOptions);
       this.renderer.setLineOverrides(renderLineOverrides);
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);

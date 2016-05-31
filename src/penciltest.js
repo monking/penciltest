@@ -134,23 +134,24 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.track = function(x, y) {
-    var coords, currentFrame, done, makeMark, point, realEraseRadius, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref, _results;
+    var coords, currentFrame, done, makeMark, point, realEraseRadius, screenEraseRadius, screenPoint, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref;
     coords = {
       x: x,
       y: y
     };
     if (this.state.toolStack[0] === 'eraser') {
-      point = this.scaleCoordinates([x, y], 1 / this.zoomFactor);
+      screenPoint = [x, y];
+      point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
       done = false;
       currentFrame = this.getCurrentFrame();
+      screenEraseRadius = 10;
       this.drawCurrentFrame();
       _ref = currentFrame.strokes;
-      _results = [];
       for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
         stroke = _ref[strokeIndex];
         for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
           segment = stroke[_j];
-          realEraseRadius = 20 / this.zoomFactor;
+          realEraseRadius = screenEraseRadius / this.zoomFactor;
           if (Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius) {
             currentFrame.strokes.splice(strokeIndex, 1);
             this.drawCurrentFrame();
@@ -162,11 +163,9 @@ Penciltest = (function() {
         }
         if (done) {
           break;
-        } else {
-          _results.push(void 0);
         }
       }
-      return _results;
+      return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
     } else {
       makeMark = false;
       if (this.currentStrokeIndex == null) {
@@ -272,6 +271,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
+    if (!this.film.frames.length) {
+      return;
+    }
     this.renderer.clear();
     if (this.options.background) {
       this.renderer.rect(0, 0, this.width, this.height, this.options.background);
@@ -349,7 +351,10 @@ Penciltest = (function() {
       this.mark(last.x, last.y);
       this.markBuffer = [];
     }
-    return this.currentStrokeIndex = null;
+    this.currentStrokeIndex = null;
+    if (this.state.toolStack[0] === 'eraser') {
+      return this.drawCurrentFrame();
+    }
   };
 
   Penciltest.prototype.dropFrame = function() {
@@ -534,7 +539,6 @@ Penciltest = (function() {
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-      console.log(this.renderer.currentLineOptions);
       this.renderer.setLineOverrides(renderLineOverrides);
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);

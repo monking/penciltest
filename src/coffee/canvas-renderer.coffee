@@ -20,15 +20,21 @@ class CanvasRenderer extends RendererInterface
     super x, y
     @context.lineTo x, y
 
-  rect: (x, y, width, height, backgroundColor) ->
+  rect: (x, y, width, height, backgroundColor, strokeColor) ->
     super x, y, width, height, backgroundColor
-    @context.fillStyle = backgroundColor
     @context.rect x, y, width, height
-    @context.fill()
-    @context.fillStyle = null
+    if backgroundColor
+      @context.fillStyle = backgroundColor
+      @context.fill()
+    if strokeColor
+      @context.strokeStyle = strokeColor
+      @context.stroke()
+
+    @updateStrokeStyle()
 
   updateStrokeStyle: ->
     if @context
+      @context.fillStyle = null # FIXME: rename this function, or move this elsewhere?
       @context.lineWidth = @currentLineOptions.weight
       @context.lineJoin = @currentLineOptions.corner
       @context.strokeStyle = 'rgba(' +

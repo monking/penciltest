@@ -46,9 +46,9 @@ PenciltestUI = (function(_super) {
         className: 'film-status',
         parent: 'statusRight'
       },
-      toggleTimeline: {
+      toggleTool: {
         tagName: 'button',
-        className: 'toggle-timeline fa fa-table',
+        className: 'toggle-tool fa fa-pencil',
         parent: 'statusRight'
       },
       toggleMenu: {
@@ -602,7 +602,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.addInputListeners = function() {
-    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, trackFromEvent;
+    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
     self = this;
     getEventPageXY = function(event) {
       var eventLocation;
@@ -678,6 +678,10 @@ PenciltestUI = (function(_super) {
         return self.controller.lift();
       }
     };
+    toggleToolListener = function(event) {
+      event.preventDefault();
+      return self.appActions.eraser.listener.call(self.controller);
+    };
     contextMenuListener = function(event) {
       event.preventDefault();
       return self.toggleMenu(getEventPageXY(event));
@@ -685,6 +689,7 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
+    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
       return self.doAppAction('describeKeyboardShortcuts');
@@ -822,7 +827,6 @@ PenciltestUI = (function(_super) {
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
-      appStatusMarkup += " [" + this.controller.state.toolStack[0] + "]";
       this.components.appStatus.setHTML(appStatusMarkup);
       filmStatusMarkup = "<div class=\"frame\">";
       filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
@@ -833,7 +837,8 @@ PenciltestUI = (function(_super) {
         filmStatusMarkup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
       }
       filmStatusMarkup += "</div>";
-      return this.components.filmStatus.setHTML(filmStatusMarkup);
+      this.components.filmStatus.setHTML(filmStatusMarkup);
+      return this.components.toggleTool.getElement().className = "toggle-tool fa fa-" + this.controller.state.toolStack[0];
     }
   };
 

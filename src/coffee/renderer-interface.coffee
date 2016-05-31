@@ -38,7 +38,7 @@ class RendererInterface
   lineTo: (x, y) ->
     null
 
-  rect: (x, y, width, height, backgroundColor) ->
+  rect: (x, y, width, height, backgroundColor, strokeColor) ->
     null
 
   setLineOverrides: ( options ) ->
