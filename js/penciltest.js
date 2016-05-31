@@ -8446,8 +8446,8 @@ RendererInterface = (function() {
     lineWeight: 1,
     lineOpacity: 1,
     lineCorner: 'round',
-    width: 64,
-    height: 64
+    width: 1920,
+    height: 1080
   };
 
   function RendererInterface(options) {
@@ -8561,6 +8561,7 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
       this.context.lineWidth = this.currentLineOptions.lineWeight;
+      this.context.lineJoin = this.currentLineOptions.lineCorner;
       return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
     }
   };
@@ -8777,7 +8778,9 @@ PenciltestUI = (function(_super) {
             _ref.destroy();
           }
           return this.renderer = new this.availableRenderers[this.options.renderer]({
-            container: this.fieldElement
+            container: this.fieldElement,
+            width: this.forceDimensions ? this.forceDimensions.width : this.width,
+            height: this.forceDimensions ? this.forceDimensions.height : this.height
           });
         }
       }
@@ -10026,8 +10029,8 @@ Penciltest = (function() {
     this.film = {
       name: '',
       version: Penciltest.prototype.state.version,
-      aspect: '1:1',
-      width: 960,
+      aspect: '16:9',
+      width: 1920,
       frames: []
     };
     this.newFrame();
@@ -10086,12 +10089,23 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifElement, gifElementId, gifEncoder, oldLineWidth, oldRendererType, property, value, _i, _ref;
-    dimensions = [64, 64];
+    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifConfiguration, gifElement, gifElementId, gifEncoder, gifLineWidth, maxGifDimension, oldLineWidth, oldRendererType, property, value, _i, _ref;
+    dimensions = this.getFilmDimensions();
+    gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split(' ');
+    maxGifDimension = parseInt(gifConfiguration[0], 10);
+    gifLineWidth = parseInt(gifConfiguration[1], 10);
+    if (dimensions.width > maxGifDimension) {
+      dimensions.width = maxGifDimension;
+      dimensions.height = maxGifDimension / dimensions.aspect;
+    } else if (dimensions.height > maxGifDimension) {
+      dimensions.height = maxGifDimension;
+      dimensions.width = maxGifDimension * dimensions.aspect;
+    }
     this.forceDimensions = {
-      width: dimensions[0],
-      height: dimensions[1]
+      width: dimensions.width,
+      height: dimensions.height
     };
+    this.ui.appActions.renderer.action();
     this.resize();
     oldRendererType = this.options.renderer;
     this.setOptions({
@@ -10105,8 +10119,7 @@ Penciltest = (function() {
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
     oldLineWidth = this.renderer.context.lineWidth;
-    this.renderer.context.lineWidth = 2;
-    this.renderer.context.lineJoin = 'round';
+    this.renderer.context.lineWidth = gifLineWidth;
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
@@ -10316,8 +10329,20 @@ Penciltest = (function() {
     return _results;
   };
 
+  Penciltest.prototype.getFilmDimensions = function() {
+    var aspect, aspectParts, dimensions;
+    aspect = this.film.aspect || '1:1';
+    aspectParts = aspect.split(':');
+    dimensions = {
+      width: this.film.width,
+      aspect: aspectParts[0] / aspectParts[1]
+    };
+    dimensions.height = Math.ceil(dimensions.width / dimensions.aspect);
+    return dimensions;
+  };
+
   Penciltest.prototype.resize = function() {
-    var aspect, aspectNumber, aspectParts, containerAspect, containerHeight, containerWidth;
+    var containerAspect, containerHeight, containerWidth, filmDimensions;
     if (this.forceDimensions) {
       containerWidth = this.forceDimensions.width;
       containerHeight = this.forceDimensions.height;
@@ -10328,16 +10353,14 @@ Penciltest = (function() {
         containerHeight -= 36;
       }
     }
-    aspect = this.film.aspect || '1:1';
-    aspectParts = aspect.split(':');
-    aspectNumber = aspectParts[0] / aspectParts[1];
+    filmDimensions = this.getFilmDimensions();
     containerAspect = containerWidth / containerHeight;
-    if (containerAspect > aspectNumber) {
-      this.width = Math.floor(containerHeight * aspectNumber);
+    if (containerAspect > filmDimensions.aspect) {
+      this.width = Math.floor(containerHeight * filmDimensions.aspect);
       this.height = containerHeight;
     } else {
       this.width = containerWidth;
-      this.height = Math.floor(containerWidth / aspectNumber);
+      this.height = Math.floor(containerWidth / filmDimensions.aspect);
     }
     this.fieldContainer.style.width = "" + this.width + "px";
     this.fieldContainer.style.height = "" + this.height + "px";
