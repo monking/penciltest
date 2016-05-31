@@ -483,6 +483,8 @@ class PenciltestUI extends PenciltestUIComponent
         else
           self.hideMenu()
 
+        self.controller.useTool 'eraser' if event.button is 1
+
         trackFromEvent event
         document.body.addEventListener 'mousemove', mouseMoveListener
         document.body.addEventListener 'touchmove', mouseMoveListener
@@ -505,6 +507,7 @@ class PenciltestUI extends PenciltestUIComponent
         if event.type is 'touchend' and Utils.currentGesture
           self.doGesture Utils.describeGesture self.fieldBounds, 'final'
           Utils.clearGesture event
+        self.controller.useTool 'pencil' if event.button is 1
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
         document.body.removeEventListener 'mouseup', mouseUpListener

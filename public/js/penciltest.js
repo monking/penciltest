@@ -9320,6 +9320,9 @@ PenciltestUI = (function(_super) {
         } else {
           self.hideMenu();
         }
+        if (event.button === 1) {
+          self.controller.useTool('eraser');
+        }
         trackFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
         document.body.addEventListener('touchmove', mouseMoveListener);
@@ -9345,6 +9348,9 @@ PenciltestUI = (function(_super) {
         if (event.type === 'touchend' && Utils.currentGesture) {
           self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
           Utils.clearGesture(event);
+        }
+        if (event.button === 1) {
+          self.controller.useTool('pencil');
         }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
