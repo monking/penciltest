@@ -358,8 +358,8 @@ class Penciltest
     @film =
       name: ''
       version: Penciltest.prototype.state.version
-      aspect: '1:1'
-      width: 960
+      aspect: '16:9'
+      width: 1920
       frames: []
 
     @newFrame()
@@ -403,11 +403,24 @@ class Penciltest
 
   renderGif: ->
     # configure for rendering
-    dimensions = [64, 64]
-    # while rendering is only useful at one size, save the step # dimensions = (Utils.prompt('WIDTHxHEIGHT', '64x64') || '64x64').split 'x'
+    # dimensions = [64, 64]
+    dimensions = @getFilmDimensions()
+    # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
+    gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split ' '
+    maxGifDimension = parseInt gifConfiguration[0], 10
+    gifLineWidth = parseInt gifConfiguration[1], 10
+    if dimensions.width > maxGifDimension
+      dimensions.width = maxGifDimension
+      dimensions.height = maxGifDimension / dimensions.aspect
+    else if dimensions.height > maxGifDimension
+      dimensions.height = maxGifDimension
+      dimensions.width = maxGifDimension * dimensions.aspect
+
     @forceDimensions =
-      width: dimensions[0]
-      height: dimensions[1]
+      width: dimensions.width
+      height: dimensions.height
+    # rebuild renderer to ensure correct resolution for capture
+    @ui.appActions.renderer.action()
     @resize()
 
     oldRendererType = @options.renderer
@@ -419,16 +432,14 @@ class Penciltest
 
     # prepare encoder
     gifEncoder = new GIFEncoder()
-    # FIXME: gifEncoder only retrieves the image data from a box the size of the canvas when it was created, not the canvas that has been resized
-    # gifEncoder.setSize dimensions[0], dimensions[1] # gifEncoder no good trying to force it
+    # gifEncoder.setSize dimensions.width, dimensions.height # no use: uses the original dimensions of the canvas, regardless of its current size
     gifEncoder.setRepeat 0
     gifEncoder.setDelay baseFrameDelay
     gifEncoder.start()
 
     # encode each frame with appropriate delay
     oldLineWidth = @renderer.context.lineWidth
-    @renderer.context.lineWidth = 2
-    @renderer.context.lineJoin = 'round'
+    @renderer.context.lineWidth = gifLineWidth
     for frameIndex in [0...@film.frames.length]
       @goToFrame frameIndex
       gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
@@ -574,6 +585,15 @@ class Penciltest
           segment[0] += deltaPoint[0]
           segment[1] += deltaPoint[1]
 
+  getFilmDimensions: ->
+    aspect = @film.aspect or '1:1'
+    aspectParts = aspect.split ':'
+    dimensions = 
+      width: @film.width
+      aspect: aspectParts[0] / aspectParts[1]
+    dimensions.height = Math.ceil dimensions.width / dimensions.aspect
+    dimensions
+
   resize: ->
     if @forceDimensions
       containerWidth = @forceDimensions.width
@@ -583,17 +603,15 @@ class Penciltest
       containerHeight = @container.offsetHeight
       if @options.showStatus
         containerHeight -= 36
-    aspect = @film.aspect or '1:1'
-    aspectParts = aspect.split ':'
-    aspectNumber = aspectParts[0] / aspectParts[1]
+    filmDimensions = @getFilmDimensions()
     containerAspect = containerWidth / containerHeight
 
-    if containerAspect > aspectNumber
-      @width = Math.floor containerHeight * aspectNumber
+    if containerAspect > filmDimensions.aspect
+      @width = Math.floor containerHeight * filmDimensions.aspect
       @height = containerHeight
     else
       @width = containerWidth
-      @height = Math.floor containerWidth / aspectNumber
+      @height = Math.floor containerWidth / filmDimensions.aspect
 
     @fieldContainer.style.width = "#{@width}px"
     @fieldContainer.style.height = "#{@height}px"

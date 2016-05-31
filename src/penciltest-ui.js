@@ -110,7 +110,9 @@ PenciltestUI = (function(_super) {
             _ref.destroy();
           }
           return this.renderer = new this.availableRenderers[this.options.renderer]({
-            container: this.fieldElement
+            container: this.fieldElement,
+            width: this.forceDimensions ? this.forceDimensions.width : this.width,
+            height: this.forceDimensions ? this.forceDimensions.height : this.height
           });
         }
       }

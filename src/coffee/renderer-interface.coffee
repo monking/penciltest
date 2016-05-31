@@ -10,8 +10,8 @@ class RendererInterface
     lineWeight: 1
     lineOpacity: 1
     lineCorner: 'round'
-    width: 64
-    height: 64
+    width: 1920
+    height: 1080
 
   constructor: (options) ->
     @options = Utils.inherit(

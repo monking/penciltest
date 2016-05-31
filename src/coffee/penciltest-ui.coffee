@@ -77,6 +77,8 @@ class PenciltestUI extends PenciltestUIComponent
           @renderer?.destroy()
           @renderer = new @availableRenderers[ @options.renderer ](
             container: @fieldElement
+            width: if @forceDimensions then @forceDimensions.width else @width
+            height: if @forceDimensions then @forceDimensions.height else @height
           )
     playPause:
       label: "Play/Pause"

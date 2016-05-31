@@ -33,6 +33,7 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
       this.context.lineWidth = this.currentLineOptions.lineWeight;
+      this.context.lineJoin = this.currentLineOptions.lineCorner;
       return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
     }
   };
