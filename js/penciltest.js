@@ -8445,6 +8445,7 @@ RendererInterface = (function() {
     lineColor: [0, 0, 0],
     lineWeight: 1,
     lineOpacity: 1,
+    lineCorner: 'round',
     width: 64,
     height: 64
   };
@@ -8486,6 +8487,7 @@ RendererInterface = (function() {
     return {
       color: this.options.lineColor,
       weight: this.options.lineWeight,
+      corner: this.options.lineCorner,
       opacity: this.options.lineOpacity
     };
   };
@@ -10104,6 +10106,7 @@ Penciltest = (function() {
     gifEncoder.start();
     oldLineWidth = this.renderer.context.lineWidth;
     this.renderer.context.lineWidth = 2;
+    this.renderer.context.lineJoin = 'round';
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
