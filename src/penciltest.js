@@ -134,26 +134,56 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.track = function(x, y) {
-    var coords, makeMark;
+    var coords, currentFrame, done, makeMark, point, realEraseRadius, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref, _results;
     coords = {
       x: x,
       y: y
     };
-    makeMark = false;
-    if (this.currentStrokeIndex == null) {
-      this.markPoint = coords;
-      this.markBuffer = [];
-      makeMark = true;
-    }
-    this.markBuffer.push(coords);
-    this.markPoint.x = (this.markPoint.x * this.options.smoothing + x) / (this.options.smoothing + 1);
-    this.markPoint.y = (this.markPoint.y * this.options.smoothing + y) / (this.options.smoothing + 1);
-    if (this.markBuffer.length > this.state.smoothDrawInterval) {
-      this.markBuffer = [];
-      makeMark = true;
-    }
-    if (makeMark) {
-      return this.mark(this.markPoint.x, this.markPoint.y);
+    if (this.state.toolStack[0] === 'eraser') {
+      point = this.scaleCoordinates([x, y], 1 / this.zoomFactor);
+      done = false;
+      currentFrame = this.getCurrentFrame();
+      this.drawCurrentFrame();
+      _ref = currentFrame.strokes;
+      _results = [];
+      for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
+        stroke = _ref[strokeIndex];
+        for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
+          segment = stroke[_j];
+          realEraseRadius = 20 / this.zoomFactor;
+          if (Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius) {
+            currentFrame.strokes.splice(strokeIndex, 1);
+            this.drawCurrentFrame();
+            done = true;
+          }
+          if (done) {
+            break;
+          }
+        }
+        if (done) {
+          break;
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    } else {
+      makeMark = false;
+      if (this.currentStrokeIndex == null) {
+        this.markPoint = coords;
+        this.markBuffer = [];
+        makeMark = true;
+      }
+      this.markBuffer.push(coords);
+      this.markPoint.x = (this.markPoint.x * this.options.smoothing + x) / (this.options.smoothing + 1);
+      this.markPoint.y = (this.markPoint.y * this.options.smoothing + y) / (this.options.smoothing + 1);
+      if (this.markBuffer.length > this.state.smoothDrawInterval) {
+        this.markBuffer = [];
+        makeMark = true;
+      }
+      if (makeMark) {
+        return this.mark(this.markPoint.x, this.markPoint.y);
+      }
     }
   };
 

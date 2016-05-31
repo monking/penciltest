@@ -24,9 +24,8 @@ CanvasRenderer = (function(_super) {
 
   CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor) {
     CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
-    this.context.fillStyle = backgroundColor;
     this.context.rect(x, y, width, height);
-    return this.context.fill();
+    return this.context.stroke();
   };
 
   CanvasRenderer.prototype.updateStrokeStyle = function() {

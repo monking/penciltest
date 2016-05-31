@@ -134,23 +134,39 @@ class Penciltest
       x: x
       y: y
 
-    makeMark = false
+    if @state.toolStack[0] == 'eraser'
+      point = @scaleCoordinates [x, y], 1 / @zoomFactor
+      done = false
+      currentFrame = @getCurrentFrame()
+      @drawCurrentFrame()
+      for stroke, strokeIndex in currentFrame.strokes
+        for segment in stroke
+          realEraseRadius = 20 / @zoomFactor
+          if Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius
+            currentFrame.strokes.splice strokeIndex, 1
+            @drawCurrentFrame()
+            done = true
+          if done then break
+        if done then break
 
-    if not @currentStrokeIndex?
-      @markPoint = coords
-      @markBuffer = []
-      makeMark = true
+    else
+      makeMark = false
 
-    @markBuffer.push coords
+      if not @currentStrokeIndex?
+        @markPoint = coords
+        @markBuffer = []
+        makeMark = true
 
-    @markPoint.x = (@markPoint.x * @options.smoothing + x) / (@options.smoothing + 1)
-    @markPoint.y = (@markPoint.y * @options.smoothing + y) / (@options.smoothing + 1)
+      @markBuffer.push coords
 
-    if @markBuffer.length > @state.smoothDrawInterval
-      @markBuffer = []
-      makeMark = true
+      @markPoint.x = (@markPoint.x * @options.smoothing + x) / (@options.smoothing + 1)
+      @markPoint.y = (@markPoint.y * @options.smoothing + y) / (@options.smoothing + 1)
 
-    @mark @markPoint.x, @markPoint.y if makeMark
+      if @markBuffer.length > @state.smoothDrawInterval
+        @markBuffer = []
+        makeMark = true
+
+      @mark @markPoint.x, @markPoint.y if makeMark
 
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()
