@@ -22,10 +22,10 @@ class CanvasRenderer extends RendererInterface
 
   rect: (x, y, width, height, backgroundColor) ->
     super x, y, width, height, backgroundColor
-    # @context.fillStyle = backgroundColor
+    @context.fillStyle = backgroundColor
     @context.rect x, y, width, height
-    @context.stroke()
-    # @context.fillStyle = null
+    @context.fill()
+    @context.fillStyle = null
 
   updateStrokeStyle: ->
     if @context
