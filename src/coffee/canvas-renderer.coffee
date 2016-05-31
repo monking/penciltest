@@ -29,8 +29,8 @@ class CanvasRenderer extends RendererInterface
 
   updateStrokeStyle: ->
     if @context
-      @context.lineWidth = @currentLineOptions.lineWeight
-      @context.lineJoin = @currentLineOptions.lineCorner
+      @context.lineWidth = @currentLineOptions.weight
+      @context.lineJoin = @currentLineOptions.corner
       @context.strokeStyle = 'rgba(' +
         @currentLineOptions.color[0] + ',' +
         @currentLineOptions.color[1] + ',' +

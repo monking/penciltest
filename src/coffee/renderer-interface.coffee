@@ -44,7 +44,6 @@ class RendererInterface
   setLineOverrides: ( options ) ->
     @overrides = options
     @currentLineOptions = Utils.inherit(
-      options
       @overrides
       @defaultLineOptions()
     )

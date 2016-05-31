@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.0',
+    version: '0.1.2',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -500,7 +500,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifConfiguration, gifElement, gifElementId, gifEncoder, gifLineWidth, maxGifDimension, oldLineWidth, oldRendererType, property, value, _i, _ref;
+    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifConfiguration, gifElement, gifElementId, gifEncoder, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
     dimensions = this.getFilmDimensions();
     gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split(' ');
     maxGifDimension = parseInt(gifConfiguration[0], 10);
@@ -523,20 +523,23 @@ Penciltest = (function() {
       renderer: 'canvas'
     });
     this.ui.appActions.renderer.action();
+    oldLineOverrides = this.renderer.overrides;
+    renderLineOverrides = {
+      weight: gifLineWidth
+    };
     baseFrameDelay = 1000 / this.options.frameRate;
     frameIndex = 0;
     gifEncoder = new GIFEncoder();
     gifEncoder.setRepeat(0);
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
-    oldLineWidth = this.renderer.context.lineWidth;
-    this.renderer.context.lineWidth = gifLineWidth;
     for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+      console.log(this.renderer.currentLineOptions);
+      this.renderer.setLineOverrides(renderLineOverrides);
       this.goToFrame(frameIndex);
       gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
       gifEncoder.addFrame(this.renderer.context);
     }
-    this.renderer.context.lineWidth = oldLineWidth;
     gifEncoder.finish();
     binaryGif = gifEncoder.stream().getData();
     dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
@@ -562,6 +565,7 @@ Penciltest = (function() {
     this.setOptions({
       renderer: oldRendererType
     });
+    this.renderer.setLineOverrides(oldLineOverrides);
     this.forceDimensions = null;
     return this.resize();
   };

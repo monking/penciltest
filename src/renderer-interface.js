@@ -45,7 +45,7 @@ RendererInterface = (function() {
 
   RendererInterface.prototype.setLineOverrides = function(options) {
     this.overrides = options;
-    return this.currentLineOptions = Utils.inherit(options, this.overrides, this.defaultLineOptions());
+    return this.currentLineOptions = Utils.inherit(this.overrides, this.defaultLineOptions());
   };
 
   RendererInterface.prototype.defaultLineOptions = function() {

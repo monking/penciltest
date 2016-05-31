@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.1.0'
+    version: '0.1.2'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -427,6 +427,10 @@ class Penciltest
     @setOptions renderer: 'canvas'
     @ui.appActions.renderer.action()
 
+    oldLineOverrides = @renderer.overrides
+    renderLineOverrides = 
+      weight: gifLineWidth
+
     baseFrameDelay = 1000 / @options.frameRate
     frameIndex = 0
 
@@ -437,14 +441,13 @@ class Penciltest
     gifEncoder.setDelay baseFrameDelay
     gifEncoder.start()
 
-    # encode each frame with appropriate delay
-    oldLineWidth = @renderer.context.lineWidth
-    @renderer.context.lineWidth = gifLineWidth
     for frameIndex in [0...@film.frames.length]
+      console.log @renderer.currentLineOptions # XXX
+      @renderer.setLineOverrides renderLineOverrides
       @goToFrame frameIndex
       gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
       gifEncoder.addFrame @renderer.context
-    @renderer.context.lineWidth = oldLineWidth
+
 
     gifEncoder.finish()
     binaryGif = gifEncoder.stream().getData()
@@ -473,6 +476,7 @@ class Penciltest
 
     # reset to user's configuration
     @setOptions renderer: oldRendererType
+    @renderer.setLineOverrides oldLineOverrides
     @forceDimensions = null
     @resize()
 
