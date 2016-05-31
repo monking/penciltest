@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.2',
+    version: '0.1.3',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
