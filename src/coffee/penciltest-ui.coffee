@@ -374,6 +374,14 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @useTool if @state.toolStack[0] == 'eraser' then @state.toolStack[1] else 'eraser'
         @ui.updateStatus()
+    toggleFullscreen:
+      label: "Fullscreen"
+      listener: ->
+        (
+          document.documentElement.requestFullscreen or
+          document.documentElement.webkitRequestFullScreen or
+          document.documentElement.mozRequestFullScreen
+        ).call(document.documentElement)
 
   menuOptions: [
     _icons: [
@@ -396,6 +404,7 @@ class PenciltestUI extends PenciltestUIComponent
     Playback: [
       'loop'
       'frameRate'
+      'toggleFullscreen'
     ]
     Tools: [
       'hideCursor'

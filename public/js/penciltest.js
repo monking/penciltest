@@ -9232,6 +9232,12 @@ PenciltestUI = (function(_super) {
         this.useTool(this.state.toolStack[0] === 'eraser' ? this.state.toolStack[1] : 'eraser');
         return this.ui.updateStatus();
       }
+    },
+    toggleFullscreen: {
+      label: "Fullscreen",
+      listener: function() {
+        return (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen || document.documentElement.mozRequestFullScreen).call(document.documentElement);
+      }
     }
   };
 
@@ -9239,7 +9245,7 @@ PenciltestUI = (function(_super) {
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
-      Playback: ['loop', 'frameRate'],
+      Playback: ['loop', 'frameRate', 'toggleFullscreen'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
       Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
@@ -9634,7 +9640,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.3',
+    version: '0.1.3.a',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
