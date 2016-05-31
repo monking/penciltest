@@ -424,7 +424,7 @@ class Penciltest
     window.localStorage.setItem storageName, JSON.stringify data
 
   saveFilm: ->
-    name = window.prompt "what will you name your film?", @film.name
+    name = Utils.prompt "what will you name your film?", @film.name
     if name
       @film.name = name
       @putStoredData 'film', name, @film
@@ -543,7 +543,7 @@ class Penciltest
     filmNames = @getFilmNames()
     if filmNames.length
       message ?= 'Choose a film'
-      selectedFilmName = window.prompt "#{message}:\n\n#{filmNames.join '\n'}"
+      selectedFilmName = Utils.select message, filmNames
 
       if selectedFilmName and filmNames.indexOf selectedFilmName is -1
         for filmName in filmNames

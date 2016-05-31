@@ -56,8 +56,24 @@ Utils = {
   confirm: function() {
     return window.confirm(arguments[0]);
   },
-  prompt: function() {
-    return window.prompt(arguments[0], arguments[1]);
+  prompt: function(message, defaultValue) {
+    return window.prompt(message, defaultValue);
+  },
+  select: function(message, options) {
+    var option, selected, _i, _len;
+    selected = this.prompt("" + message + ":\n\n" + (options.join('\n')));
+    if (selected && options.indexOf(selected === -1)) {
+      for (_i = 0, _len = options.length; _i < _len; _i++) {
+        option = options[_i];
+        if (RegExp(selected).test(option)) {
+          selected = option;
+        }
+      }
+    }
+    if (!selected || options.indexOf(selected) === -1) {
+      selected = false;
+    }
+    return selected;
   },
   keyCodeNames: {
     8: 'Backspace',

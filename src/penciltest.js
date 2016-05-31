@@ -531,7 +531,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.saveFilm = function() {
     var name;
-    name = window.prompt("what will you name your film?", this.film.name);
+    name = Utils.prompt("what will you name your film?", this.film.name);
     if (name) {
       this.film.name = name;
       this.putStoredData('film', name, this.film);
@@ -653,7 +653,7 @@ Penciltest = (function() {
       if (message == null) {
         message = 'Choose a film';
       }
-      selectedFilmName = window.prompt("" + message + ":\n\n" + (filmNames.join('\n')));
+      selectedFilmName = Utils.select(message, filmNames);
       if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
         for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
           filmName = filmNames[_i];

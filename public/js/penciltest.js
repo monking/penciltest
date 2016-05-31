@@ -8174,8 +8174,24 @@ Utils = {
   confirm: function() {
     return window.confirm(arguments[0]);
   },
-  prompt: function() {
-    return window.prompt(arguments[0], arguments[1]);
+  prompt: function(message, defaultValue) {
+    return window.prompt(message, defaultValue);
+  },
+  select: function(message, options) {
+    var option, selected, _i, _len;
+    selected = this.prompt("" + message + ":\n\n" + (options.join('\n')));
+    if (selected && options.indexOf(selected === -1)) {
+      for (_i = 0, _len = options.length; _i < _len; _i++) {
+        option = options[_i];
+        if (RegExp(selected).test(option)) {
+          selected = option;
+        }
+      }
+    }
+    if (!selected || options.indexOf(selected) === -1) {
+      selected = false;
+    }
+    return selected;
   },
   keyCodeNames: {
     8: 'Backspace',
@@ -10171,7 +10187,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.saveFilm = function() {
     var name;
-    name = window.prompt("what will you name your film?", this.film.name);
+    name = Utils.prompt("what will you name your film?", this.film.name);
     if (name) {
       this.film.name = name;
       this.putStoredData('film', name, this.film);
@@ -10293,7 +10309,7 @@ Penciltest = (function() {
       if (message == null) {
         message = 'Choose a film';
       }
-      selectedFilmName = window.prompt("" + message + ":\n\n" + (filmNames.join('\n')));
+      selectedFilmName = Utils.select(message, filmNames);
       if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
         for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
           filmName = filmNames[_i];
