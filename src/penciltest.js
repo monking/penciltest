@@ -505,7 +505,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, cssProperties, dataUrl, dimensions, frameIndex, gifConfiguration, gifElement, gifElementId, gifEncoder, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
+    var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
     dimensions = this.getFilmDimensions();
     gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split(' ');
     maxGifDimension = parseInt(gifConfiguration[0], 10);
@@ -552,18 +552,55 @@ Penciltest = (function() {
     if (!gifElement) {
       gifElement = document.createElement('img');
       gifElement.id = gifElementId;
-      cssProperties = {
+      gifCss = {
         position: 'absolute',
-        top: '20%',
-        left: '0',
+        top: '50%',
+        left: '50%',
+        transform: 'translateX(-50%) translateY(-50%)',
         maxWidth: '80%',
-        maxHeight: '60%'
+        maxHeight: '80%'
       };
-      for (property in cssProperties) {
-        value = cssProperties[property];
+      for (property in gifCss) {
+        value = gifCss[property];
         gifElement.style[property] = value;
       }
-      document.body.appendChild(gifElement);
+      gifContainer = document.createElement('div');
+      containerCss = {
+        position: 'absolute',
+        top: '0px',
+        left: '0px',
+        bottom: '0px',
+        right: '0px',
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      };
+      for (property in containerCss) {
+        value = containerCss[property];
+        gifContainer.style[property] = value;
+      }
+      gifInstructions = document.createElement('div');
+      containerCss = {
+        position: 'relative',
+        color: 'white',
+        textAlign: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      };
+      for (property in containerCss) {
+        value = containerCss[property];
+        gifInstructions.style[property] = value;
+      }
+      gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
+      gifContainer.appendChild(gifElement);
+      gifContainer.appendChild(gifInstructions);
+      document.body.appendChild(gifContainer);
+      gifCloseHandler = function(event) {
+        if (event.target !== gifElement) {
+          gifContainer.removeEventListener('click', gifCloseHandler);
+          gifContainer.removeEventListener('touchend', gifCloseHandler);
+          return gifContainer.remove();
+        }
+      };
+      gifContainer.addEventListener('click', gifCloseHandler);
+      gifContainer.addEventListener('touchend', gifCloseHandler);
     }
     gifElement.src = dataUrl;
     this.setOptions({

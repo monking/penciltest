@@ -464,15 +464,46 @@ class Penciltest
     if not gifElement
       gifElement = document.createElement 'img'
       gifElement.id = gifElementId
-      cssProperties =
+      gifCss =
         position: 'absolute'
-        top: '20%'
-        left: '0'
+        top: '50%'
+        left: '50%'
+        transform: 'translateX(-50%) translateY(-50%)'
         maxWidth: '80%'
-        maxHeight: '60%'
-      for property, value of cssProperties
+        maxHeight: '80%'
+      for property, value of gifCss
         gifElement.style[property] = value
-      document.body.appendChild gifElement
+      gifContainer = document.createElement 'div'
+      containerCss =
+        position: 'absolute'
+        top: '0px'
+        left: '0px'
+        bottom: '0px'
+        right: '0px'
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      for property, value of containerCss
+        gifContainer.style[property] = value
+      gifInstructions = document.createElement 'div'
+      containerCss =
+        position: 'relative'
+        color: 'white'
+        textAlign: 'center'
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      for property, value of containerCss
+        gifInstructions.style[property] = value
+      gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close."
+      gifContainer.appendChild gifElement
+      gifContainer.appendChild gifInstructions
+      document.body.appendChild gifContainer
+
+      gifCloseHandler = (event) ->
+        if event.target isnt gifElement
+          gifContainer.removeEventListener 'click', gifCloseHandler
+          gifContainer.removeEventListener 'touchend', gifCloseHandler
+          gifContainer.remove()
+
+      gifContainer.addEventListener 'click', gifCloseHandler
+      gifContainer.addEventListener 'touchend', gifCloseHandler
 
     gifElement.src = dataUrl
 
