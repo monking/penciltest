@@ -321,6 +321,15 @@ PenciltestUI = (function(_super) {
         return this.resize();
       }
     },
+    dropFrame: {
+      label: "Drop Frame",
+      hotkey: ['Shift+X'],
+      gesture: /4 down from center top/,
+      cancelComplement: true,
+      listener: function() {
+        return this.dropFrame();
+      }
+    },
     cutFrame: {
       label: "Cut Frame",
       hotkey: ['X'],
@@ -584,7 +593,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'copyFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'cutFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],

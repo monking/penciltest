@@ -215,6 +215,12 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
         @resize() # FIXME: should either not redraw, or redraw fine without this
+    dropFrame:
+      label: "Drop Frame"
+      hotkey: ['Shift+X']
+      gesture: /4 down from center top/
+      cancelComplement: true
+      listener: -> @dropFrame()
     cutFrame:
       label: "Cut Frame"
       hotkey: ['X']
@@ -401,15 +407,16 @@ class PenciltestUI extends PenciltestUIComponent
     Edit: [
       'undo'
       'redo'
+      'moreHold'
+      'lessHold'
       'copyFrame'
+      'cutFrame'
       'pasteFrame'
       'pasteStrokes'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
-      'cutFrame'
-      'moreHold'
-      'lessHold'
+      'dropFrame'
     ]
     Playback: [
       'loop'
