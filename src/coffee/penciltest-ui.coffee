@@ -129,6 +129,21 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
+    copyFrame:
+      label: "Copy Frame"
+      hotkey: ['C']
+      listener: ->
+        @copyFrame()
+    pasteFrame:
+      label: "Paste Frame"
+      hotkey: ['V']
+      listener: ->
+        @pasteFrame()
+    pasteStrokes:
+      label: "Paste Strokes"
+      hotkey: ['Shift+V']
+      listener: ->
+        @pasteStrokes()
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
@@ -189,7 +204,7 @@ class PenciltestUI extends PenciltestUIComponent
             @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
-      hotkey: ['C']
+      hotkey: ['H']
       listener: -> @setOptions hideCursor: not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
@@ -202,10 +217,16 @@ class PenciltestUI extends PenciltestUIComponent
         @resize() # FIXME: should either not redraw, or redraw fine without this
     dropFrame:
       label: "Drop Frame"
-      hotkey: ['X','Backspace']
-      gesture: /3 down from center top/
+      hotkey: ['Shift+X']
+      gesture: /4 down from center top/
       cancelComplement: true
       listener: -> @dropFrame()
+    cutFrame:
+      label: "Cut Frame"
+      hotkey: ['X']
+      gesture: /3 down from center top/
+      cancelComplement: true
+      listener: -> @cutFrame()
     smoothing:
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
@@ -386,12 +407,16 @@ class PenciltestUI extends PenciltestUIComponent
     Edit: [
       'undo'
       'redo'
+      'moreHold'
+      'lessHold'
+      'copyFrame'
+      'cutFrame'
+      'pasteFrame'
+      'pasteStrokes'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
       'dropFrame'
-      'moreHold'
-      'lessHold'
     ]
     Playback: [
       'loop'
@@ -483,6 +508,8 @@ class PenciltestUI extends PenciltestUIComponent
         else
           self.hideMenu()
 
+        self.controller.useTool 'eraser' if event.button is 1
+
         trackFromEvent event
         document.body.addEventListener 'mousemove', mouseMoveListener
         document.body.addEventListener 'touchmove', mouseMoveListener
@@ -505,6 +532,7 @@ class PenciltestUI extends PenciltestUIComponent
         if event.type is 'touchend' and Utils.currentGesture
           self.doGesture Utils.describeGesture self.fieldBounds, 'final'
           Utils.clearGesture event
+        self.controller.useTool 'pencil' if event.button is 1
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
         document.body.removeEventListener 'mouseup', mouseUpListener

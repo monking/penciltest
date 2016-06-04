@@ -4,6 +4,9 @@ global: document, window
 
 Utils =
 
+  clone: (object) ->
+    return JSON.parse(JSON.stringify(object))
+
   toggleClass: (element, className, presence = null) ->
     added = false
     classes = element.className.split /\s+/

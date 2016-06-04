@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.1.3'
+    version: '0.1.4'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -300,7 +300,27 @@ class Penciltest
     if @state.toolStack[0] == 'eraser'
       @drawCurrentFrame()
 
+  copyFrame: (frame = @getCurrentFrame()) ->
+    if frame.strokes.length
+      @copyBuffer = Utils.clone frame
+
+  pasteFrame: ->
+    if @copyBuffer
+      newFrameIndex = @current.frameNumber + 1
+      @film.frames.splice newFrameIndex, 0, Utils.clone(@copyBuffer)
+      @buildFilmMeta()
+      @goToFrame(newFrameIndex)
+
+  pasteStrokes: ->
+    if @copyBuffer
+      @film.frames[@current.frameNumber].strokes = @film.frames[@current.frameNumber].strokes.concat(Utils.clone(@copyBuffer.strokes))
+      @drawCurrentFrame()
+
+  cutFrame: ->
+    @copyFrame @dropFrame() if @getCurrentFrame().strokes.length
+
   dropFrame: ->
+    droppedFrame = @getCurrentFrame()
     @film.frames.splice @current.frameNumber, 1
     @current.frameNumber-- if @current.frameNumber >= @film.frames.length and @current.frameNumber > 0
     if @film.frames.length is 0
@@ -308,6 +328,8 @@ class Penciltest
 
     @buildFilmMeta()
     @drawCurrentFrame()
+
+    droppedFrame
 
   smoothFrame: (index, amount) ->
     if not amount

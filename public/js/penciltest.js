@@ -8124,6 +8124,9 @@ var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
 
 Utils = {
+  clone: function(object) {
+    return JSON.parse(JSON.stringify(object));
+  },
   toggleClass: function(element, className, presence) {
     var added, classIndex, classes;
     if (presence == null) {
@@ -8857,6 +8860,27 @@ PenciltestUI = (function(_super) {
         return this.stop();
       }
     },
+    copyFrame: {
+      label: "Copy Frame",
+      hotkey: ['C'],
+      listener: function() {
+        return this.copyFrame();
+      }
+    },
+    pasteFrame: {
+      label: "Paste Frame",
+      hotkey: ['V'],
+      listener: function() {
+        return this.pasteFrame();
+      }
+    },
+    pasteStrokes: {
+      label: "Paste Strokes",
+      hotkey: ['Shift+V'],
+      listener: function() {
+        return this.pasteStrokes();
+      }
+    },
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
@@ -8953,7 +8977,7 @@ PenciltestUI = (function(_super) {
     },
     hideCursor: {
       label: "Hide Cursor",
-      hotkey: ['C'],
+      hotkey: ['H'],
       listener: function() {
         return this.setOptions({
           hideCursor: !this.options.hideCursor
@@ -8977,11 +9001,20 @@ PenciltestUI = (function(_super) {
     },
     dropFrame: {
       label: "Drop Frame",
-      hotkey: ['X', 'Backspace'],
-      gesture: /3 down from center top/,
+      hotkey: ['Shift+X'],
+      gesture: /4 down from center top/,
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
+      }
+    },
+    cutFrame: {
+      label: "Cut Frame",
+      hotkey: ['X'],
+      gesture: /3 down from center top/,
+      cancelComplement: true,
+      listener: function() {
+        return this.cutFrame();
       }
     },
     smoothing: {
@@ -9238,7 +9271,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
@@ -9320,6 +9353,9 @@ PenciltestUI = (function(_super) {
         } else {
           self.hideMenu();
         }
+        if (event.button === 1) {
+          self.controller.useTool('eraser');
+        }
         trackFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
         document.body.addEventListener('touchmove', mouseMoveListener);
@@ -9345,6 +9381,9 @@ PenciltestUI = (function(_super) {
         if (event.type === 'touchend' && Utils.currentGesture) {
           self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
           Utils.clearGesture(event);
+        }
+        if (event.button === 1) {
+          self.controller.useTool('pencil');
         }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
@@ -9634,7 +9673,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.3',
+    version: '0.1.4',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -9958,7 +9997,41 @@ Penciltest = (function() {
     }
   };
 
+  Penciltest.prototype.copyFrame = function(frame) {
+    if (frame == null) {
+      frame = this.getCurrentFrame();
+    }
+    if (frame.strokes.length) {
+      return this.copyBuffer = Utils.clone(frame);
+    }
+  };
+
+  Penciltest.prototype.pasteFrame = function() {
+    var newFrameIndex;
+    if (this.copyBuffer) {
+      newFrameIndex = this.current.frameNumber + 1;
+      this.film.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      this.buildFilmMeta();
+      return this.goToFrame(newFrameIndex);
+    }
+  };
+
+  Penciltest.prototype.pasteStrokes = function() {
+    if (this.copyBuffer) {
+      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+      return this.drawCurrentFrame();
+    }
+  };
+
+  Penciltest.prototype.cutFrame = function() {
+    if (this.getCurrentFrame().strokes.length) {
+      return this.copyFrame(this.dropFrame());
+    }
+  };
+
   Penciltest.prototype.dropFrame = function() {
+    var droppedFrame;
+    droppedFrame = this.getCurrentFrame();
     this.film.frames.splice(this.current.frameNumber, 1);
     if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;
@@ -9967,7 +10040,8 @@ Penciltest = (function() {
       this.newFrame();
     }
     this.buildFilmMeta();
-    return this.drawCurrentFrame();
+    this.drawCurrentFrame();
+    return droppedFrame;
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {

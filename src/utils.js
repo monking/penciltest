@@ -6,6 +6,9 @@ var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
 
 Utils = {
+  clone: function(object) {
+    return JSON.parse(JSON.stringify(object));
+  },
   toggleClass: function(element, className, presence) {
     var added, classIndex, classes;
     if (presence == null) {

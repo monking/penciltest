@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.3',
+    version: '0.1.4',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -357,7 +357,41 @@ Penciltest = (function() {
     }
   };
 
+  Penciltest.prototype.copyFrame = function(frame) {
+    if (frame == null) {
+      frame = this.getCurrentFrame();
+    }
+    if (frame.strokes.length) {
+      return this.copyBuffer = Utils.clone(frame);
+    }
+  };
+
+  Penciltest.prototype.pasteFrame = function() {
+    var newFrameIndex;
+    if (this.copyBuffer) {
+      newFrameIndex = this.current.frameNumber + 1;
+      this.film.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      this.buildFilmMeta();
+      return this.goToFrame(newFrameIndex);
+    }
+  };
+
+  Penciltest.prototype.pasteStrokes = function() {
+    if (this.copyBuffer) {
+      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+      return this.drawCurrentFrame();
+    }
+  };
+
+  Penciltest.prototype.cutFrame = function() {
+    if (this.getCurrentFrame().strokes.length) {
+      return this.copyFrame(this.dropFrame());
+    }
+  };
+
   Penciltest.prototype.dropFrame = function() {
+    var droppedFrame;
+    droppedFrame = this.getCurrentFrame();
     this.film.frames.splice(this.current.frameNumber, 1);
     if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;
@@ -366,7 +400,8 @@ Penciltest = (function() {
       this.newFrame();
     }
     this.buildFilmMeta();
-    return this.drawCurrentFrame();
+    this.drawCurrentFrame();
+    return droppedFrame;
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
