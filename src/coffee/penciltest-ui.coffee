@@ -129,6 +129,21 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
+    copyFrame:
+      label: "Copy Frame"
+      hotkey: ['C']
+      listener: ->
+        @copyFrame()
+    pasteFrame:
+      label: "Paste Frame"
+      hotkey: ['V']
+      listener: ->
+        @pasteFrame()
+    pasteStrokes:
+      label: "Paste Strokes"
+      hotkey: ['Shift+V']
+      listener: ->
+        @pasteStrokes()
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
@@ -189,7 +204,7 @@ class PenciltestUI extends PenciltestUIComponent
             @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
-      hotkey: ['C']
+      hotkey: ['H']
       listener: -> @setOptions hideCursor: not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
@@ -200,12 +215,12 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
         @resize() # FIXME: should either not redraw, or redraw fine without this
-    dropFrame:
-      label: "Drop Frame"
-      hotkey: ['X','Backspace']
+    cutFrame:
+      label: "Cut Frame"
+      hotkey: ['X']
       gesture: /3 down from center top/
       cancelComplement: true
-      listener: -> @dropFrame()
+      listener: -> @cutFrame()
     smoothing:
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
@@ -386,10 +401,13 @@ class PenciltestUI extends PenciltestUIComponent
     Edit: [
       'undo'
       'redo'
+      'copyFrame'
+      'pasteFrame'
+      'pasteStrokes'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
-      'dropFrame'
+      'cutFrame'
       'moreHold'
       'lessHold'
     ]

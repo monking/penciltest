@@ -300,7 +300,21 @@ class Penciltest
     if @state.toolStack[0] == 'eraser'
       @drawCurrentFrame()
 
-  dropFrame: ->
+  copyFrame: ->
+    @copyBuffer = JSON.parse(JSON.stringify(@getCurrentFrame()))
+
+  pasteFrame: ->
+    newFrameIndex = @current.frameNumber + 1
+    @film.frames.splice newFrameIndex, 0, @copyBuffer if @copyBuffer
+    @buildFilmMeta()
+    @goToFrame(newFrameIndex)
+
+  pasteStrokes: ->
+    @film.frames[@current.frameNumber].strokes = @film.frames[@current.frameNumber].strokes.concat(@copyBuffer.strokes) if @copyBuffer
+    @drawCurrentFrame()
+
+  cutFrame: ->
+    @copyFrame() if @getCurrentFrame().strokes.length
     @film.frames.splice @current.frameNumber, 1
     @current.frameNumber-- if @current.frameNumber >= @film.frames.length and @current.frameNumber > 0
     if @film.frames.length is 0

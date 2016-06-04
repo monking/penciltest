@@ -357,7 +357,31 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.dropFrame = function() {
+  Penciltest.prototype.copyFrame = function() {
+    return this.copyBuffer = JSON.parse(JSON.stringify(this.getCurrentFrame()));
+  };
+
+  Penciltest.prototype.pasteFrame = function() {
+    var newFrameIndex;
+    newFrameIndex = this.current.frameNumber + 1;
+    if (this.copyBuffer) {
+      this.film.frames.splice(newFrameIndex, 0, this.copyBuffer);
+    }
+    this.buildFilmMeta();
+    return this.goToFrame(newFrameIndex);
+  };
+
+  Penciltest.prototype.pasteStrokes = function() {
+    if (this.copyBuffer) {
+      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(this.copyBuffer.strokes);
+    }
+    return this.drawCurrentFrame();
+  };
+
+  Penciltest.prototype.cutFrame = function() {
+    if (this.getCurrentFrame().strokes.length) {
+      this.copyFrame();
+    }
     this.film.frames.splice(this.current.frameNumber, 1);
     if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;

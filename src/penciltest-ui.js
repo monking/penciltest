@@ -182,6 +182,27 @@ PenciltestUI = (function(_super) {
         return this.stop();
       }
     },
+    copyFrame: {
+      label: "Copy Frame",
+      hotkey: ['C'],
+      listener: function() {
+        return this.copyFrame();
+      }
+    },
+    pasteFrame: {
+      label: "Paste Frame",
+      hotkey: ['V'],
+      listener: function() {
+        return this.pasteFrame();
+      }
+    },
+    pasteStrokes: {
+      label: "Paste Strokes",
+      hotkey: ['Shift+V'],
+      listener: function() {
+        return this.pasteStrokes();
+      }
+    },
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
@@ -278,7 +299,7 @@ PenciltestUI = (function(_super) {
     },
     hideCursor: {
       label: "Hide Cursor",
-      hotkey: ['C'],
+      hotkey: ['H'],
       listener: function() {
         return this.setOptions({
           hideCursor: !this.options.hideCursor
@@ -300,13 +321,13 @@ PenciltestUI = (function(_super) {
         return this.resize();
       }
     },
-    dropFrame: {
-      label: "Drop Frame",
-      hotkey: ['X', 'Backspace'],
+    cutFrame: {
+      label: "Cut Frame",
+      hotkey: ['X'],
       gesture: /3 down from center top/,
       cancelComplement: true,
       listener: function() {
-        return this.dropFrame();
+        return this.cutFrame();
       }
     },
     smoothing: {
@@ -563,7 +584,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'copyFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'cutFrame', 'moreHold', 'lessHold'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
