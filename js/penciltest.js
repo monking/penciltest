@@ -8124,6 +8124,9 @@ var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
 
 Utils = {
+  clone: function(object) {
+    return JSON.parse(JSON.stringify(object));
+  },
   toggleClass: function(element, className, presence) {
     var added, classIndex, classes;
     if (presence == null) {
@@ -8996,6 +8999,15 @@ PenciltestUI = (function(_super) {
         return this.resize();
       }
     },
+    dropFrame: {
+      label: "Drop Frame",
+      hotkey: ['Shift+X'],
+      gesture: /4 down from center top/,
+      cancelComplement: true,
+      listener: function() {
+        return this.dropFrame();
+      }
+    },
     cutFrame: {
       label: "Cut Frame",
       hotkey: ['X'],
@@ -9259,7 +9271,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'copyFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'cutFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
@@ -9985,31 +9997,41 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.copyFrame = function() {
-    return this.copyBuffer = JSON.parse(JSON.stringify(this.getCurrentFrame()));
+  Penciltest.prototype.copyFrame = function(frame) {
+    if (frame == null) {
+      frame = this.getCurrentFrame();
+    }
+    if (frame.strokes.length) {
+      return this.copyBuffer = Utils.clone(frame);
+    }
   };
 
   Penciltest.prototype.pasteFrame = function() {
     var newFrameIndex;
-    newFrameIndex = this.current.frameNumber + 1;
     if (this.copyBuffer) {
-      this.film.frames.splice(newFrameIndex, 0, this.copyBuffer);
+      newFrameIndex = this.current.frameNumber + 1;
+      this.film.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      this.buildFilmMeta();
+      return this.goToFrame(newFrameIndex);
     }
-    this.buildFilmMeta();
-    return this.goToFrame(newFrameIndex);
   };
 
   Penciltest.prototype.pasteStrokes = function() {
     if (this.copyBuffer) {
-      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(this.copyBuffer.strokes);
+      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+      return this.drawCurrentFrame();
     }
-    return this.drawCurrentFrame();
   };
 
   Penciltest.prototype.cutFrame = function() {
     if (this.getCurrentFrame().strokes.length) {
-      this.copyFrame();
+      return this.copyFrame(this.dropFrame());
     }
+  };
+
+  Penciltest.prototype.dropFrame = function() {
+    var droppedFrame;
+    droppedFrame = this.getCurrentFrame();
     this.film.frames.splice(this.current.frameNumber, 1);
     if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;
@@ -10018,7 +10040,8 @@ Penciltest = (function() {
       this.newFrame();
     }
     this.buildFilmMeta();
-    return this.drawCurrentFrame();
+    this.drawCurrentFrame();
+    return droppedFrame;
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
