@@ -1,6 +1,6 @@
 
 /*
-global: document, window
+global: document, window, btoa
  */
 var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
@@ -333,6 +333,19 @@ Utils = {
       output = parts.join('.');
     }
     return output;
+  },
+  encodeBase64: function(input) {
+    return btoa(input);
+  },
+  decodeBase64: function(input) {
+    return atob(input);
+  },
+  downloadFromUrl: function(url, filename) {
+    var link;
+    link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    return link.click();
   }
 };
 

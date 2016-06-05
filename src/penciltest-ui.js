@@ -514,13 +514,9 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        var open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = JSON.stringify(this.film);
-        } else {
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var dataUrl;
+        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify(this.film));
+        return Utils.downloadFromUrl(dataUrl, this.film.name + '.json');
       }
     },
     importFilm: {

@@ -1,5 +1,5 @@
 ###
-global: document, window
+global: document, window, btoa
 ###
 
 Utils =
@@ -258,6 +258,18 @@ Utils =
       output = parts.join '.'
 
     output
+
+  encodeBase64: (input) ->
+    btoa input
+
+  decodeBase64: (input) ->
+    atob input
+
+  downloadFromUrl: (url, filename) ->
+    link = document.createElement 'a'
+    link.download = filename
+    link.href = url
+    link.click()
 
 Utils.keyCodes = {}
 for code in [0...256]

@@ -343,11 +343,8 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
-        if open
-          @ui.components.textIO.getElement().value = JSON.stringify @film
-        else
-          @ui.components.textIO.getElement().value = ''
+        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify @film)
+        Utils.downloadFromUrl dataUrl, @film.name + '.json'
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
