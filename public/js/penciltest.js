@@ -8220,7 +8220,6 @@ Utils = {
     promptCancelButton = document.createElement('button');
     promptCancelButton.innerHTML = 'Cancel';
     promptCancelButton.addEventListener('click', function(event) {
-      console.log("canceling...don't submit!");
       event.preventDefault();
       return closePromptModal();
     });

@@ -74,7 +74,6 @@ Utils =
     promptCancelButton = document.createElement 'button'
     promptCancelButton.innerHTML = 'Cancel'
     promptCancelButton.addEventListener 'click', (event) ->
-      console.log "canceling...don't submit!" # XXX
       event.preventDefault()
       closePromptModal()
     promptForm.appendChild promptCancelButton
