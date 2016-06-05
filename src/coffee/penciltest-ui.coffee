@@ -69,9 +69,9 @@ class PenciltestUI extends PenciltestUIComponent
     renderer:
       label: "Set Renderer"
       listener: ->
-        name = Utils.prompt 'renderer (svg, canvas): ', @options.renderer
-        if name of @availableRenderers
-          @setOptions renderer: name
+        self = @
+        name = Utils.select 'renderer', @availableRenderers, @options.renderer, (selected) ->
+          self.setOptions renderer: selected
       action: ->
         if @fieldElement
           @renderer?.destroy()
@@ -164,11 +164,12 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Insert Seconds"
       hotkey: ['Alt+Shift+I']
       listener: ->
-        seconds = Number Utils.prompt '# of seconds to insert: ', 1
-        first = @current.frameNumber + 1
-        last = @current.frameNumber + Math.floor @options.frameRate * seconds
-        @newFrame newIndex for newIndex in [first..last]
-        @goToFrame newIndex
+        self = @
+        Utils.prompt '# of seconds to insert: ', 1, (seconds) ->
+          first = self.current.frameNumber + 1
+          last = self.current.frameNumber + Math.floor self.options.frameRate * Number(seconds)
+          self.newFrame newIndex for newIndex in [first..last]
+          self.goToFrame newIndex
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
@@ -186,22 +187,22 @@ class PenciltestUI extends PenciltestUIComponent
     frameRate:
       label: "Frame Rate"
       listener: ->
-        rate = Utils.prompt 'frames per second: ', @options.frameRate
-        if rate then @setOptions frameRate: Number rate
+        Utils.prompt 'frames per second: ', @options.frameRate, (rate) ->
+          if rate then @setOptions frameRate: Number rate
       action: -> @singleFrameDuration = 1 / @options.frameRate
     frameHold:
       label: "Default Frame Hold"
       listener: ->
-        hold = Utils.prompt 'default exposures per drawing: ', @options.frameHold
-        update = Utils.confirm 'update hold for existing frames in proportion to new setting??: '
-        if hold
-          oldHold = @options.frameHold
-          @setOptions frameHold: Number hold
-          if update
-            magnitudeDelta = @options.frameHold / oldHold
-            for frame in @film.frames
-              frame.hold = Math.round frame.hold * magnitudeDelta
-            @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
+        Utils.prompt 'default exposures per drawing: ', @options.frameHold, (hold) ->
+          update = Utils.confirm 'update hold for existing frames in proportion to new setting??: '
+          if hold
+            oldHold = @options.frameHold
+            @setOptions frameHold: Number hold
+            if update
+              magnitudeDelta = @options.frameHold / oldHold
+              for frame in @film.frames
+                frame.hold = Math.round frame.hold * magnitudeDelta
+              @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['H']
@@ -231,7 +232,10 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
       hotkey: ['Shift+S']
-      listener: -> @setOptions smoothing: Number Utils.prompt('Smoothing', @options.smoothing)
+      listener: ->
+        self = @
+        Utils.prompt 'Smoothing', @options.smoothing, (smoothing) ->
+          self.setOptions smoothing: Number smoothing
       action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
     smoothFrame:
       label: "Smooth Frame"
@@ -289,11 +293,11 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Resize Film"
       hotkey: ['Alt+R']
       listener: ->
-        dimensionsResponse = Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}"
-        dimensions = dimensionsResponse.split ' '
-        @film.width = Number dimensions[0]
-        @film.aspect = dimensions[1]
-        @resize()
+        Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}", (dimensionsResponse) ->
+          dimensions = dimensionsResponse.split ' '
+          @film.width = Number dimensions[0]
+          @film.aspect = dimensions[1]
+          @resize()
     panFilm:
       label: "Pan Film"
       hotkey: ['P']
@@ -358,9 +362,8 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
-        audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
-        if audioURL?
-          @loadAudio audioURL
+        Utils.prompt 'Audio file URL: ', @state.audioURL, (audioURL) ->
+          @loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
       listener: ->

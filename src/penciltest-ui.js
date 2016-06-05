@@ -95,13 +95,13 @@ PenciltestUI = (function(_super) {
     renderer: {
       label: "Set Renderer",
       listener: function() {
-        var name;
-        name = Utils.prompt('renderer (svg, canvas): ', this.options.renderer);
-        if (name in this.availableRenderers) {
-          return this.setOptions({
-            renderer: name
+        var name, self;
+        self = this;
+        return name = Utils.select('renderer', this.availableRenderers, this.options.renderer, function(selected) {
+          return self.setOptions({
+            renderer: selected
           });
-        }
+        });
       },
       action: function() {
         var _ref;
@@ -229,14 +229,17 @@ PenciltestUI = (function(_super) {
       label: "Insert Seconds",
       hotkey: ['Alt+Shift+I'],
       listener: function() {
-        var first, last, newIndex, seconds, _i;
-        seconds = Number(Utils.prompt('# of seconds to insert: ', 1));
-        first = this.current.frameNumber + 1;
-        last = this.current.frameNumber + Math.floor(this.options.frameRate * seconds);
-        for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
-          this.newFrame(newIndex);
-        }
-        return this.goToFrame(newIndex);
+        var self;
+        self = this;
+        return Utils.prompt('# of seconds to insert: ', 1, function(seconds) {
+          var first, last, newIndex, _i;
+          first = self.current.frameNumber + 1;
+          last = self.current.frameNumber + Math.floor(self.options.frameRate * Number(seconds));
+          for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
+            self.newFrame(newIndex);
+          }
+          return self.goToFrame(newIndex);
+        });
       }
     },
     undo: {
@@ -262,13 +265,13 @@ PenciltestUI = (function(_super) {
     frameRate: {
       label: "Frame Rate",
       listener: function() {
-        var rate;
-        rate = Utils.prompt('frames per second: ', this.options.frameRate);
-        if (rate) {
-          return this.setOptions({
-            frameRate: Number(rate)
-          });
-        }
+        return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
+          if (rate) {
+            return this.setOptions({
+              frameRate: Number(rate)
+            });
+          }
+        });
       },
       action: function() {
         return this.singleFrameDuration = 1 / this.options.frameRate;
@@ -277,24 +280,25 @@ PenciltestUI = (function(_super) {
     frameHold: {
       label: "Default Frame Hold",
       listener: function() {
-        var frame, hold, magnitudeDelta, oldHold, update, _i, _len, _ref;
-        hold = Utils.prompt('default exposures per drawing: ', this.options.frameHold);
-        update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
-        if (hold) {
-          oldHold = this.options.frameHold;
-          this.setOptions({
-            frameHold: Number(hold)
-          });
-          if (update) {
-            magnitudeDelta = this.options.frameHold / oldHold;
-            _ref = this.film.frames;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              frame = _ref[_i];
-              frame.hold = Math.round(frame.hold * magnitudeDelta);
+        return Utils.prompt('default exposures per drawing: ', this.options.frameHold, function(hold) {
+          var frame, magnitudeDelta, oldHold, update, _i, _len, _ref;
+          update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
+          if (hold) {
+            oldHold = this.options.frameHold;
+            this.setOptions({
+              frameHold: Number(hold)
+            });
+            if (update) {
+              magnitudeDelta = this.options.frameHold / oldHold;
+              _ref = this.film.frames;
+              for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+                frame = _ref[_i];
+                frame.hold = Math.round(frame.hold * magnitudeDelta);
+              }
+              return this.drawCurrentFrame();
             }
-            return this.drawCurrentFrame();
           }
-        }
+        });
       }
     },
     hideCursor: {
@@ -344,8 +348,12 @@ PenciltestUI = (function(_super) {
       title: "How much your lines will be smoothed as you draw",
       hotkey: ['Shift+S'],
       listener: function() {
-        return this.setOptions({
-          smoothing: Number(Utils.prompt('Smoothing', this.options.smoothing))
+        var self;
+        self = this;
+        return Utils.prompt('Smoothing', this.options.smoothing, function(smoothing) {
+          return self.setOptions({
+            smoothing: Number(smoothing)
+          });
         });
       },
       action: function() {
@@ -445,12 +453,13 @@ PenciltestUI = (function(_super) {
       label: "Resize Film",
       hotkey: ['Alt+R'],
       listener: function() {
-        var dimensions, dimensionsResponse;
-        dimensionsResponse = Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect);
-        dimensions = dimensionsResponse.split(' ');
-        this.film.width = Number(dimensions[0]);
-        this.film.aspect = dimensions[1];
-        return this.resize();
+        return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
+          var dimensions;
+          dimensions = dimensionsResponse.split(' ');
+          this.film.width = Number(dimensions[0]);
+          this.film.aspect = dimensions[1];
+          return this.resize();
+        });
       }
     },
     panFilm: {
@@ -530,11 +539,11 @@ PenciltestUI = (function(_super) {
       label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
-        var audioURL;
-        audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
-        if (audioURL != null) {
-          return this.loadAudio(audioURL);
-        }
+        return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
+          if (audioURL != null) {
+            return this.loadAudio(audioURL);
+          }
+        });
       }
     },
     unloadAudio: {

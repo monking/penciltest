@@ -332,33 +332,41 @@ class Penciltest
     droppedFrame
 
   smoothFrame: (index, amount) ->
-    if not amount
-      amount = Number Utils.prompt 'How much to smooth? 1-5', 2
-    smoothingBackup = @options.smoothing
-    @options.smoothing = amount
-    frame = @film.frames[index]
-    oldStrokes = JSON.parse JSON.stringify frame.strokes
-    @lift()
-    frame.strokes = []
-    @current.frameNumber = index
-    @renderer.clear()
-    for stroke in oldStrokes
-      for segment in stroke
-        @track.apply @, segment
+    smooth = (amount) ->
+      amount = Number amount
+      smoothingBackup = @options.smoothing
+      @options.smoothing = amount
+      frame = @film.frames[index]
+      oldStrokes = JSON.parse JSON.stringify frame.strokes
       @lift()
+      frame.strokes = []
+      @current.frameNumber = index
+      @renderer.clear()
+      for stroke in oldStrokes
+        for segment in stroke
+          @track.apply @, segment
+        @lift()
 
     @options.smoothing = smoothingBackup
+    if amount
+      Utils.prompt 'How much to smooth? 1-5', 2, smooth
+    else
+      smooth amount
 
   smoothFilm: (amount) ->
     if @state.mode is Penciltest.prototype.modes.DRAWING
       if Utils.confirm 'Would you like to smooth every frame of this film?'
+        doTheThing = (amount) ->
+          amount = Number amount
+          @state.mode = Penciltest.prototype.modes.BUSY
+          lastIndex = @film.frames.length - 1
+          for frame in [0..lastIndex]
+            @smoothFrame frame, amount
+          @state.mode = Penciltest.prototype.modes.DRAWING
         if not amount
-          amount = Number Utils.prompt 'How much to smooth? 1-5', 2
-        @state.mode = Penciltest.prototype.modes.BUSY
-        lastIndex = @film.frames.length - 1
-        for frame in [0..lastIndex]
-          @smoothFrame frame, amount
-        @state.mode = Penciltest.prototype.modes.DRAWING
+          Utils.prompt 'How much to smooth? 1-5', 2, doTheThing
+        else
+          doTheThing amount
     else
       Utils.log 'Unable to alter film while playing'
 
@@ -424,135 +432,133 @@ class Penciltest
     window.localStorage.setItem storageName, JSON.stringify data
 
   saveFilm: ->
-    name = Utils.prompt "what will you name your film?", @film.name
-    if name
-      @film.name = name
-      @putStoredData 'film', name, @film
-      @unsavedChanges = false
+    Utils.prompt "what will you name your film?", @film.name, (name) ->
+      if name
+        @film.name = name
+        @putStoredData 'film', name, @film
+        @unsavedChanges = false
 
   renderGif: ->
-    # configure for rendering
-    # dimensions = [64, 64]
-    dimensions = @getFilmDimensions()
-    # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
-    gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split ' '
-    maxGifDimension = parseInt gifConfiguration[0], 10
-    gifLineWidth = parseInt gifConfiguration[1], 10
-    if dimensions.width > maxGifDimension
-      dimensions.width = maxGifDimension
-      dimensions.height = maxGifDimension / dimensions.aspect
-    else if dimensions.height > maxGifDimension
-      dimensions.height = maxGifDimension
-      dimensions.width = maxGifDimension * dimensions.aspect
+    doTheThing = (gifConfigurationString) ->
+      gifConfiguration = (gifConfigurationString || '512 2').split ' '
+      # configure for rendering
+      # dimensions = [64, 64]
+      dimensions = @getFilmDimensions()
+      # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
+      maxGifDimension = parseInt gifConfiguration[0], 10
+      gifLineWidth = parseInt gifConfiguration[1], 10
+      if dimensions.width > maxGifDimension
+        dimensions.width = maxGifDimension
+        dimensions.height = maxGifDimension / dimensions.aspect
+      else if dimensions.height > maxGifDimension
+        dimensions.height = maxGifDimension
+        dimensions.width = maxGifDimension * dimensions.aspect
 
-    @forceDimensions =
-      width: dimensions.width
-      height: dimensions.height
-    # rebuild renderer to ensure correct resolution for capture
-    @ui.appActions.renderer.action()
-    @resize()
+      @forceDimensions =
+        width: dimensions.width
+        height: dimensions.height
+      # rebuild renderer to ensure correct resolution for capture
+      @ui.appActions.renderer.action()
+      @resize()
 
-    oldRendererType = @options.renderer
-    @setOptions renderer: 'canvas'
-    @ui.appActions.renderer.action()
+      oldRendererType = @options.renderer
+      @setOptions renderer: 'canvas'
+      @ui.appActions.renderer.action()
 
-    oldLineOverrides = @renderer.overrides
-    renderLineOverrides = 
-      weight: gifLineWidth
+      oldLineOverrides = @renderer.overrides
+      renderLineOverrides = 
+        weight: gifLineWidth
 
-    baseFrameDelay = 1000 / @options.frameRate
-    frameIndex = 0
+      baseFrameDelay = 1000 / @options.frameRate
+      frameIndex = 0
 
-    # prepare encoder
-    gifEncoder = new GIFEncoder()
-    # gifEncoder.setSize dimensions.width, dimensions.height # no use: uses the original dimensions of the canvas, regardless of its current size
-    gifEncoder.setRepeat 0
-    gifEncoder.setDelay baseFrameDelay
-    gifEncoder.start()
+      # prepare encoder
+      gifEncoder = new GIFEncoder()
+      # gifEncoder.setSize dimensions.width, dimensions.height # no use: uses the original dimensions of the canvas, regardless of its current size
+      gifEncoder.setRepeat 0
+      gifEncoder.setDelay baseFrameDelay
+      gifEncoder.start()
 
-    for frameIndex in [0...@film.frames.length]
-      @renderer.setLineOverrides renderLineOverrides
-      @goToFrame frameIndex
-      gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
-      gifEncoder.addFrame @renderer.context
+      for frameIndex in [0...@film.frames.length]
+        @renderer.setLineOverrides renderLineOverrides
+        @goToFrame frameIndex
+        gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
+        gifEncoder.addFrame @renderer.context
 
 
-    gifEncoder.finish()
-    binaryGif = gifEncoder.stream().getData()
-    dataUrl = 'data:image/gif;base64,' + encode64 binaryGif
+      gifEncoder.finish()
+      binaryGif = gifEncoder.stream().getData()
+      dataUrl = 'data:image/gif;base64,' + encode64 binaryGif
 
-    gifElementId = 'rendered_gif'
-    gifElement = document.getElementById gifElementId
-    if not gifElement
-      gifElement = document.createElement 'img'
-      gifElement.id = gifElementId
-      gifCss =
-        position: 'absolute'
-        top: '50%'
-        left: '50%'
-        transform: 'translateX(-50%) translateY(-50%)'
-        maxWidth: '80%'
-        maxHeight: '80%'
-      for property, value of gifCss
-        gifElement.style[property] = value
-      gifContainer = document.createElement 'div'
-      containerCss =
-        position: 'absolute'
-        top: '0px'
-        left: '0px'
-        bottom: '0px'
-        right: '0px'
-        backgroundColor: 'rgba(0,0,0,0.5)'
-      for property, value of containerCss
-        gifContainer.style[property] = value
-      gifInstructions = document.createElement 'div'
-      containerCss =
-        position: 'relative'
-        color: 'white'
-        textAlign: 'center'
-        backgroundColor: 'rgba(0,0,0,0.5)'
-      for property, value of containerCss
-        gifInstructions.style[property] = value
-      gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close."
-      gifContainer.appendChild gifElement
-      gifContainer.appendChild gifInstructions
-      document.body.appendChild gifContainer
+      gifElementId = 'rendered_gif'
+      gifElement = document.getElementById gifElementId
+      if not gifElement
+        gifElement = document.createElement 'img'
+        gifElement.id = gifElementId
+        gifCss =
+          position: 'absolute'
+          top: '50%'
+          left: '50%'
+          transform: 'translateX(-50%) translateY(-50%)'
+          maxWidth: '80%'
+          maxHeight: '80%'
+        for property, value of gifCss
+          gifElement.style[property] = value
+        gifContainer = document.createElement 'div'
+        containerCss =
+          position: 'absolute'
+          top: '0px'
+          left: '0px'
+          bottom: '0px'
+          right: '0px'
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        for property, value of containerCss
+          gifContainer.style[property] = value
+        gifInstructions = document.createElement 'div'
+        containerCss =
+          position: 'relative'
+          color: 'white'
+          textAlign: 'center'
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        for property, value of containerCss
+          gifInstructions.style[property] = value
+        gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close."
+        gifContainer.appendChild gifElement
+        gifContainer.appendChild gifInstructions
+        document.body.appendChild gifContainer
 
-      gifCloseHandler = (event) ->
-        if event.target isnt gifElement
-          gifContainer.removeEventListener 'click', gifCloseHandler
-          gifContainer.removeEventListener 'touchend', gifCloseHandler
-          gifContainer.remove()
+        gifCloseHandler = (event) ->
+          if event.target isnt gifElement
+            gifContainer.removeEventListener 'click', gifCloseHandler
+            gifContainer.removeEventListener 'touchend', gifCloseHandler
+            gifContainer.remove()
 
-      gifContainer.addEventListener 'click', gifCloseHandler
-      gifContainer.addEventListener 'touchend', gifCloseHandler
+        gifContainer.addEventListener 'click', gifCloseHandler
+        gifContainer.addEventListener 'touchend', gifCloseHandler
 
-    gifElement.src = dataUrl
+      gifElement.src = dataUrl
 
-    # TODO 1) render each frame small in canvas
-    # TODO 2) append with the corect duration to a GIF in memory
-    # TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
+      # TODO 1) render each frame small in canvas
+      # TODO 2) append with the corect duration to a GIF in memory
+      # TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
 
-    # reset to user's configuration
-    @setOptions renderer: oldRendererType
-    @renderer.setLineOverrides oldLineOverrides
-    @forceDimensions = null
-    @resize()
+      # reset to user's configuration
+      @setOptions renderer: oldRendererType
+      @renderer.setLineOverrides oldLineOverrides
+      @forceDimensions = null
+      @resize()
 
-  selectFilmName: (message) ->
+    Utils.prompt 'GIF size & lineWidth', '512 2', doTheThing
+
+  selectFilmName: (message, callback) ->
     filmNames = @getFilmNames()
     if filmNames.length
       message ?= 'Choose a film'
-      selectedFilmName = Utils.select message, filmNames
-
-      if selectedFilmName and filmNames.indexOf selectedFilmName is -1
-        for filmName in filmNames
-          selectedFilmName = filmName if RegExp(selectedFilmName).test filmName
-
-      if selectedFilmName and filmNames.indexOf( selectedFilmName ) isnt -1
-        return selectedFilmName
-      else
-        Utils.alert "No film by that name."
+      Utils.select message, filmNames, null, (selectedFilmName) ->
+        if selectedFilmName
+          callback selectedFilmName
+        else
+          Utils.alert "No film by that name."
     else
       Utils.alert "You don't have any saved films yet."
 
@@ -571,12 +577,14 @@ class Penciltest
     @resize() # FIXME
 
   loadFilm: ->
-    if name = @selectFilmName 'Choose a film to load'
-      @setFilm @getStoredData 'film', name
+    self = @
+    @selectFilmName 'Choose a film to load', (name) ->
+      self.setFilm self.getStoredData 'film', name
 
   deleteFilm: ->
-    if filmName = @selectFilmName 'Choose a film to DELETE...FOREVER'
-      window.localStorage.removeItem @encodeStorageReference 'film', filmName
+    self = @
+    @selectFilmName 'Choose a film to DELETE...FOREVER', (filmName) ->
+      window.localStorage.removeItem self.encodeStorageReference 'film', filmName
 
   buildFilmMeta: ->
     @current.frameIndex = []

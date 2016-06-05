@@ -36,25 +36,23 @@ Utils =
   confirm: ->
     window.confirm arguments[0]
 
-  prompt: (message, defaultValue) ->
-    window.prompt message, defaultValue
+  prompt: (message, defaultValue, callback) ->
+    callback(window.prompt message, defaultValue)
 
   # @param message string
   # @param options array of strings
   # @return selected string or boolean false
-  select: (message, options) ->
+  select: (message, options, defaultValue, callback) ->
     # TODO: a real selectable list
     # TODO: update the application core to handle async prompts (e.g. selectFilmNames)
-    selected = @prompt "#{message}:\n\n#{options.join '\n'}"
+    @prompt "#{message}:\n\n#{options.join '\n'}", '', (selected) ->
+      if selected and options.indexOf selected is -1
+        for option in options
+          selected = option if RegExp(selected).test option
 
-    if selected and options.indexOf selected is -1
-      for option in options
-        selected = option if RegExp(selected).test option
-
-    if !selected or options.indexOf(selected) is -1
-      selected = false
-
-    return selected
+      if !selected or options.indexOf(selected) is -1
+        selected = false
+      callback(selected)
 
   keyCodeNames:
     8   : 'Backspace'

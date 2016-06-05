@@ -405,42 +405,56 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
-    var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1;
-    if (!amount) {
-      amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
-    }
-    smoothingBackup = this.options.smoothing;
-    this.options.smoothing = amount;
-    frame = this.film.frames[index];
-    oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
-    this.lift();
-    frame.strokes = [];
-    this.current.frameNumber = index;
-    this.renderer.clear();
-    for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
-      stroke = oldStrokes[_i];
-      for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
-        segment = stroke[_j];
-        this.track.apply(this, segment);
-      }
+    var smooth;
+    smooth = function(amount) {
+      var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1, _results;
+      amount = Number(amount);
+      smoothingBackup = this.options.smoothing;
+      this.options.smoothing = amount;
+      frame = this.film.frames[index];
+      oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
       this.lift();
+      frame.strokes = [];
+      this.current.frameNumber = index;
+      this.renderer.clear();
+      _results = [];
+      for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
+        stroke = oldStrokes[_i];
+        for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
+          segment = stroke[_j];
+          this.track.apply(this, segment);
+        }
+        _results.push(this.lift());
+      }
+      return _results;
+    };
+    this.options.smoothing = smoothingBackup;
+    if (amount) {
+      return Utils.prompt('How much to smooth? 1-5', 2, smooth);
+    } else {
+      return smooth(amount);
     }
-    return this.options.smoothing = smoothingBackup;
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var frame, lastIndex, _i;
+    var doTheThing;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+        doTheThing = function(amount) {
+          var frame, lastIndex, _i;
+          amount = Number(amount);
+          this.state.mode = Penciltest.prototype.modes.BUSY;
+          lastIndex = this.film.frames.length - 1;
+          for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
+            this.smoothFrame(frame, amount);
+          }
+          return this.state.mode = Penciltest.prototype.modes.DRAWING;
+        };
         if (!amount) {
-          amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
+          return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
+        } else {
+          return doTheThing(amount);
         }
-        this.state.mode = Penciltest.prototype.modes.BUSY;
-        lastIndex = this.film.frames.length - 1;
-        for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
-          this.smoothFrame(frame, amount);
-        }
-        return this.state.mode = Penciltest.prototype.modes.DRAWING;
       }
     } else {
       return Utils.log('Unable to alter film while playing');
@@ -530,143 +544,140 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.saveFilm = function() {
-    var name;
-    name = Utils.prompt("what will you name your film?", this.film.name);
-    if (name) {
-      this.film.name = name;
-      this.putStoredData('film', name, this.film);
-      return this.unsavedChanges = false;
-    }
+    return Utils.prompt("what will you name your film?", this.film.name, function(name) {
+      if (name) {
+        this.film.name = name;
+        this.putStoredData('film', name, this.film);
+        return this.unsavedChanges = false;
+      }
+    });
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
-    dimensions = this.getFilmDimensions();
-    gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split(' ');
-    maxGifDimension = parseInt(gifConfiguration[0], 10);
-    gifLineWidth = parseInt(gifConfiguration[1], 10);
-    if (dimensions.width > maxGifDimension) {
-      dimensions.width = maxGifDimension;
-      dimensions.height = maxGifDimension / dimensions.aspect;
-    } else if (dimensions.height > maxGifDimension) {
-      dimensions.height = maxGifDimension;
-      dimensions.width = maxGifDimension * dimensions.aspect;
-    }
-    this.forceDimensions = {
-      width: dimensions.width,
-      height: dimensions.height
-    };
-    this.ui.appActions.renderer.action();
-    this.resize();
-    oldRendererType = this.options.renderer;
-    this.setOptions({
-      renderer: 'canvas'
-    });
-    this.ui.appActions.renderer.action();
-    oldLineOverrides = this.renderer.overrides;
-    renderLineOverrides = {
-      weight: gifLineWidth
-    };
-    baseFrameDelay = 1000 / this.options.frameRate;
-    frameIndex = 0;
-    gifEncoder = new GIFEncoder();
-    gifEncoder.setRepeat(0);
-    gifEncoder.setDelay(baseFrameDelay);
-    gifEncoder.start();
-    for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-      this.renderer.setLineOverrides(renderLineOverrides);
-      this.goToFrame(frameIndex);
-      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
-      gifEncoder.addFrame(this.renderer.context);
-    }
-    gifEncoder.finish();
-    binaryGif = gifEncoder.stream().getData();
-    dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
-    gifElementId = 'rendered_gif';
-    gifElement = document.getElementById(gifElementId);
-    if (!gifElement) {
-      gifElement = document.createElement('img');
-      gifElement.id = gifElementId;
-      gifCss = {
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translateX(-50%) translateY(-50%)',
-        maxWidth: '80%',
-        maxHeight: '80%'
-      };
-      for (property in gifCss) {
-        value = gifCss[property];
-        gifElement.style[property] = value;
+    var doTheThing;
+    doTheThing = function(gifConfigurationString) {
+      var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
+      gifConfiguration = (gifConfigurationString || '512 2').split(' ');
+      dimensions = this.getFilmDimensions();
+      maxGifDimension = parseInt(gifConfiguration[0], 10);
+      gifLineWidth = parseInt(gifConfiguration[1], 10);
+      if (dimensions.width > maxGifDimension) {
+        dimensions.width = maxGifDimension;
+        dimensions.height = maxGifDimension / dimensions.aspect;
+      } else if (dimensions.height > maxGifDimension) {
+        dimensions.height = maxGifDimension;
+        dimensions.width = maxGifDimension * dimensions.aspect;
       }
-      gifContainer = document.createElement('div');
-      containerCss = {
-        position: 'absolute',
-        top: '0px',
-        left: '0px',
-        bottom: '0px',
-        right: '0px',
-        backgroundColor: 'rgba(0,0,0,0.5)'
+      this.forceDimensions = {
+        width: dimensions.width,
+        height: dimensions.height
       };
-      for (property in containerCss) {
-        value = containerCss[property];
-        gifContainer.style[property] = value;
-      }
-      gifInstructions = document.createElement('div');
-      containerCss = {
-        position: 'relative',
-        color: 'white',
-        textAlign: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)'
+      this.ui.appActions.renderer.action();
+      this.resize();
+      oldRendererType = this.options.renderer;
+      this.setOptions({
+        renderer: 'canvas'
+      });
+      this.ui.appActions.renderer.action();
+      oldLineOverrides = this.renderer.overrides;
+      renderLineOverrides = {
+        weight: gifLineWidth
       };
-      for (property in containerCss) {
-        value = containerCss[property];
-        gifInstructions.style[property] = value;
+      baseFrameDelay = 1000 / this.options.frameRate;
+      frameIndex = 0;
+      gifEncoder = new GIFEncoder();
+      gifEncoder.setRepeat(0);
+      gifEncoder.setDelay(baseFrameDelay);
+      gifEncoder.start();
+      for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+        this.renderer.setLineOverrides(renderLineOverrides);
+        this.goToFrame(frameIndex);
+        gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
+        gifEncoder.addFrame(this.renderer.context);
       }
-      gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
-      gifContainer.appendChild(gifElement);
-      gifContainer.appendChild(gifInstructions);
-      document.body.appendChild(gifContainer);
-      gifCloseHandler = function(event) {
-        if (event.target !== gifElement) {
-          gifContainer.removeEventListener('click', gifCloseHandler);
-          gifContainer.removeEventListener('touchend', gifCloseHandler);
-          return gifContainer.remove();
+      gifEncoder.finish();
+      binaryGif = gifEncoder.stream().getData();
+      dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+      gifElementId = 'rendered_gif';
+      gifElement = document.getElementById(gifElementId);
+      if (!gifElement) {
+        gifElement = document.createElement('img');
+        gifElement.id = gifElementId;
+        gifCss = {
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translateX(-50%) translateY(-50%)',
+          maxWidth: '80%',
+          maxHeight: '80%'
+        };
+        for (property in gifCss) {
+          value = gifCss[property];
+          gifElement.style[property] = value;
         }
-      };
-      gifContainer.addEventListener('click', gifCloseHandler);
-      gifContainer.addEventListener('touchend', gifCloseHandler);
-    }
-    gifElement.src = dataUrl;
-    this.setOptions({
-      renderer: oldRendererType
-    });
-    this.renderer.setLineOverrides(oldLineOverrides);
-    this.forceDimensions = null;
-    return this.resize();
+        gifContainer = document.createElement('div');
+        containerCss = {
+          position: 'absolute',
+          top: '0px',
+          left: '0px',
+          bottom: '0px',
+          right: '0px',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        };
+        for (property in containerCss) {
+          value = containerCss[property];
+          gifContainer.style[property] = value;
+        }
+        gifInstructions = document.createElement('div');
+        containerCss = {
+          position: 'relative',
+          color: 'white',
+          textAlign: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        };
+        for (property in containerCss) {
+          value = containerCss[property];
+          gifInstructions.style[property] = value;
+        }
+        gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
+        gifContainer.appendChild(gifElement);
+        gifContainer.appendChild(gifInstructions);
+        document.body.appendChild(gifContainer);
+        gifCloseHandler = function(event) {
+          if (event.target !== gifElement) {
+            gifContainer.removeEventListener('click', gifCloseHandler);
+            gifContainer.removeEventListener('touchend', gifCloseHandler);
+            return gifContainer.remove();
+          }
+        };
+        gifContainer.addEventListener('click', gifCloseHandler);
+        gifContainer.addEventListener('touchend', gifCloseHandler);
+      }
+      gifElement.src = dataUrl;
+      this.setOptions({
+        renderer: oldRendererType
+      });
+      this.renderer.setLineOverrides(oldLineOverrides);
+      this.forceDimensions = null;
+      return this.resize();
+    };
+    return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
   };
 
-  Penciltest.prototype.selectFilmName = function(message) {
-    var filmName, filmNames, selectedFilmName, _i, _len;
+  Penciltest.prototype.selectFilmName = function(message, callback) {
+    var filmNames;
     filmNames = this.getFilmNames();
     if (filmNames.length) {
       if (message == null) {
         message = 'Choose a film';
       }
-      selectedFilmName = Utils.select(message, filmNames);
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
-        for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
-          filmName = filmNames[_i];
-          if (RegExp(selectedFilmName).test(filmName)) {
-            selectedFilmName = filmName;
-          }
+      Utils.select(message, filmNames, null, function(selectedFilmName) {
+        if (selectedFilmName) {
+          return callback(selectedFilmName);
+        } else {
+          return Utils.alert("No film by that name.");
         }
-      }
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName) !== -1) {
-        return selectedFilmName;
-      } else {
-        Utils.alert("No film by that name.");
-      }
+      });
     } else {
       Utils.alert("You don't have any saved films yet.");
     }
@@ -688,17 +699,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.loadFilm = function() {
-    var name;
-    if (name = this.selectFilmName('Choose a film to load')) {
-      return this.setFilm(this.getStoredData('film', name));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to load', function(name) {
+      return self.setFilm(self.getStoredData('film', name));
+    });
   };
 
   Penciltest.prototype.deleteFilm = function() {
-    var filmName;
-    if (filmName = this.selectFilmName('Choose a film to DELETE...FOREVER')) {
-      return window.localStorage.removeItem(this.encodeStorageReference('film', filmName));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to DELETE...FOREVER', function(filmName) {
+      return window.localStorage.removeItem(self.encodeStorageReference('film', filmName));
+    });
   };
 
   Penciltest.prototype.buildFilmMeta = function() {
