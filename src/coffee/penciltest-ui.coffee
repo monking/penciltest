@@ -197,11 +197,10 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Default Frame Hold"
       listener: ->
         Utils.prompt 'default exposures per drawing: ', @options.frameHold, (hold) ->
-          update = Utils.confirm 'update hold for existing frames in proportion to new setting??: '
           if hold
             oldHold = @options.frameHold
             @setOptions frameHold: Number hold
-            if update
+            Utils.confirm 'update hold for existing frames in proportion to new setting??: ', ->
               magnitudeDelta = @options.frameHold / oldHold
               for frame in @film.frames
                 frame.hold = Math.round frame.hold * magnitudeDelta
@@ -287,7 +286,12 @@ class PenciltestUI extends PenciltestUIComponent
     newFilm:
       label: "New"
       hotkey: ['Alt+N']
-      listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+      listener: ->
+        self = @
+        if @unsavedChanges
+          Utils.confirm "Unsaved changes will be lost.", -> self.newFilm()
+        else
+          @newFilm()
     renderGif:
       label: "Render GIF"
       hotkey: ['Alt+G']
@@ -350,14 +354,9 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
-        if open
-          @ui.components.textIO.getElement().value = ''
-        else
-          importJSON = @ui.components.textIO.getElement().value
-          try
-            @setFilm JSON.parse importJSON
-          @ui.components.textIO.getElement().value = ''
+        self = @
+        Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
+          self.setFilm JSON.parse filmJSON
     linkAudio:
       label: "Link Audio"
       hotkey: ['Alt+A']

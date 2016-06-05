@@ -1,6 +1,6 @@
 
 /*
-global: document, window, btoa
+global: document, window, btoa, FileReader
  */
 var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
@@ -53,8 +53,10 @@ Utils = {
   alert: function() {
     return window.alert(arguments[0]);
   },
-  confirm: function() {
-    return window.confirm(arguments[0]);
+  confirm: function(message, callback) {
+    if (window.confirm(message)) {
+      return callback();
+    }
   },
   prompt: function(message, defaultValue, callback, promptInput) {
     var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
@@ -147,6 +149,26 @@ Utils = {
       return callback(selected);
     };
     return this.prompt(message, null, promptCallback, selectInput);
+  },
+  promptForFile: function(message, callback) {
+    var fileInput, loadFile;
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    loadFile = function() {
+      var file, fileReader, _i, _len, _ref, _results;
+      _ref = fileInput.files;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        file = _ref[_i];
+        fileReader = new FileReader();
+        fileReader.addEventListener('load', function(event) {
+          return callback(event.target.result);
+        });
+        _results.push(fileReader.readAsText(file));
+      }
+      return _results;
+    };
+    return this.prompt(message, null, loadFile, fileInput);
   },
   keyCodeNames: {
     8: 'Backspace',

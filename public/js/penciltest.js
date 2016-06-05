@@ -8118,7 +8118,7 @@
 
 
 /*
-global: document, window, btoa
+global: document, window, btoa, FileReader
  */
 var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
@@ -8171,8 +8171,10 @@ Utils = {
   alert: function() {
     return window.alert(arguments[0]);
   },
-  confirm: function() {
-    return window.confirm(arguments[0]);
+  confirm: function(message, callback) {
+    if (window.confirm(message)) {
+      return callback();
+    }
   },
   prompt: function(message, defaultValue, callback, promptInput) {
     var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
@@ -8265,6 +8267,26 @@ Utils = {
       return callback(selected);
     };
     return this.prompt(message, null, promptCallback, selectInput);
+  },
+  promptForFile: function(message, callback) {
+    var fileInput, loadFile;
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    loadFile = function() {
+      var file, fileReader, _i, _len, _ref, _results;
+      _ref = fileInput.files;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        file = _ref[_i];
+        fileReader = new FileReader();
+        fileReader.addEventListener('load', function(event) {
+          return callback(event.target.result);
+        });
+        _results.push(fileReader.readAsText(file));
+      }
+      return _results;
+    };
+    return this.prompt(message, null, loadFile, fileInput);
   },
   keyCodeNames: {
     8: 'Backspace',
@@ -9067,14 +9089,14 @@ PenciltestUI = (function(_super) {
       label: "Default Frame Hold",
       listener: function() {
         return Utils.prompt('default exposures per drawing: ', this.options.frameHold, function(hold) {
-          var frame, magnitudeDelta, oldHold, update, _i, _len, _ref;
-          update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
+          var oldHold;
           if (hold) {
             oldHold = this.options.frameHold;
             this.setOptions({
               frameHold: Number(hold)
             });
-            if (update) {
+            return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
+              var frame, magnitudeDelta, _i, _len, _ref;
               magnitudeDelta = this.options.frameHold / oldHold;
               _ref = this.film.frames;
               for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -9082,7 +9104,7 @@ PenciltestUI = (function(_super) {
                 frame.hold = Math.round(frame.hold * magnitudeDelta);
               }
               return this.drawCurrentFrame();
-            }
+            });
           }
         });
       }
@@ -9223,7 +9245,13 @@ PenciltestUI = (function(_super) {
       label: "New",
       hotkey: ['Alt+N'],
       listener: function() {
-        if (Utils.confirm("This will BURN your current animation.")) {
+        var self;
+        self = this;
+        if (this.unsavedChanges) {
+          return Utils.confirm("Unsaved changes will be lost.", function() {
+            return self.newFilm();
+          });
+        } else {
           return this.newFilm();
         }
       }
@@ -9304,17 +9332,11 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+I'],
       cancelComplement: true,
       listener: function() {
-        var importJSON, open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = '';
-        } else {
-          importJSON = this.ui.components.textIO.getElement().value;
-          try {
-            this.setFilm(JSON.parse(importJSON));
-          } catch (_error) {}
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var self;
+        self = this;
+        return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
+          return self.setFilm(JSON.parse(filmJSON));
+        });
       }
     },
     linkAudio: {
@@ -10199,9 +10221,9 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var doTheThing, self;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
-      if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+      return Utils.confirm('Would you like to smooth every frame of this film?', function() {
+        var doTheThing, self;
         self = this;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
@@ -10218,7 +10240,7 @@ Penciltest = (function() {
         } else {
           return doTheThing(amount);
         }
-      }
+      });
     } else {
       return Utils.log('Unable to alter film while playing');
     }
@@ -10261,6 +10283,7 @@ Penciltest = (function() {
       width: 1920,
       frames: []
     };
+    this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
   };

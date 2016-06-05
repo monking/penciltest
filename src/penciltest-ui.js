@@ -287,14 +287,14 @@ PenciltestUI = (function(_super) {
       label: "Default Frame Hold",
       listener: function() {
         return Utils.prompt('default exposures per drawing: ', this.options.frameHold, function(hold) {
-          var frame, magnitudeDelta, oldHold, update, _i, _len, _ref;
-          update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
+          var oldHold;
           if (hold) {
             oldHold = this.options.frameHold;
             this.setOptions({
               frameHold: Number(hold)
             });
-            if (update) {
+            return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
+              var frame, magnitudeDelta, _i, _len, _ref;
               magnitudeDelta = this.options.frameHold / oldHold;
               _ref = this.film.frames;
               for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -302,7 +302,7 @@ PenciltestUI = (function(_super) {
                 frame.hold = Math.round(frame.hold * magnitudeDelta);
               }
               return this.drawCurrentFrame();
-            }
+            });
           }
         });
       }
@@ -443,7 +443,13 @@ PenciltestUI = (function(_super) {
       label: "New",
       hotkey: ['Alt+N'],
       listener: function() {
-        if (Utils.confirm("This will BURN your current animation.")) {
+        var self;
+        self = this;
+        if (this.unsavedChanges) {
+          return Utils.confirm("Unsaved changes will be lost.", function() {
+            return self.newFilm();
+          });
+        } else {
           return this.newFilm();
         }
       }
@@ -524,17 +530,11 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+I'],
       cancelComplement: true,
       listener: function() {
-        var importJSON, open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = '';
-        } else {
-          importJSON = this.ui.components.textIO.getElement().value;
-          try {
-            this.setFilm(JSON.parse(importJSON));
-          } catch (_error) {}
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var self;
+        self = this;
+        return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
+          return self.setFilm(JSON.parse(filmJSON));
+        });
       }
     },
     linkAudio: {

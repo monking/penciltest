@@ -440,9 +440,9 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var doTheThing, self;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
-      if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+      return Utils.confirm('Would you like to smooth every frame of this film?', function() {
+        var doTheThing, self;
         self = this;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
@@ -459,7 +459,7 @@ Penciltest = (function() {
         } else {
           return doTheThing(amount);
         }
-      }
+      });
     } else {
       return Utils.log('Unable to alter film while playing');
     }
@@ -502,6 +502,7 @@ Penciltest = (function() {
       width: 1920,
       frames: []
     };
+    this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
   };

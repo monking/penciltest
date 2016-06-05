@@ -357,7 +357,7 @@ class Penciltest
 
   smoothFilm: (amount) ->
     if @state.mode is Penciltest.prototype.modes.DRAWING
-      if Utils.confirm 'Would you like to smooth every frame of this film?'
+      Utils.confirm 'Would you like to smooth every frame of this film?', ->
         self = @
         doTheThing = (amount) ->
           amount = Number amount
@@ -401,6 +401,8 @@ class Penciltest
       aspect: '16:9'
       width: 1920
       frames: []
+
+    @unsavedChanges = false
 
     @newFrame()
     @goToFrame 0

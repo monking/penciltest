@@ -1,5 +1,5 @@
 ###
-global: document, window, btoa
+global: document, window, btoa, FileReader
 ###
 
 Utils =
@@ -33,8 +33,8 @@ Utils =
   alert: ->
     window.alert arguments[0]
 
-  confirm: ->
-    window.confirm arguments[0]
+  confirm: (message, callback) ->
+    callback() if window.confirm message
 
   prompt: (message, defaultValue, callback, promptInput) ->
     window.pauseKeyboardListeners = true # FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
@@ -114,6 +114,17 @@ Utils =
         selected = false
       callback(selected)
     @prompt message, null, promptCallback, selectInput
+
+  promptForFile: (message, callback) ->
+    fileInput = document.createElement 'input'
+    fileInput.type = 'file'
+    loadFile = ->
+      for file in fileInput.files
+        fileReader = new FileReader()
+        fileReader.addEventListener 'load', (event) ->
+          callback event.target.result
+        fileReader.readAsText file
+    @prompt message, null, loadFile, fileInput
 
   keyCodeNames:
     8   : 'Backspace'
