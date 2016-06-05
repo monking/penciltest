@@ -8174,15 +8174,87 @@ Utils = {
   confirm: function() {
     return window.confirm(arguments[0]);
   },
-  prompt: function(message, defaultValue, callback) {
-    return callback(window.prompt(message, defaultValue));
+  prompt: function(message, defaultValue, callback, promptInput) {
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
+    window.pauseKeyboardListeners = true;
+    promptModal = document.createElement('div');
+    promptModalCss = {
+      position: 'absolute',
+      top: '0px',
+      left: '0px',
+      bottom: '0px',
+      right: '0px',
+      backgroundColor: 'rgba(0,0,0,0.5)'
+    };
+    for (property in promptModalCss) {
+      value = promptModalCss[property];
+      promptModal.style[property] = value;
+    }
+    promptForm = document.createElement('form');
+    promptFormCss = {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      padding: '1em',
+      transform: 'translateX(-50%) translateY(-50%)',
+      backgroundColor: 'white'
+    };
+    for (property in promptFormCss) {
+      value = promptFormCss[property];
+      promptForm.style[property] = value;
+    }
+    promptForm.innerHTML = message;
+    promptModal.appendChild(promptForm);
+    if (!promptInput) {
+      promptInput = document.createElement('input');
+    }
+    if (defaultValue !== null) {
+      promptInput.value = defaultValue;
+    }
+    promptInput.style.display = 'block';
+    promptForm.appendChild(promptInput);
+    closePromptModal = function() {
+      promptModal.remove();
+      return window.pauseKeyboardListeners = false;
+    };
+    promptCancelButton = document.createElement('button');
+    promptCancelButton.innerHTML = 'Cancel';
+    promptCancelButton.addEventListener('click', function(event) {
+      console.log("canceling...don't submit!");
+      event.preventDefault();
+      return closePromptModal();
+    });
+    promptForm.appendChild(promptCancelButton);
+    promptAcceptButton = document.createElement('input');
+    promptAcceptButton.type = 'submit';
+    promptAcceptButton.value = 'Accept';
+    promptForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      closePromptModal();
+      return callback(promptInput.value);
+    });
+    promptForm.appendChild(promptAcceptButton);
+    document.body.appendChild(promptModal);
+    return promptInput.focus();
   },
   select: function(message, options, defaultValue, callback) {
-    return this.prompt("" + message + ":\n\n" + (options.join('\n')), '', function(selected) {
-      var option, _i, _len;
+    var index, option, optionElement, promptCallback, selectInput, _i, _len;
+    selectInput = document.createElement('select');
+    for (index = _i = 0, _len = options.length; _i < _len; index = ++_i) {
+      option = options[index];
+      optionElement = document.createElement('option');
+      optionElement.value = option;
+      optionElement.innerHTML = option;
+      selectInput.appendChild(optionElement);
+      if (option === defaultValue) {
+        selectInput.selectedIndex = index;
+      }
+    }
+    promptCallback = function(selected) {
+      var _j, _len1;
       if (selected && options.indexOf(selected === -1)) {
-        for (_i = 0, _len = options.length; _i < _len; _i++) {
-          option = options[_i];
+        for (_j = 0, _len1 = options.length; _j < _len1; _j++) {
+          option = options[_j];
           if (RegExp(selected).test(option)) {
             selected = option;
           }
@@ -8192,7 +8264,8 @@ Utils = {
         selected = false;
       }
       return callback(selected);
-    });
+    };
+    return this.prompt(message, null, promptCallback, selectInput);
   },
   keyCodeNames: {
     8: 'Backspace',
@@ -8790,9 +8863,15 @@ PenciltestUI = (function(_super) {
     renderer: {
       label: "Set Renderer",
       listener: function() {
-        var name, self;
+        var name, renderer, rendererNames, self, _ref;
         self = this;
-        return name = Utils.select('renderer', this.availableRenderers, this.options.renderer, function(selected) {
+        rendererNames = [];
+        _ref = this.availableRenderers;
+        for (name in _ref) {
+          renderer = _ref[name];
+          rendererNames.push(name);
+        }
+        return Utils.select('Set renderer', rendererNames, this.options.renderer, function(selected) {
           return self.setOptions({
             renderer: selected
           });
@@ -9511,17 +9590,23 @@ PenciltestUI = (function(_super) {
     }
     keyboardListener = function(event) {
       var actionName, combo;
-      combo = Utils.describeKeyCombo(event);
-      actionName = self.keyBindings[event.type][combo];
-      if (actionName || actionName === null) {
-        event.preventDefault();
-        if (actionName) {
-          return self.doAppAction(actionName);
+      if (!window.pauseKeyboardListeners) {
+        combo = Utils.describeKeyCombo(event);
+        actionName = self.keyBindings[event.type][combo];
+        if (actionName || actionName === null) {
+          event.preventDefault();
+          if (actionName) {
+            return self.doAppAction(actionName);
+          }
         }
       }
     };
-    document.body.addEventListener('keydown', keyboardListener);
-    return document.body.addEventListener('keyup', keyboardListener);
+    document.body.addEventListener('keydown', function(event) {
+      return keyboardListener(event);
+    });
+    return document.body.addEventListener('keyup', function(event) {
+      return keyboardListener(event);
+    });
   };
 
   PenciltestUI.prototype.addOtherListeners = function() {
@@ -10050,8 +10135,10 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.cutFrame = function() {
-    if (this.getCurrentFrame().strokes.length) {
-      return this.copyFrame(this.dropFrame());
+    var droppedFrame;
+    droppedFrame = this.dropFrame();
+    if (droppedFrame.strokes.length) {
+      return this.copyFrame(droppedFrame);
     }
   };
 
@@ -10071,26 +10158,27 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
-    var smooth;
+    var self, smooth;
+    self = this;
     smooth = function(amount) {
       var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1, _results;
       amount = Number(amount);
-      smoothingBackup = this.options.smoothing;
-      this.options.smoothing = amount;
-      frame = this.film.frames[index];
+      smoothingBackup = self.options.smoothing;
+      self.options.smoothing = amount;
+      frame = self.film.frames[index];
       oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
-      this.lift();
+      self.lift();
       frame.strokes = [];
-      this.current.frameNumber = index;
-      this.renderer.clear();
+      self.current.frameNumber = index;
+      self.renderer.clear();
       _results = [];
       for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
         stroke = oldStrokes[_i];
         for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
           segment = stroke[_j];
-          this.track.apply(this, segment);
+          self.track.apply(self, segment);
         }
-        _results.push(this.lift());
+        _results.push(self.lift());
       }
       return _results;
     };
@@ -10103,18 +10191,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var doTheThing;
+    var doTheThing, self;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+        self = this;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);
-          this.state.mode = Penciltest.prototype.modes.BUSY;
-          lastIndex = this.film.frames.length - 1;
+          self.state.mode = Penciltest.prototype.modes.BUSY;
+          lastIndex = self.film.frames.length - 1;
           for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
-            this.smoothFrame(frame, amount);
+            self.smoothFrame(frame, amount);
           }
-          return this.state.mode = Penciltest.prototype.modes.DRAWING;
+          return self.state.mode = Penciltest.prototype.modes.DRAWING;
         };
         if (!amount) {
           return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
@@ -10210,21 +10299,24 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.saveFilm = function() {
+    var self;
+    self = this;
     return Utils.prompt("what will you name your film?", this.film.name, function(name) {
       if (name) {
-        this.film.name = name;
-        this.putStoredData('film', name, this.film);
-        return this.unsavedChanges = false;
+        self.film.name = name;
+        self.putStoredData('film', name, self.film);
+        return self.unsavedChanges = false;
       }
     });
   };
 
   Penciltest.prototype.renderGif = function() {
-    var doTheThing;
+    var doTheThing, self;
+    self = this;
     doTheThing = function(gifConfigurationString) {
       var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-      dimensions = this.getFilmDimensions();
+      dimensions = self.getFilmDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
       gifLineWidth = parseInt(gifConfiguration[1], 10);
       if (dimensions.width > maxGifDimension) {
@@ -10234,32 +10326,32 @@ Penciltest = (function() {
         dimensions.height = maxGifDimension;
         dimensions.width = maxGifDimension * dimensions.aspect;
       }
-      this.forceDimensions = {
+      self.forceDimensions = {
         width: dimensions.width,
         height: dimensions.height
       };
-      this.ui.appActions.renderer.action();
-      this.resize();
-      oldRendererType = this.options.renderer;
-      this.setOptions({
+      self.ui.appActions.renderer.action();
+      self.resize();
+      oldRendererType = self.options.renderer;
+      self.setOptions({
         renderer: 'canvas'
       });
-      this.ui.appActions.renderer.action();
-      oldLineOverrides = this.renderer.overrides;
+      self.ui.appActions.renderer.action();
+      oldLineOverrides = self.renderer.overrides;
       renderLineOverrides = {
         weight: gifLineWidth
       };
-      baseFrameDelay = 1000 / this.options.frameRate;
+      baseFrameDelay = 1000 / self.options.frameRate;
       frameIndex = 0;
       gifEncoder = new GIFEncoder();
       gifEncoder.setRepeat(0);
       gifEncoder.setDelay(baseFrameDelay);
       gifEncoder.start();
-      for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-        this.renderer.setLineOverrides(renderLineOverrides);
-        this.goToFrame(frameIndex);
-        gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
-        gifEncoder.addFrame(this.renderer.context);
+      for (frameIndex = _i = 0, _ref = self.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+        self.renderer.setLineOverrides(renderLineOverrides);
+        self.goToFrame(frameIndex);
+        gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
+        gifEncoder.addFrame(self.renderer.context);
       }
       gifEncoder.finish();
       binaryGif = gifEncoder.stream().getData();
@@ -10320,12 +10412,12 @@ Penciltest = (function() {
         gifContainer.addEventListener('touchend', gifCloseHandler);
       }
       gifElement.src = dataUrl;
-      this.setOptions({
+      self.setOptions({
         renderer: oldRendererType
       });
-      this.renderer.setLineOverrides(oldLineOverrides);
-      this.forceDimensions = null;
-      return this.resize();
+      self.renderer.setLineOverrides(oldLineOverrides);
+      self.forceDimensions = null;
+      return self.resize();
     };
     return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
   };
@@ -10337,7 +10429,7 @@ Penciltest = (function() {
       if (message == null) {
         message = 'Choose a film';
       }
-      Utils.select(message, filmNames, null, function(selectedFilmName) {
+      Utils.select(message, filmNames, this.film.name, function(selectedFilmName) {
         if (selectedFilmName) {
           return callback(selectedFilmName);
         } else {
