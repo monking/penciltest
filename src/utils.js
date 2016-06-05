@@ -56,15 +56,87 @@ Utils = {
   confirm: function() {
     return window.confirm(arguments[0]);
   },
-  prompt: function(message, defaultValue, callback) {
-    return callback(window.prompt(message, defaultValue));
+  prompt: function(message, defaultValue, callback, promptInput) {
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
+    window.pauseKeyboardListeners = true;
+    promptModal = document.createElement('div');
+    promptModalCss = {
+      position: 'absolute',
+      top: '0px',
+      left: '0px',
+      bottom: '0px',
+      right: '0px',
+      backgroundColor: 'rgba(0,0,0,0.5)'
+    };
+    for (property in promptModalCss) {
+      value = promptModalCss[property];
+      promptModal.style[property] = value;
+    }
+    promptForm = document.createElement('form');
+    promptFormCss = {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      padding: '1em',
+      transform: 'translateX(-50%) translateY(-50%)',
+      backgroundColor: 'white'
+    };
+    for (property in promptFormCss) {
+      value = promptFormCss[property];
+      promptForm.style[property] = value;
+    }
+    promptForm.innerHTML = message;
+    promptModal.appendChild(promptForm);
+    if (!promptInput) {
+      promptInput = document.createElement('input');
+    }
+    if (defaultValue !== null) {
+      promptInput.value = defaultValue;
+    }
+    promptInput.style.display = 'block';
+    promptForm.appendChild(promptInput);
+    closePromptModal = function() {
+      promptModal.remove();
+      return window.pauseKeyboardListeners = false;
+    };
+    promptCancelButton = document.createElement('button');
+    promptCancelButton.innerHTML = 'Cancel';
+    promptCancelButton.addEventListener('click', function(event) {
+      console.log("canceling...don't submit!");
+      event.preventDefault();
+      return closePromptModal();
+    });
+    promptForm.appendChild(promptCancelButton);
+    promptAcceptButton = document.createElement('input');
+    promptAcceptButton.type = 'submit';
+    promptAcceptButton.value = 'Accept';
+    promptForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      closePromptModal();
+      return callback(promptInput.value);
+    });
+    promptForm.appendChild(promptAcceptButton);
+    document.body.appendChild(promptModal);
+    return promptInput.focus();
   },
   select: function(message, options, defaultValue, callback) {
-    return this.prompt("" + message + ":\n\n" + (options.join('\n')), '', function(selected) {
-      var option, _i, _len;
+    var index, option, optionElement, promptCallback, selectInput, _i, _len;
+    selectInput = document.createElement('select');
+    for (index = _i = 0, _len = options.length; _i < _len; index = ++_i) {
+      option = options[index];
+      optionElement = document.createElement('option');
+      optionElement.value = option;
+      optionElement.innerHTML = option;
+      selectInput.appendChild(optionElement);
+      if (option === defaultValue) {
+        selectInput.selectedIndex = index;
+      }
+    }
+    promptCallback = function(selected) {
+      var _j, _len1;
       if (selected && options.indexOf(selected === -1)) {
-        for (_i = 0, _len = options.length; _i < _len; _i++) {
-          option = options[_i];
+        for (_j = 0, _len1 = options.length; _j < _len1; _j++) {
+          option = options[_j];
           if (RegExp(selected).test(option)) {
             selected = option;
           }
@@ -74,7 +146,8 @@ Utils = {
         selected = false;
       }
       return callback(selected);
-    });
+    };
+    return this.prompt(message, null, promptCallback, selectInput);
   },
   keyCodeNames: {
     8: 'Backspace',

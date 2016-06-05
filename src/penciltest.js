@@ -384,8 +384,10 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.cutFrame = function() {
-    if (this.getCurrentFrame().strokes.length) {
-      return this.copyFrame(this.dropFrame());
+    var droppedFrame;
+    droppedFrame = this.dropFrame();
+    if (droppedFrame.strokes.length) {
+      return this.copyFrame(droppedFrame);
     }
   };
 
@@ -405,26 +407,27 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
-    var smooth;
+    var self, smooth;
+    self = this;
     smooth = function(amount) {
       var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1, _results;
       amount = Number(amount);
-      smoothingBackup = this.options.smoothing;
-      this.options.smoothing = amount;
-      frame = this.film.frames[index];
+      smoothingBackup = self.options.smoothing;
+      self.options.smoothing = amount;
+      frame = self.film.frames[index];
       oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
-      this.lift();
+      self.lift();
       frame.strokes = [];
-      this.current.frameNumber = index;
-      this.renderer.clear();
+      self.current.frameNumber = index;
+      self.renderer.clear();
       _results = [];
       for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
         stroke = oldStrokes[_i];
         for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
           segment = stroke[_j];
-          this.track.apply(this, segment);
+          self.track.apply(self, segment);
         }
-        _results.push(this.lift());
+        _results.push(self.lift());
       }
       return _results;
     };
@@ -437,18 +440,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var doTheThing;
+    var doTheThing, self;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+        self = this;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);
-          this.state.mode = Penciltest.prototype.modes.BUSY;
-          lastIndex = this.film.frames.length - 1;
+          self.state.mode = Penciltest.prototype.modes.BUSY;
+          lastIndex = self.film.frames.length - 1;
           for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
-            this.smoothFrame(frame, amount);
+            self.smoothFrame(frame, amount);
           }
-          return this.state.mode = Penciltest.prototype.modes.DRAWING;
+          return self.state.mode = Penciltest.prototype.modes.DRAWING;
         };
         if (!amount) {
           return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
@@ -544,21 +548,24 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.saveFilm = function() {
+    var self;
+    self = this;
     return Utils.prompt("what will you name your film?", this.film.name, function(name) {
       if (name) {
-        this.film.name = name;
-        this.putStoredData('film', name, this.film);
-        return this.unsavedChanges = false;
+        self.film.name = name;
+        self.putStoredData('film', name, self.film);
+        return self.unsavedChanges = false;
       }
     });
   };
 
   Penciltest.prototype.renderGif = function() {
-    var doTheThing;
+    var doTheThing, self;
+    self = this;
     doTheThing = function(gifConfigurationString) {
       var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-      dimensions = this.getFilmDimensions();
+      dimensions = self.getFilmDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
       gifLineWidth = parseInt(gifConfiguration[1], 10);
       if (dimensions.width > maxGifDimension) {
@@ -568,32 +575,32 @@ Penciltest = (function() {
         dimensions.height = maxGifDimension;
         dimensions.width = maxGifDimension * dimensions.aspect;
       }
-      this.forceDimensions = {
+      self.forceDimensions = {
         width: dimensions.width,
         height: dimensions.height
       };
-      this.ui.appActions.renderer.action();
-      this.resize();
-      oldRendererType = this.options.renderer;
-      this.setOptions({
+      self.ui.appActions.renderer.action();
+      self.resize();
+      oldRendererType = self.options.renderer;
+      self.setOptions({
         renderer: 'canvas'
       });
-      this.ui.appActions.renderer.action();
-      oldLineOverrides = this.renderer.overrides;
+      self.ui.appActions.renderer.action();
+      oldLineOverrides = self.renderer.overrides;
       renderLineOverrides = {
         weight: gifLineWidth
       };
-      baseFrameDelay = 1000 / this.options.frameRate;
+      baseFrameDelay = 1000 / self.options.frameRate;
       frameIndex = 0;
       gifEncoder = new GIFEncoder();
       gifEncoder.setRepeat(0);
       gifEncoder.setDelay(baseFrameDelay);
       gifEncoder.start();
-      for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-        this.renderer.setLineOverrides(renderLineOverrides);
-        this.goToFrame(frameIndex);
-        gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
-        gifEncoder.addFrame(this.renderer.context);
+      for (frameIndex = _i = 0, _ref = self.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+        self.renderer.setLineOverrides(renderLineOverrides);
+        self.goToFrame(frameIndex);
+        gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
+        gifEncoder.addFrame(self.renderer.context);
       }
       gifEncoder.finish();
       binaryGif = gifEncoder.stream().getData();
@@ -654,12 +661,12 @@ Penciltest = (function() {
         gifContainer.addEventListener('touchend', gifCloseHandler);
       }
       gifElement.src = dataUrl;
-      this.setOptions({
+      self.setOptions({
         renderer: oldRendererType
       });
-      this.renderer.setLineOverrides(oldLineOverrides);
-      this.forceDimensions = null;
-      return this.resize();
+      self.renderer.setLineOverrides(oldLineOverrides);
+      self.forceDimensions = null;
+      return self.resize();
     };
     return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
   };
@@ -671,7 +678,7 @@ Penciltest = (function() {
       if (message == null) {
         message = 'Choose a film';
       }
-      Utils.select(message, filmNames, null, function(selectedFilmName) {
+      Utils.select(message, filmNames, this.film.name, function(selectedFilmName) {
         if (selectedFilmName) {
           return callback(selectedFilmName);
         } else {

@@ -95,9 +95,15 @@ PenciltestUI = (function(_super) {
     renderer: {
       label: "Set Renderer",
       listener: function() {
-        var name, self;
+        var name, renderer, rendererNames, self, _ref;
         self = this;
-        return name = Utils.select('renderer', this.availableRenderers, this.options.renderer, function(selected) {
+        rendererNames = [];
+        _ref = this.availableRenderers;
+        for (name in _ref) {
+          renderer = _ref[name];
+          rendererNames.push(name);
+        }
+        return Utils.select('Set renderer', rendererNames, this.options.renderer, function(selected) {
           return self.setOptions({
             renderer: selected
           });
@@ -816,17 +822,23 @@ PenciltestUI = (function(_super) {
     }
     keyboardListener = function(event) {
       var actionName, combo;
-      combo = Utils.describeKeyCombo(event);
-      actionName = self.keyBindings[event.type][combo];
-      if (actionName || actionName === null) {
-        event.preventDefault();
-        if (actionName) {
-          return self.doAppAction(actionName);
+      if (!window.pauseKeyboardListeners) {
+        combo = Utils.describeKeyCombo(event);
+        actionName = self.keyBindings[event.type][combo];
+        if (actionName || actionName === null) {
+          event.preventDefault();
+          if (actionName) {
+            return self.doAppAction(actionName);
+          }
         }
       }
     };
-    document.body.addEventListener('keydown', keyboardListener);
-    return document.body.addEventListener('keyup', keyboardListener);
+    document.body.addEventListener('keydown', function(event) {
+      return keyboardListener(event);
+    });
+    return document.body.addEventListener('keyup', function(event) {
+      return keyboardListener(event);
+    });
   };
 
   PenciltestUI.prototype.addOtherListeners = function() {

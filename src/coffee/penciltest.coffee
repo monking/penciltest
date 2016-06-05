@@ -317,7 +317,8 @@ class Penciltest
       @drawCurrentFrame()
 
   cutFrame: ->
-    @copyFrame @dropFrame() if @getCurrentFrame().strokes.length
+    droppedFrame = @dropFrame()
+    @copyFrame droppedFrame if droppedFrame.strokes.length
 
   dropFrame: ->
     droppedFrame = @getCurrentFrame()
@@ -332,20 +333,21 @@ class Penciltest
     droppedFrame
 
   smoothFrame: (index, amount) ->
+    self = @
     smooth = (amount) ->
       amount = Number amount
-      smoothingBackup = @options.smoothing
-      @options.smoothing = amount
-      frame = @film.frames[index]
+      smoothingBackup = self.options.smoothing
+      self.options.smoothing = amount
+      frame = self.film.frames[index]
       oldStrokes = JSON.parse JSON.stringify frame.strokes
-      @lift()
+      self.lift()
       frame.strokes = []
-      @current.frameNumber = index
-      @renderer.clear()
+      self.current.frameNumber = index
+      self.renderer.clear()
       for stroke in oldStrokes
         for segment in stroke
-          @track.apply @, segment
-        @lift()
+          self.track.apply self, segment
+        self.lift()
 
     @options.smoothing = smoothingBackup
     if amount
@@ -356,13 +358,14 @@ class Penciltest
   smoothFilm: (amount) ->
     if @state.mode is Penciltest.prototype.modes.DRAWING
       if Utils.confirm 'Would you like to smooth every frame of this film?'
+        self = @
         doTheThing = (amount) ->
           amount = Number amount
-          @state.mode = Penciltest.prototype.modes.BUSY
-          lastIndex = @film.frames.length - 1
+          self.state.mode = Penciltest.prototype.modes.BUSY
+          lastIndex = self.film.frames.length - 1
           for frame in [0..lastIndex]
-            @smoothFrame frame, amount
-          @state.mode = Penciltest.prototype.modes.DRAWING
+            self.smoothFrame frame, amount
+          self.state.mode = Penciltest.prototype.modes.DRAWING
         if not amount
           Utils.prompt 'How much to smooth? 1-5', 2, doTheThing
         else
@@ -432,18 +435,20 @@ class Penciltest
     window.localStorage.setItem storageName, JSON.stringify data
 
   saveFilm: ->
+    self = @
     Utils.prompt "what will you name your film?", @film.name, (name) ->
       if name
-        @film.name = name
-        @putStoredData 'film', name, @film
-        @unsavedChanges = false
+        self.film.name = name
+        self.putStoredData 'film', name, self.film
+        self.unsavedChanges = false
 
   renderGif: ->
+    self = @
     doTheThing = (gifConfigurationString) ->
       gifConfiguration = (gifConfigurationString || '512 2').split ' '
       # configure for rendering
       # dimensions = [64, 64]
-      dimensions = @getFilmDimensions()
+      dimensions = self.getFilmDimensions()
       # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
       maxGifDimension = parseInt gifConfiguration[0], 10
       gifLineWidth = parseInt gifConfiguration[1], 10
@@ -454,22 +459,22 @@ class Penciltest
         dimensions.height = maxGifDimension
         dimensions.width = maxGifDimension * dimensions.aspect
 
-      @forceDimensions =
+      self.forceDimensions =
         width: dimensions.width
         height: dimensions.height
       # rebuild renderer to ensure correct resolution for capture
-      @ui.appActions.renderer.action()
-      @resize()
+      self.ui.appActions.renderer.action()
+      self.resize()
 
-      oldRendererType = @options.renderer
-      @setOptions renderer: 'canvas'
-      @ui.appActions.renderer.action()
+      oldRendererType = self.options.renderer
+      self.setOptions renderer: 'canvas'
+      self.ui.appActions.renderer.action()
 
-      oldLineOverrides = @renderer.overrides
+      oldLineOverrides = self.renderer.overrides
       renderLineOverrides = 
         weight: gifLineWidth
 
-      baseFrameDelay = 1000 / @options.frameRate
+      baseFrameDelay = 1000 / self.options.frameRate
       frameIndex = 0
 
       # prepare encoder
@@ -479,11 +484,11 @@ class Penciltest
       gifEncoder.setDelay baseFrameDelay
       gifEncoder.start()
 
-      for frameIndex in [0...@film.frames.length]
-        @renderer.setLineOverrides renderLineOverrides
-        @goToFrame frameIndex
-        gifEncoder.setDelay baseFrameDelay * @getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
-        gifEncoder.addFrame @renderer.context
+      for frameIndex in [0...self.film.frames.length]
+        self.renderer.setLineOverrides renderLineOverrides
+        self.goToFrame frameIndex
+        gifEncoder.setDelay baseFrameDelay * self.getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
+        gifEncoder.addFrame self.renderer.context
 
 
       gifEncoder.finish()
@@ -543,10 +548,10 @@ class Penciltest
       # TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
 
       # reset to user's configuration
-      @setOptions renderer: oldRendererType
-      @renderer.setLineOverrides oldLineOverrides
-      @forceDimensions = null
-      @resize()
+      self.setOptions renderer: oldRendererType
+      self.renderer.setLineOverrides oldLineOverrides
+      self.forceDimensions = null
+      self.resize()
 
     Utils.prompt 'GIF size & lineWidth', '512 2', doTheThing
 
@@ -554,7 +559,7 @@ class Penciltest
     filmNames = @getFilmNames()
     if filmNames.length
       message ?= 'Choose a film'
-      Utils.select message, filmNames, null, (selectedFilmName) ->
+      Utils.select message, filmNames, @film.name, (selectedFilmName) ->
         if selectedFilmName
           callback selectedFilmName
         else

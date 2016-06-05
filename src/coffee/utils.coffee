@@ -36,8 +36,61 @@ Utils =
   confirm: ->
     window.confirm arguments[0]
 
-  prompt: (message, defaultValue, callback) ->
-    callback(window.prompt message, defaultValue)
+  prompt: (message, defaultValue, callback, promptInput) ->
+    window.pauseKeyboardListeners = true # FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
+    promptModal = document.createElement 'div'
+    promptModalCss =
+      position: 'absolute'
+      top: '0px'
+      left: '0px'
+      bottom: '0px'
+      right: '0px'
+      backgroundColor: 'rgba(0,0,0,0.5)'
+    for property, value of promptModalCss
+      promptModal.style[property] = value
+
+    promptForm = document.createElement 'form'
+    promptFormCss =
+      position: 'absolute'
+      top: '50%'
+      left: '50%'
+      padding: '1em'
+      transform: 'translateX(-50%) translateY(-50%)'
+      backgroundColor: 'white'
+    for property, value of promptFormCss
+      promptForm.style[property] = value
+    promptForm.innerHTML = message
+    promptModal.appendChild promptForm
+
+    promptInput = document.createElement 'input' if !promptInput
+    promptInput.value = defaultValue if defaultValue isnt null
+    promptInput.style.display = 'block'
+    promptForm.appendChild promptInput
+
+    closePromptModal = ->
+      promptModal.remove()
+      window.pauseKeyboardListeners = false
+
+    promptCancelButton = document.createElement 'button'
+    promptCancelButton.innerHTML = 'Cancel'
+    promptCancelButton.addEventListener 'click', (event) ->
+      console.log "canceling...don't submit!" # XXX
+      event.preventDefault()
+      closePromptModal()
+    promptForm.appendChild promptCancelButton
+
+    promptAcceptButton = document.createElement 'input'
+    promptAcceptButton.type = 'submit'
+    promptAcceptButton.value = 'Accept'
+    promptForm.addEventListener 'submit', (event) ->
+      event.preventDefault()
+      closePromptModal()
+      callback promptInput.value
+    promptForm.appendChild promptAcceptButton
+
+    document.body.appendChild promptModal
+    promptInput.focus()
+
 
   # @param message string
   # @param options array of strings
@@ -45,7 +98,15 @@ Utils =
   select: (message, options, defaultValue, callback) ->
     # TODO: a real selectable list
     # TODO: update the application core to handle async prompts (e.g. selectFilmNames)
-    @prompt "#{message}:\n\n#{options.join '\n'}", '', (selected) ->
+    selectInput = document.createElement 'select'
+    for option, index in options
+      optionElement = document.createElement 'option'
+      optionElement.value = option
+      optionElement.innerHTML = option
+      selectInput.appendChild optionElement
+      selectInput.selectedIndex = index if option == defaultValue
+
+    promptCallback = (selected) ->
       if selected and options.indexOf selected is -1
         for option in options
           selected = option if RegExp(selected).test option
@@ -53,6 +114,7 @@ Utils =
       if !selected or options.indexOf(selected) is -1
         selected = false
       callback(selected)
+    @prompt message, null, promptCallback, selectInput
 
   keyCodeNames:
     8   : 'Backspace'

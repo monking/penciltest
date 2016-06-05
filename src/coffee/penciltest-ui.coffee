@@ -70,7 +70,10 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Set Renderer"
       listener: ->
         self = @
-        name = Utils.select 'renderer', @availableRenderers, @options.renderer, (selected) ->
+        rendererNames = []
+        for name, renderer of @availableRenderers
+          rendererNames.push name
+        Utils.select 'Set renderer', rendererNames, @options.renderer, (selected) ->
           self.setOptions renderer: selected
       action: ->
         if @fieldElement
@@ -610,19 +613,20 @@ class PenciltestUI extends PenciltestUIComponent
               @keyBindings.keydown[hotkey] = null
 
     keyboardListener = (event) ->
-      combo = Utils.describeKeyCombo event
-      actionName = self.keyBindings[event.type][combo]
+      if !window.pauseKeyboardListeners
+        combo = Utils.describeKeyCombo event
+        actionName = self.keyBindings[event.type][combo]
 
-      if actionName or actionName is null
-        event.preventDefault()
+        if actionName or actionName is null
+          event.preventDefault()
 
-        if actionName
-          self.doAppAction actionName
+          if actionName
+            self.doAppAction actionName
 
-      # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
+        # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
-    document.body.addEventListener 'keydown', keyboardListener
-    document.body.addEventListener 'keyup', keyboardListener
+    document.body.addEventListener 'keydown', (event) -> keyboardListener(event)
+    document.body.addEventListener 'keyup', (event) -> keyboardListener(event)
 
   addOtherListeners: ->
     self = @
