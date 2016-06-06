@@ -9073,9 +9073,11 @@ PenciltestUI = (function(_super) {
     frameRate: {
       label: "Frame Rate",
       listener: function() {
+        var self;
+        self = this;
         return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
           if (rate) {
-            return this.setOptions({
+            return self.setOptions({
               frameRate: Number(rate)
             });
           }
@@ -9088,22 +9090,24 @@ PenciltestUI = (function(_super) {
     frameHold: {
       label: "Default Frame Hold",
       listener: function() {
-        return Utils.prompt('default exposures per drawing: ', this.options.frameHold, function(hold) {
+        var self;
+        self = this;
+        return Utils.prompt('default exposures per drawing: ', self.options.frameHold, function(hold) {
           var oldHold;
           if (hold) {
-            oldHold = this.options.frameHold;
-            this.setOptions({
+            oldHold = self.options.frameHold;
+            self.setOptions({
               frameHold: Number(hold)
             });
             return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
               var frame, magnitudeDelta, _i, _len, _ref;
-              magnitudeDelta = this.options.frameHold / oldHold;
-              _ref = this.film.frames;
+              magnitudeDelta = self.options.frameHold / oldHold;
+              _ref = self.film.frames;
               for (_i = 0, _len = _ref.length; _i < _len; _i++) {
                 frame = _ref[_i];
                 frame.hold = Math.round(frame.hold * magnitudeDelta);
               }
-              return this.drawCurrentFrame();
+              return self.drawCurrentFrame();
             });
           }
         });
@@ -9345,9 +9349,11 @@ PenciltestUI = (function(_super) {
       label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
+        var self;
+        self = this;
         return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
           if (audioURL != null) {
-            return this.loadAudio(audioURL);
+            return self.loadAudio(audioURL);
           }
         });
       }
@@ -9816,7 +9822,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.0',
+    version: '0.2.1',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
