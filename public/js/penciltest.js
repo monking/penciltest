@@ -9267,12 +9267,14 @@ PenciltestUI = (function(_super) {
       label: "Resize Film",
       hotkey: ['Alt+R'],
       listener: function() {
+        var self;
+        self = this;
         return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
           var dimensions;
           dimensions = dimensionsResponse.split(' ');
-          this.film.width = Number(dimensions[0]);
-          this.film.aspect = dimensions[1];
-          return this.resize();
+          self.film.width = Number(dimensions[0]);
+          self.film.aspect = dimensions[1];
+          return self.resize();
         });
       }
     },
@@ -9814,7 +9816,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.4',
+    version: '0.2.0',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -10221,10 +10223,11 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
+    var self;
+    self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       return Utils.confirm('Would you like to smooth every frame of this film?', function() {
-        var doTheThing, self;
-        self = this;
+        var doTheThing;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);

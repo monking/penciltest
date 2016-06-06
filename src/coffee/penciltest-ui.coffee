@@ -300,11 +300,12 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Resize Film"
       hotkey: ['Alt+R']
       listener: ->
+        self = @
         Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}", (dimensionsResponse) ->
           dimensions = dimensionsResponse.split ' '
-          @film.width = Number dimensions[0]
-          @film.aspect = dimensions[1]
-          @resize()
+          self.film.width = Number dimensions[0]
+          self.film.aspect = dimensions[1]
+          self.resize()
     panFilm:
       label: "Pan Film"
       hotkey: ['P']

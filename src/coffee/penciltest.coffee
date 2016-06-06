@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.1.4'
+    version: '0.2.0'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -356,9 +356,9 @@ class Penciltest
       smooth amount
 
   smoothFilm: (amount) ->
+    self = @
     if @state.mode is Penciltest.prototype.modes.DRAWING
       Utils.confirm 'Would you like to smooth every frame of this film?', ->
-        self = @
         doTheThing = (amount) ->
           amount = Number amount
           self.state.mode = Penciltest.prototype.modes.BUSY

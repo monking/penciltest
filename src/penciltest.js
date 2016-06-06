@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.4',
+    version: '0.2.0',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -440,10 +440,11 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
+    var self;
+    self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       return Utils.confirm('Would you like to smooth every frame of this film?', function() {
-        var doTheThing, self;
-        self = this;
+        var doTheThing;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);

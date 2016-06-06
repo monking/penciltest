@@ -465,12 +465,14 @@ PenciltestUI = (function(_super) {
       label: "Resize Film",
       hotkey: ['Alt+R'],
       listener: function() {
+        var self;
+        self = this;
         return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
           var dimensions;
           dimensions = dimensionsResponse.split(' ');
-          this.film.width = Number(dimensions[0]);
-          this.film.aspect = dimensions[1];
-          return this.resize();
+          self.film.width = Number(dimensions[0]);
+          self.film.aspect = dimensions[1];
+          return self.resize();
         });
       }
     },
