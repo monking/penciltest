@@ -95,13 +95,19 @@ PenciltestUI = (function(_super) {
     renderer: {
       label: "Set Renderer",
       listener: function() {
-        var name;
-        name = Utils.prompt('renderer (svg, canvas): ', this.options.renderer);
-        if (name in this.availableRenderers) {
-          return this.setOptions({
-            renderer: name
-          });
+        var name, renderer, rendererNames, self, _ref;
+        self = this;
+        rendererNames = [];
+        _ref = this.availableRenderers;
+        for (name in _ref) {
+          renderer = _ref[name];
+          rendererNames.push(name);
         }
+        return Utils.select('Set renderer', rendererNames, this.options.renderer, function(selected) {
+          return self.setOptions({
+            renderer: selected
+          });
+        });
       },
       action: function() {
         var _ref;
@@ -182,6 +188,27 @@ PenciltestUI = (function(_super) {
         return this.stop();
       }
     },
+    copyFrame: {
+      label: "Copy Frame",
+      hotkey: ['C'],
+      listener: function() {
+        return this.copyFrame();
+      }
+    },
+    pasteFrame: {
+      label: "Paste Frame",
+      hotkey: ['V'],
+      listener: function() {
+        return this.pasteFrame();
+      }
+    },
+    pasteStrokes: {
+      label: "Paste Strokes",
+      hotkey: ['Shift+V'],
+      listener: function() {
+        return this.pasteStrokes();
+      }
+    },
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
@@ -208,14 +235,17 @@ PenciltestUI = (function(_super) {
       label: "Insert Seconds",
       hotkey: ['Alt+Shift+I'],
       listener: function() {
-        var first, last, newIndex, seconds, _i;
-        seconds = Number(Utils.prompt('# of seconds to insert: ', 1));
-        first = this.current.frameNumber + 1;
-        last = this.current.frameNumber + Math.floor(this.options.frameRate * seconds);
-        for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
-          this.newFrame(newIndex);
-        }
-        return this.goToFrame(newIndex);
+        var self;
+        self = this;
+        return Utils.prompt('# of seconds to insert: ', 1, function(seconds) {
+          var first, last, newIndex, _i;
+          first = self.current.frameNumber + 1;
+          last = self.current.frameNumber + Math.floor(self.options.frameRate * Number(seconds));
+          for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
+            self.newFrame(newIndex);
+          }
+          return self.goToFrame(newIndex);
+        });
       }
     },
     undo: {
@@ -241,13 +271,15 @@ PenciltestUI = (function(_super) {
     frameRate: {
       label: "Frame Rate",
       listener: function() {
-        var rate;
-        rate = Utils.prompt('frames per second: ', this.options.frameRate);
-        if (rate) {
-          return this.setOptions({
-            frameRate: Number(rate)
-          });
-        }
+        var self;
+        self = this;
+        return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
+          if (rate) {
+            return self.setOptions({
+              frameRate: Number(rate)
+            });
+          }
+        });
       },
       action: function() {
         return this.singleFrameDuration = 1 / this.options.frameRate;
@@ -256,29 +288,32 @@ PenciltestUI = (function(_super) {
     frameHold: {
       label: "Default Frame Hold",
       listener: function() {
-        var frame, hold, magnitudeDelta, oldHold, update, _i, _len, _ref;
-        hold = Utils.prompt('default exposures per drawing: ', this.options.frameHold);
-        update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
-        if (hold) {
-          oldHold = this.options.frameHold;
-          this.setOptions({
-            frameHold: Number(hold)
-          });
-          if (update) {
-            magnitudeDelta = this.options.frameHold / oldHold;
-            _ref = this.film.frames;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              frame = _ref[_i];
-              frame.hold = Math.round(frame.hold * magnitudeDelta);
-            }
-            return this.drawCurrentFrame();
+        var self;
+        self = this;
+        return Utils.prompt('default exposures per drawing: ', self.options.frameHold, function(hold) {
+          var oldHold;
+          if (hold) {
+            oldHold = self.options.frameHold;
+            self.setOptions({
+              frameHold: Number(hold)
+            });
+            return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
+              var frame, magnitudeDelta, _i, _len, _ref;
+              magnitudeDelta = self.options.frameHold / oldHold;
+              _ref = self.film.frames;
+              for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+                frame = _ref[_i];
+                frame.hold = Math.round(frame.hold * magnitudeDelta);
+              }
+              return self.drawCurrentFrame();
+            });
           }
-        }
+        });
       }
     },
     hideCursor: {
       label: "Hide Cursor",
-      hotkey: ['C'],
+      hotkey: ['H'],
       listener: function() {
         return this.setOptions({
           hideCursor: !this.options.hideCursor
@@ -302,11 +337,20 @@ PenciltestUI = (function(_super) {
     },
     dropFrame: {
       label: "Drop Frame",
-      hotkey: ['X', 'Backspace'],
-      gesture: /3 down from center top/,
+      hotkey: ['Shift+X'],
+      gesture: /4 down from center top/,
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
+      }
+    },
+    cutFrame: {
+      label: "Cut Frame",
+      hotkey: ['X'],
+      gesture: /3 down from center top/,
+      cancelComplement: true,
+      listener: function() {
+        return this.cutFrame();
       }
     },
     smoothing: {
@@ -314,8 +358,12 @@ PenciltestUI = (function(_super) {
       title: "How much your lines will be smoothed as you draw",
       hotkey: ['Shift+S'],
       listener: function() {
-        return this.setOptions({
-          smoothing: Number(Utils.prompt('Smoothing', this.options.smoothing))
+        var self;
+        self = this;
+        return Utils.prompt('Smoothing', this.options.smoothing, function(smoothing) {
+          return self.setOptions({
+            smoothing: Number(smoothing)
+          });
         });
       },
       action: function() {
@@ -399,7 +447,13 @@ PenciltestUI = (function(_super) {
       label: "New",
       hotkey: ['Alt+N'],
       listener: function() {
-        if (Utils.confirm("This will BURN your current animation.")) {
+        var self;
+        self = this;
+        if (this.unsavedChanges) {
+          return Utils.confirm("Unsaved changes will be lost.", function() {
+            return self.newFilm();
+          });
+        } else {
           return this.newFilm();
         }
       }
@@ -415,12 +469,15 @@ PenciltestUI = (function(_super) {
       label: "Resize Film",
       hotkey: ['Alt+R'],
       listener: function() {
-        var dimensions, dimensionsResponse;
-        dimensionsResponse = Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect);
-        dimensions = dimensionsResponse.split(' ');
-        this.film.width = Number(dimensions[0]);
-        this.film.aspect = dimensions[1];
-        return this.resize();
+        var self;
+        self = this;
+        return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
+          var dimensions;
+          dimensions = dimensionsResponse.split(' ');
+          self.film.width = Number(dimensions[0]);
+          self.film.aspect = dimensions[1];
+          return self.resize();
+        });
       }
     },
     panFilm: {
@@ -469,13 +526,9 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        var open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = JSON.stringify(this.film);
-        } else {
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var dataUrl;
+        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify(this.film));
+        return Utils.downloadFromUrl(dataUrl, this.film.name + '.json');
       }
     },
     importFilm: {
@@ -483,28 +536,24 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+I'],
       cancelComplement: true,
       listener: function() {
-        var importJSON, open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = '';
-        } else {
-          importJSON = this.ui.components.textIO.getElement().value;
-          try {
-            this.setFilm(JSON.parse(importJSON));
-          } catch (_error) {}
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var self;
+        self = this;
+        return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
+          return self.setFilm(JSON.parse(filmJSON));
+        });
       }
     },
     linkAudio: {
       label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
-        var audioURL;
-        audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
-        if (audioURL != null) {
-          return this.loadAudio(audioURL);
-        }
+        var self;
+        self = this;
+        return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
+          if (audioURL != null) {
+            return self.loadAudio(audioURL);
+          }
+        });
       }
     },
     unloadAudio: {
@@ -569,7 +618,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate', 'toggleFullscreen'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
@@ -651,6 +700,9 @@ PenciltestUI = (function(_super) {
         } else {
           self.hideMenu();
         }
+        if (event.button === 1) {
+          self.controller.useTool('eraser');
+        }
         trackFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
         document.body.addEventListener('touchmove', mouseMoveListener);
@@ -676,6 +728,9 @@ PenciltestUI = (function(_super) {
         if (event.type === 'touchend' && Utils.currentGesture) {
           self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
           Utils.clearGesture(event);
+        }
+        if (event.button === 1) {
+          self.controller.useTool('pencil');
         }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
@@ -777,17 +832,23 @@ PenciltestUI = (function(_super) {
     }
     keyboardListener = function(event) {
       var actionName, combo;
-      combo = Utils.describeKeyCombo(event);
-      actionName = self.keyBindings[event.type][combo];
-      if (actionName || actionName === null) {
-        event.preventDefault();
-        if (actionName) {
-          return self.doAppAction(actionName);
+      if (!window.pauseKeyboardListeners) {
+        combo = Utils.describeKeyCombo(event);
+        actionName = self.keyBindings[event.type][combo];
+        if (actionName || actionName === null) {
+          event.preventDefault();
+          if (actionName) {
+            return self.doAppAction(actionName);
+          }
         }
       }
     };
-    document.body.addEventListener('keydown', keyboardListener);
-    return document.body.addEventListener('keyup', keyboardListener);
+    document.body.addEventListener('keydown', function(event) {
+      return keyboardListener(event);
+    });
+    return document.body.addEventListener('keyup', function(event) {
+      return keyboardListener(event);
+    });
   };
 
   PenciltestUI.prototype.addOtherListeners = function() {

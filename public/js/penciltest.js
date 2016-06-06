@@ -8118,12 +8118,15 @@
 
 
 /*
-global: document, window
+global: document, window, btoa, FileReader
  */
 var Utils, code, name, _base, _i, _ref,
   __slice = [].slice;
 
 Utils = {
+  clone: function(object) {
+    return JSON.parse(JSON.stringify(object));
+  },
   toggleClass: function(element, className, presence) {
     var added, classIndex, classes;
     if (presence == null) {
@@ -8168,11 +8171,122 @@ Utils = {
   alert: function() {
     return window.alert(arguments[0]);
   },
-  confirm: function() {
-    return window.confirm(arguments[0]);
+  confirm: function(message, callback) {
+    if (window.confirm(message)) {
+      return callback();
+    }
   },
-  prompt: function() {
-    return window.prompt(arguments[0], arguments[1]);
+  prompt: function(message, defaultValue, callback, promptInput) {
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
+    window.pauseKeyboardListeners = true;
+    promptModal = document.createElement('div');
+    promptModalCss = {
+      position: 'absolute',
+      top: '0px',
+      left: '0px',
+      bottom: '0px',
+      right: '0px',
+      backgroundColor: 'rgba(0,0,0,0.5)'
+    };
+    for (property in promptModalCss) {
+      value = promptModalCss[property];
+      promptModal.style[property] = value;
+    }
+    promptForm = document.createElement('form');
+    promptFormCss = {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      padding: '1em',
+      transform: 'translateX(-50%) translateY(-50%)',
+      backgroundColor: 'white'
+    };
+    for (property in promptFormCss) {
+      value = promptFormCss[property];
+      promptForm.style[property] = value;
+    }
+    promptForm.innerHTML = message;
+    promptModal.appendChild(promptForm);
+    if (!promptInput) {
+      promptInput = document.createElement('input');
+    }
+    if (defaultValue !== null) {
+      promptInput.value = defaultValue;
+    }
+    promptInput.style.display = 'block';
+    promptForm.appendChild(promptInput);
+    closePromptModal = function() {
+      promptModal.remove();
+      return window.pauseKeyboardListeners = false;
+    };
+    promptCancelButton = document.createElement('button');
+    promptCancelButton.innerHTML = 'Cancel';
+    promptCancelButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      return closePromptModal();
+    });
+    promptForm.appendChild(promptCancelButton);
+    promptAcceptButton = document.createElement('input');
+    promptAcceptButton.type = 'submit';
+    promptAcceptButton.value = 'Accept';
+    promptForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      closePromptModal();
+      return callback(promptInput.value);
+    });
+    promptForm.appendChild(promptAcceptButton);
+    document.body.appendChild(promptModal);
+    return promptInput.focus();
+  },
+  select: function(message, options, defaultValue, callback) {
+    var index, option, optionElement, promptCallback, selectInput, _i, _len;
+    selectInput = document.createElement('select');
+    for (index = _i = 0, _len = options.length; _i < _len; index = ++_i) {
+      option = options[index];
+      optionElement = document.createElement('option');
+      optionElement.value = option;
+      optionElement.innerHTML = option;
+      selectInput.appendChild(optionElement);
+      if (option === defaultValue) {
+        selectInput.selectedIndex = index;
+      }
+    }
+    promptCallback = function(selected) {
+      var _j, _len1;
+      if (selected && options.indexOf(selected === -1)) {
+        for (_j = 0, _len1 = options.length; _j < _len1; _j++) {
+          option = options[_j];
+          if (RegExp(selected).test(option)) {
+            selected = option;
+          }
+        }
+      }
+      if (!selected || options.indexOf(selected) === -1) {
+        selected = false;
+      }
+      return callback(selected);
+    };
+    return this.prompt(message, null, promptCallback, selectInput);
+  },
+  promptForFile: function(message, callback) {
+    var fileInput, loadFile;
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    loadFile = function() {
+      var file, fileReader, _i, _len, _ref, _results;
+      _ref = fileInput.files;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        file = _ref[_i];
+        fileReader = new FileReader();
+        fileReader.addEventListener('load', function(event) {
+          return callback(event.target.result);
+        });
+        _results.push(fileReader.readAsText(file));
+      }
+      return _results;
+    };
+    return this.prompt(message, null, loadFile, fileInput);
   },
   keyCodeNames: {
     8: 'Backspace',
@@ -8359,6 +8473,19 @@ Utils = {
       output = parts.join('.');
     }
     return output;
+  },
+  encodeBase64: function(input) {
+    return btoa(input);
+  },
+  decodeBase64: function(input) {
+    return atob(input);
+  },
+  downloadFromUrl: function(url, filename) {
+    var link;
+    link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    return link.click();
   }
 };
 
@@ -8770,13 +8897,19 @@ PenciltestUI = (function(_super) {
     renderer: {
       label: "Set Renderer",
       listener: function() {
-        var name;
-        name = Utils.prompt('renderer (svg, canvas): ', this.options.renderer);
-        if (name in this.availableRenderers) {
-          return this.setOptions({
-            renderer: name
-          });
+        var name, renderer, rendererNames, self, _ref;
+        self = this;
+        rendererNames = [];
+        _ref = this.availableRenderers;
+        for (name in _ref) {
+          renderer = _ref[name];
+          rendererNames.push(name);
         }
+        return Utils.select('Set renderer', rendererNames, this.options.renderer, function(selected) {
+          return self.setOptions({
+            renderer: selected
+          });
+        });
       },
       action: function() {
         var _ref;
@@ -8857,6 +8990,27 @@ PenciltestUI = (function(_super) {
         return this.stop();
       }
     },
+    copyFrame: {
+      label: "Copy Frame",
+      hotkey: ['C'],
+      listener: function() {
+        return this.copyFrame();
+      }
+    },
+    pasteFrame: {
+      label: "Paste Frame",
+      hotkey: ['V'],
+      listener: function() {
+        return this.pasteFrame();
+      }
+    },
+    pasteStrokes: {
+      label: "Paste Strokes",
+      hotkey: ['Shift+V'],
+      listener: function() {
+        return this.pasteStrokes();
+      }
+    },
     insertFrameBefore: {
       label: "Insert Frame Before",
       hotkey: ['Shift+I'],
@@ -8883,14 +9037,17 @@ PenciltestUI = (function(_super) {
       label: "Insert Seconds",
       hotkey: ['Alt+Shift+I'],
       listener: function() {
-        var first, last, newIndex, seconds, _i;
-        seconds = Number(Utils.prompt('# of seconds to insert: ', 1));
-        first = this.current.frameNumber + 1;
-        last = this.current.frameNumber + Math.floor(this.options.frameRate * seconds);
-        for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
-          this.newFrame(newIndex);
-        }
-        return this.goToFrame(newIndex);
+        var self;
+        self = this;
+        return Utils.prompt('# of seconds to insert: ', 1, function(seconds) {
+          var first, last, newIndex, _i;
+          first = self.current.frameNumber + 1;
+          last = self.current.frameNumber + Math.floor(self.options.frameRate * Number(seconds));
+          for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
+            self.newFrame(newIndex);
+          }
+          return self.goToFrame(newIndex);
+        });
       }
     },
     undo: {
@@ -8916,13 +9073,15 @@ PenciltestUI = (function(_super) {
     frameRate: {
       label: "Frame Rate",
       listener: function() {
-        var rate;
-        rate = Utils.prompt('frames per second: ', this.options.frameRate);
-        if (rate) {
-          return this.setOptions({
-            frameRate: Number(rate)
-          });
-        }
+        var self;
+        self = this;
+        return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
+          if (rate) {
+            return self.setOptions({
+              frameRate: Number(rate)
+            });
+          }
+        });
       },
       action: function() {
         return this.singleFrameDuration = 1 / this.options.frameRate;
@@ -8931,29 +9090,32 @@ PenciltestUI = (function(_super) {
     frameHold: {
       label: "Default Frame Hold",
       listener: function() {
-        var frame, hold, magnitudeDelta, oldHold, update, _i, _len, _ref;
-        hold = Utils.prompt('default exposures per drawing: ', this.options.frameHold);
-        update = Utils.confirm('update hold for existing frames in proportion to new setting??: ');
-        if (hold) {
-          oldHold = this.options.frameHold;
-          this.setOptions({
-            frameHold: Number(hold)
-          });
-          if (update) {
-            magnitudeDelta = this.options.frameHold / oldHold;
-            _ref = this.film.frames;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              frame = _ref[_i];
-              frame.hold = Math.round(frame.hold * magnitudeDelta);
-            }
-            return this.drawCurrentFrame();
+        var self;
+        self = this;
+        return Utils.prompt('default exposures per drawing: ', self.options.frameHold, function(hold) {
+          var oldHold;
+          if (hold) {
+            oldHold = self.options.frameHold;
+            self.setOptions({
+              frameHold: Number(hold)
+            });
+            return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
+              var frame, magnitudeDelta, _i, _len, _ref;
+              magnitudeDelta = self.options.frameHold / oldHold;
+              _ref = self.film.frames;
+              for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+                frame = _ref[_i];
+                frame.hold = Math.round(frame.hold * magnitudeDelta);
+              }
+              return self.drawCurrentFrame();
+            });
           }
-        }
+        });
       }
     },
     hideCursor: {
       label: "Hide Cursor",
-      hotkey: ['C'],
+      hotkey: ['H'],
       listener: function() {
         return this.setOptions({
           hideCursor: !this.options.hideCursor
@@ -8977,11 +9139,20 @@ PenciltestUI = (function(_super) {
     },
     dropFrame: {
       label: "Drop Frame",
-      hotkey: ['X', 'Backspace'],
-      gesture: /3 down from center top/,
+      hotkey: ['Shift+X'],
+      gesture: /4 down from center top/,
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
+      }
+    },
+    cutFrame: {
+      label: "Cut Frame",
+      hotkey: ['X'],
+      gesture: /3 down from center top/,
+      cancelComplement: true,
+      listener: function() {
+        return this.cutFrame();
       }
     },
     smoothing: {
@@ -8989,8 +9160,12 @@ PenciltestUI = (function(_super) {
       title: "How much your lines will be smoothed as you draw",
       hotkey: ['Shift+S'],
       listener: function() {
-        return this.setOptions({
-          smoothing: Number(Utils.prompt('Smoothing', this.options.smoothing))
+        var self;
+        self = this;
+        return Utils.prompt('Smoothing', this.options.smoothing, function(smoothing) {
+          return self.setOptions({
+            smoothing: Number(smoothing)
+          });
         });
       },
       action: function() {
@@ -9074,7 +9249,13 @@ PenciltestUI = (function(_super) {
       label: "New",
       hotkey: ['Alt+N'],
       listener: function() {
-        if (Utils.confirm("This will BURN your current animation.")) {
+        var self;
+        self = this;
+        if (this.unsavedChanges) {
+          return Utils.confirm("Unsaved changes will be lost.", function() {
+            return self.newFilm();
+          });
+        } else {
           return this.newFilm();
         }
       }
@@ -9090,12 +9271,15 @@ PenciltestUI = (function(_super) {
       label: "Resize Film",
       hotkey: ['Alt+R'],
       listener: function() {
-        var dimensions, dimensionsResponse;
-        dimensionsResponse = Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect);
-        dimensions = dimensionsResponse.split(' ');
-        this.film.width = Number(dimensions[0]);
-        this.film.aspect = dimensions[1];
-        return this.resize();
+        var self;
+        self = this;
+        return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
+          var dimensions;
+          dimensions = dimensionsResponse.split(' ');
+          self.film.width = Number(dimensions[0]);
+          self.film.aspect = dimensions[1];
+          return self.resize();
+        });
       }
     },
     panFilm: {
@@ -9144,13 +9328,9 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        var open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = JSON.stringify(this.film);
-        } else {
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var dataUrl;
+        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify(this.film));
+        return Utils.downloadFromUrl(dataUrl, this.film.name + '.json');
       }
     },
     importFilm: {
@@ -9158,28 +9338,24 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+I'],
       cancelComplement: true,
       listener: function() {
-        var importJSON, open;
-        open = Utils.toggleClass(this.ui.components.textIO.getElement(), 'active');
-        if (open) {
-          return this.ui.components.textIO.getElement().value = '';
-        } else {
-          importJSON = this.ui.components.textIO.getElement().value;
-          try {
-            this.setFilm(JSON.parse(importJSON));
-          } catch (_error) {}
-          return this.ui.components.textIO.getElement().value = '';
-        }
+        var self;
+        self = this;
+        return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
+          return self.setFilm(JSON.parse(filmJSON));
+        });
       }
     },
     linkAudio: {
       label: "Link Audio",
       hotkey: ['Alt+A'],
       listener: function() {
-        var audioURL;
-        audioURL = Utils.prompt('Audio file URL: ', this.state.audioURL);
-        if (audioURL != null) {
-          return this.loadAudio(audioURL);
-        }
+        var self;
+        self = this;
+        return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
+          if (audioURL != null) {
+            return self.loadAudio(audioURL);
+          }
+        });
       }
     },
     unloadAudio: {
@@ -9244,7 +9420,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame', 'moreHold', 'lessHold'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate', 'toggleFullscreen'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
@@ -9326,6 +9502,9 @@ PenciltestUI = (function(_super) {
         } else {
           self.hideMenu();
         }
+        if (event.button === 1) {
+          self.controller.useTool('eraser');
+        }
         trackFromEvent(event);
         document.body.addEventListener('mousemove', mouseMoveListener);
         document.body.addEventListener('touchmove', mouseMoveListener);
@@ -9351,6 +9530,9 @@ PenciltestUI = (function(_super) {
         if (event.type === 'touchend' && Utils.currentGesture) {
           self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
           Utils.clearGesture(event);
+        }
+        if (event.button === 1) {
+          self.controller.useTool('pencil');
         }
         document.body.removeEventListener('mousemove', mouseMoveListener);
         document.body.removeEventListener('touchmove', mouseMoveListener);
@@ -9452,17 +9634,23 @@ PenciltestUI = (function(_super) {
     }
     keyboardListener = function(event) {
       var actionName, combo;
-      combo = Utils.describeKeyCombo(event);
-      actionName = self.keyBindings[event.type][combo];
-      if (actionName || actionName === null) {
-        event.preventDefault();
-        if (actionName) {
-          return self.doAppAction(actionName);
+      if (!window.pauseKeyboardListeners) {
+        combo = Utils.describeKeyCombo(event);
+        actionName = self.keyBindings[event.type][combo];
+        if (actionName || actionName === null) {
+          event.preventDefault();
+          if (actionName) {
+            return self.doAppAction(actionName);
+          }
         }
       }
     };
-    document.body.addEventListener('keydown', keyboardListener);
-    return document.body.addEventListener('keyup', keyboardListener);
+    document.body.addEventListener('keydown', function(event) {
+      return keyboardListener(event);
+    });
+    return document.body.addEventListener('keyup', function(event) {
+      return keyboardListener(event);
+    });
   };
 
   PenciltestUI.prototype.addOtherListeners = function() {
@@ -9640,7 +9828,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.1.3.a',
+    version: '0.2.1',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -9964,7 +10152,43 @@ Penciltest = (function() {
     }
   };
 
+  Penciltest.prototype.copyFrame = function(frame) {
+    if (frame == null) {
+      frame = this.getCurrentFrame();
+    }
+    if (frame.strokes.length) {
+      return this.copyBuffer = Utils.clone(frame);
+    }
+  };
+
+  Penciltest.prototype.pasteFrame = function() {
+    var newFrameIndex;
+    if (this.copyBuffer) {
+      newFrameIndex = this.current.frameNumber + 1;
+      this.film.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      this.buildFilmMeta();
+      return this.goToFrame(newFrameIndex);
+    }
+  };
+
+  Penciltest.prototype.pasteStrokes = function() {
+    if (this.copyBuffer) {
+      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+      return this.drawCurrentFrame();
+    }
+  };
+
+  Penciltest.prototype.cutFrame = function() {
+    var droppedFrame;
+    droppedFrame = this.dropFrame();
+    if (droppedFrame.strokes.length) {
+      return this.copyFrame(droppedFrame);
+    }
+  };
+
   Penciltest.prototype.dropFrame = function() {
+    var droppedFrame;
+    droppedFrame = this.getCurrentFrame();
     this.film.frames.splice(this.current.frameNumber, 1);
     if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;
@@ -9973,47 +10197,65 @@ Penciltest = (function() {
       this.newFrame();
     }
     this.buildFilmMeta();
-    return this.drawCurrentFrame();
+    this.drawCurrentFrame();
+    return droppedFrame;
   };
 
   Penciltest.prototype.smoothFrame = function(index, amount) {
-    var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1;
-    if (!amount) {
-      amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
-    }
-    smoothingBackup = this.options.smoothing;
-    this.options.smoothing = amount;
-    frame = this.film.frames[index];
-    oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
-    this.lift();
-    frame.strokes = [];
-    this.current.frameNumber = index;
-    this.renderer.clear();
-    for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
-      stroke = oldStrokes[_i];
-      for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
-        segment = stroke[_j];
-        this.track.apply(this, segment);
+    var self, smooth;
+    self = this;
+    smooth = function(amount) {
+      var frame, oldStrokes, segment, smoothingBackup, stroke, _i, _j, _len, _len1, _results;
+      amount = Number(amount);
+      smoothingBackup = self.options.smoothing;
+      self.options.smoothing = amount;
+      frame = self.film.frames[index];
+      oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
+      self.lift();
+      frame.strokes = [];
+      self.current.frameNumber = index;
+      self.renderer.clear();
+      _results = [];
+      for (_i = 0, _len = oldStrokes.length; _i < _len; _i++) {
+        stroke = oldStrokes[_i];
+        for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
+          segment = stroke[_j];
+          self.track.apply(self, segment);
+        }
+        _results.push(self.lift());
       }
-      this.lift();
+      return _results;
+    };
+    this.options.smoothing = smoothingBackup;
+    if (amount) {
+      return Utils.prompt('How much to smooth? 1-5', 2, smooth);
+    } else {
+      return smooth(amount);
     }
-    return this.options.smoothing = smoothingBackup;
   };
 
   Penciltest.prototype.smoothFilm = function(amount) {
-    var frame, lastIndex, _i;
+    var self;
+    self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
-      if (Utils.confirm('Would you like to smooth every frame of this film?')) {
+      return Utils.confirm('Would you like to smooth every frame of this film?', function() {
+        var doTheThing;
+        doTheThing = function(amount) {
+          var frame, lastIndex, _i;
+          amount = Number(amount);
+          self.state.mode = Penciltest.prototype.modes.BUSY;
+          lastIndex = self.film.frames.length - 1;
+          for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
+            self.smoothFrame(frame, amount);
+          }
+          return self.state.mode = Penciltest.prototype.modes.DRAWING;
+        };
         if (!amount) {
-          amount = Number(Utils.prompt('How much to smooth? 1-5', 2));
+          return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
+        } else {
+          return doTheThing(amount);
         }
-        this.state.mode = Penciltest.prototype.modes.BUSY;
-        lastIndex = this.film.frames.length - 1;
-        for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
-          this.smoothFrame(frame, amount);
-        }
-        return this.state.mode = Penciltest.prototype.modes.DRAWING;
-      }
+      });
     } else {
       return Utils.log('Unable to alter film while playing');
     }
@@ -10056,6 +10298,7 @@ Penciltest = (function() {
       width: 1920,
       frames: []
     };
+    this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
   };
@@ -10102,143 +10345,143 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.saveFilm = function() {
-    var name;
-    name = window.prompt("what will you name your film?", this.film.name);
-    if (name) {
-      this.film.name = name;
-      this.putStoredData('film', name, this.film);
-      return this.unsavedChanges = false;
-    }
+    var self;
+    self = this;
+    return Utils.prompt("what will you name your film?", this.film.name, function(name) {
+      if (name) {
+        self.film.name = name;
+        self.putStoredData('film', name, self.film);
+        return self.unsavedChanges = false;
+      }
+    });
   };
 
   Penciltest.prototype.renderGif = function() {
-    var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
-    dimensions = this.getFilmDimensions();
-    gifConfiguration = (Utils.prompt('GIF size & lineWidth', '512 2') || '512 2').split(' ');
-    maxGifDimension = parseInt(gifConfiguration[0], 10);
-    gifLineWidth = parseInt(gifConfiguration[1], 10);
-    if (dimensions.width > maxGifDimension) {
-      dimensions.width = maxGifDimension;
-      dimensions.height = maxGifDimension / dimensions.aspect;
-    } else if (dimensions.height > maxGifDimension) {
-      dimensions.height = maxGifDimension;
-      dimensions.width = maxGifDimension * dimensions.aspect;
-    }
-    this.forceDimensions = {
-      width: dimensions.width,
-      height: dimensions.height
-    };
-    this.ui.appActions.renderer.action();
-    this.resize();
-    oldRendererType = this.options.renderer;
-    this.setOptions({
-      renderer: 'canvas'
-    });
-    this.ui.appActions.renderer.action();
-    oldLineOverrides = this.renderer.overrides;
-    renderLineOverrides = {
-      weight: gifLineWidth
-    };
-    baseFrameDelay = 1000 / this.options.frameRate;
-    frameIndex = 0;
-    gifEncoder = new GIFEncoder();
-    gifEncoder.setRepeat(0);
-    gifEncoder.setDelay(baseFrameDelay);
-    gifEncoder.start();
-    for (frameIndex = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-      this.renderer.setLineOverrides(renderLineOverrides);
-      this.goToFrame(frameIndex);
-      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold);
-      gifEncoder.addFrame(this.renderer.context);
-    }
-    gifEncoder.finish();
-    binaryGif = gifEncoder.stream().getData();
-    dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
-    gifElementId = 'rendered_gif';
-    gifElement = document.getElementById(gifElementId);
-    if (!gifElement) {
-      gifElement = document.createElement('img');
-      gifElement.id = gifElementId;
-      gifCss = {
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translateX(-50%) translateY(-50%)',
-        maxWidth: '80%',
-        maxHeight: '80%'
-      };
-      for (property in gifCss) {
-        value = gifCss[property];
-        gifElement.style[property] = value;
+    var doTheThing, self;
+    self = this;
+    doTheThing = function(gifConfigurationString) {
+      var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
+      gifConfiguration = (gifConfigurationString || '512 2').split(' ');
+      dimensions = self.getFilmDimensions();
+      maxGifDimension = parseInt(gifConfiguration[0], 10);
+      gifLineWidth = parseInt(gifConfiguration[1], 10);
+      if (dimensions.width > maxGifDimension) {
+        dimensions.width = maxGifDimension;
+        dimensions.height = maxGifDimension / dimensions.aspect;
+      } else if (dimensions.height > maxGifDimension) {
+        dimensions.height = maxGifDimension;
+        dimensions.width = maxGifDimension * dimensions.aspect;
       }
-      gifContainer = document.createElement('div');
-      containerCss = {
-        position: 'absolute',
-        top: '0px',
-        left: '0px',
-        bottom: '0px',
-        right: '0px',
-        backgroundColor: 'rgba(0,0,0,0.5)'
+      self.forceDimensions = {
+        width: dimensions.width,
+        height: dimensions.height
       };
-      for (property in containerCss) {
-        value = containerCss[property];
-        gifContainer.style[property] = value;
-      }
-      gifInstructions = document.createElement('div');
-      containerCss = {
-        position: 'relative',
-        color: 'white',
-        textAlign: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)'
+      self.ui.appActions.renderer.action();
+      self.resize();
+      oldRendererType = self.options.renderer;
+      self.setOptions({
+        renderer: 'canvas'
+      });
+      self.ui.appActions.renderer.action();
+      oldLineOverrides = self.renderer.overrides;
+      renderLineOverrides = {
+        weight: gifLineWidth
       };
-      for (property in containerCss) {
-        value = containerCss[property];
-        gifInstructions.style[property] = value;
+      baseFrameDelay = 1000 / self.options.frameRate;
+      frameIndex = 0;
+      gifEncoder = new GIFEncoder();
+      gifEncoder.setRepeat(0);
+      gifEncoder.setDelay(baseFrameDelay);
+      gifEncoder.start();
+      for (frameIndex = _i = 0, _ref = self.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+        self.renderer.setLineOverrides(renderLineOverrides);
+        self.goToFrame(frameIndex);
+        gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
+        gifEncoder.addFrame(self.renderer.context);
       }
-      gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
-      gifContainer.appendChild(gifElement);
-      gifContainer.appendChild(gifInstructions);
-      document.body.appendChild(gifContainer);
-      gifCloseHandler = function(event) {
-        if (event.target !== gifElement) {
-          gifContainer.removeEventListener('click', gifCloseHandler);
-          gifContainer.removeEventListener('touchend', gifCloseHandler);
-          return gifContainer.remove();
+      gifEncoder.finish();
+      binaryGif = gifEncoder.stream().getData();
+      dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+      gifElementId = 'rendered_gif';
+      gifElement = document.getElementById(gifElementId);
+      if (!gifElement) {
+        gifElement = document.createElement('img');
+        gifElement.id = gifElementId;
+        gifCss = {
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translateX(-50%) translateY(-50%)',
+          maxWidth: '80%',
+          maxHeight: '80%'
+        };
+        for (property in gifCss) {
+          value = gifCss[property];
+          gifElement.style[property] = value;
         }
-      };
-      gifContainer.addEventListener('click', gifCloseHandler);
-      gifContainer.addEventListener('touchend', gifCloseHandler);
-    }
-    gifElement.src = dataUrl;
-    this.setOptions({
-      renderer: oldRendererType
-    });
-    this.renderer.setLineOverrides(oldLineOverrides);
-    this.forceDimensions = null;
-    return this.resize();
+        gifContainer = document.createElement('div');
+        containerCss = {
+          position: 'absolute',
+          top: '0px',
+          left: '0px',
+          bottom: '0px',
+          right: '0px',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        };
+        for (property in containerCss) {
+          value = containerCss[property];
+          gifContainer.style[property] = value;
+        }
+        gifInstructions = document.createElement('div');
+        containerCss = {
+          position: 'relative',
+          color: 'white',
+          textAlign: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        };
+        for (property in containerCss) {
+          value = containerCss[property];
+          gifInstructions.style[property] = value;
+        }
+        gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
+        gifContainer.appendChild(gifElement);
+        gifContainer.appendChild(gifInstructions);
+        document.body.appendChild(gifContainer);
+        gifCloseHandler = function(event) {
+          if (event.target !== gifElement) {
+            gifContainer.removeEventListener('click', gifCloseHandler);
+            gifContainer.removeEventListener('touchend', gifCloseHandler);
+            return gifContainer.remove();
+          }
+        };
+        gifContainer.addEventListener('click', gifCloseHandler);
+        gifContainer.addEventListener('touchend', gifCloseHandler);
+      }
+      gifElement.src = dataUrl;
+      self.setOptions({
+        renderer: oldRendererType
+      });
+      self.renderer.setLineOverrides(oldLineOverrides);
+      self.forceDimensions = null;
+      return self.resize();
+    };
+    return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
   };
 
-  Penciltest.prototype.selectFilmName = function(message) {
-    var filmName, filmNames, selectedFilmName, _i, _len;
+  Penciltest.prototype.selectFilmName = function(message, callback) {
+    var filmNames;
     filmNames = this.getFilmNames();
     if (filmNames.length) {
       if (message == null) {
         message = 'Choose a film';
       }
-      selectedFilmName = window.prompt("" + message + ":\n\n" + (filmNames.join('\n')));
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName === -1)) {
-        for (_i = 0, _len = filmNames.length; _i < _len; _i++) {
-          filmName = filmNames[_i];
-          if (RegExp(selectedFilmName).test(filmName)) {
-            selectedFilmName = filmName;
-          }
+      Utils.select(message, filmNames, this.film.name, function(selectedFilmName) {
+        if (selectedFilmName) {
+          return callback(selectedFilmName);
+        } else {
+          return Utils.alert("No film by that name.");
         }
-      }
-      if (selectedFilmName && filmNames.indexOf(selectedFilmName) !== -1) {
-        return selectedFilmName;
-      } else {
-        Utils.alert("No film by that name.");
-      }
+      });
     } else {
       Utils.alert("You don't have any saved films yet.");
     }
@@ -10260,17 +10503,19 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.loadFilm = function() {
-    var name;
-    if (name = this.selectFilmName('Choose a film to load')) {
-      return this.setFilm(this.getStoredData('film', name));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to load', function(name) {
+      return self.setFilm(self.getStoredData('film', name));
+    });
   };
 
   Penciltest.prototype.deleteFilm = function() {
-    var filmName;
-    if (filmName = this.selectFilmName('Choose a film to DELETE...FOREVER')) {
-      return window.localStorage.removeItem(this.encodeStorageReference('film', filmName));
-    }
+    var self;
+    self = this;
+    return this.selectFilmName('Choose a film to DELETE...FOREVER', function(filmName) {
+      return window.localStorage.removeItem(self.encodeStorageReference('film', filmName));
+    });
   };
 
   Penciltest.prototype.buildFilmMeta = function() {

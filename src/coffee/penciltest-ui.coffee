@@ -69,9 +69,12 @@ class PenciltestUI extends PenciltestUIComponent
     renderer:
       label: "Set Renderer"
       listener: ->
-        name = Utils.prompt 'renderer (svg, canvas): ', @options.renderer
-        if name of @availableRenderers
-          @setOptions renderer: name
+        self = @
+        rendererNames = []
+        for name, renderer of @availableRenderers
+          rendererNames.push name
+        Utils.select 'Set renderer', rendererNames, @options.renderer, (selected) ->
+          self.setOptions renderer: selected
       action: ->
         if @fieldElement
           @renderer?.destroy()
@@ -129,6 +132,21 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
+    copyFrame:
+      label: "Copy Frame"
+      hotkey: ['C']
+      listener: ->
+        @copyFrame()
+    pasteFrame:
+      label: "Paste Frame"
+      hotkey: ['V']
+      listener: ->
+        @pasteFrame()
+    pasteStrokes:
+      label: "Paste Strokes"
+      hotkey: ['Shift+V']
+      listener: ->
+        @pasteStrokes()
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
@@ -149,11 +167,12 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Insert Seconds"
       hotkey: ['Alt+Shift+I']
       listener: ->
-        seconds = Number Utils.prompt '# of seconds to insert: ', 1
-        first = @current.frameNumber + 1
-        last = @current.frameNumber + Math.floor @options.frameRate * seconds
-        @newFrame newIndex for newIndex in [first..last]
-        @goToFrame newIndex
+        self = @
+        Utils.prompt '# of seconds to insert: ', 1, (seconds) ->
+          first = self.current.frameNumber + 1
+          last = self.current.frameNumber + Math.floor self.options.frameRate * Number(seconds)
+          self.newFrame newIndex for newIndex in [first..last]
+          self.goToFrame newIndex
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
@@ -171,25 +190,26 @@ class PenciltestUI extends PenciltestUIComponent
     frameRate:
       label: "Frame Rate"
       listener: ->
-        rate = Utils.prompt 'frames per second: ', @options.frameRate
-        if rate then @setOptions frameRate: Number rate
+        self = @
+        Utils.prompt 'frames per second: ', @options.frameRate, (rate) ->
+          if rate then self.setOptions frameRate: Number rate
       action: -> @singleFrameDuration = 1 / @options.frameRate
     frameHold:
       label: "Default Frame Hold"
       listener: ->
-        hold = Utils.prompt 'default exposures per drawing: ', @options.frameHold
-        update = Utils.confirm 'update hold for existing frames in proportion to new setting??: '
-        if hold
-          oldHold = @options.frameHold
-          @setOptions frameHold: Number hold
-          if update
-            magnitudeDelta = @options.frameHold / oldHold
-            for frame in @film.frames
-              frame.hold = Math.round frame.hold * magnitudeDelta
-            @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
+        self = @
+        Utils.prompt 'default exposures per drawing: ', self.options.frameHold, (hold) ->
+          if hold
+            oldHold = self.options.frameHold
+            self.setOptions frameHold: Number hold
+            Utils.confirm 'update hold for existing frames in proportion to new setting??: ', ->
+              magnitudeDelta = self.options.frameHold / oldHold
+              for frame in self.film.frames
+                frame.hold = Math.round frame.hold * magnitudeDelta
+              self.drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
-      hotkey: ['C']
+      hotkey: ['H']
       listener: -> @setOptions hideCursor: not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
@@ -202,15 +222,24 @@ class PenciltestUI extends PenciltestUIComponent
         @resize() # FIXME: should either not redraw, or redraw fine without this
     dropFrame:
       label: "Drop Frame"
-      hotkey: ['X','Backspace']
-      gesture: /3 down from center top/
+      hotkey: ['Shift+X']
+      gesture: /4 down from center top/
       cancelComplement: true
       listener: -> @dropFrame()
+    cutFrame:
+      label: "Cut Frame"
+      hotkey: ['X']
+      gesture: /3 down from center top/
+      cancelComplement: true
+      listener: -> @cutFrame()
     smoothing:
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
       hotkey: ['Shift+S']
-      listener: -> @setOptions smoothing: Number Utils.prompt('Smoothing', @options.smoothing)
+      listener: ->
+        self = @
+        Utils.prompt 'Smoothing', @options.smoothing, (smoothing) ->
+          self.setOptions smoothing: Number smoothing
       action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
     smoothFrame:
       label: "Smooth Frame"
@@ -259,7 +288,12 @@ class PenciltestUI extends PenciltestUIComponent
     newFilm:
       label: "New"
       hotkey: ['Alt+N']
-      listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+      listener: ->
+        self = @
+        if @unsavedChanges
+          Utils.confirm "Unsaved changes will be lost.", -> self.newFilm()
+        else
+          @newFilm()
     renderGif:
       label: "Render GIF"
       hotkey: ['Alt+G']
@@ -268,11 +302,12 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Resize Film"
       hotkey: ['Alt+R']
       listener: ->
-        dimensionsResponse = Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}"
-        dimensions = dimensionsResponse.split ' '
-        @film.width = Number dimensions[0]
-        @film.aspect = dimensions[1]
-        @resize()
+        self = @
+        Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}", (dimensionsResponse) ->
+          dimensions = dimensionsResponse.split ' '
+          self.film.width = Number dimensions[0]
+          self.film.aspect = dimensions[1]
+          self.resize()
     panFilm:
       label: "Pan Film"
       hotkey: ['P']
@@ -315,31 +350,23 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
-        if open
-          @ui.components.textIO.getElement().value = JSON.stringify @film
-        else
-          @ui.components.textIO.getElement().value = ''
+        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify @film)
+        Utils.downloadFromUrl dataUrl, @film.name + '.json'
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO.getElement(), 'active'
-        if open
-          @ui.components.textIO.getElement().value = ''
-        else
-          importJSON = @ui.components.textIO.getElement().value
-          try
-            @setFilm JSON.parse importJSON
-          @ui.components.textIO.getElement().value = ''
+        self = @
+        Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
+          self.setFilm JSON.parse filmJSON
     linkAudio:
       label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
-        audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
-        if audioURL?
-          @loadAudio audioURL
+        self = @
+        Utils.prompt 'Audio file URL: ', @state.audioURL, (audioURL) ->
+          self.loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
       listener: ->
@@ -394,12 +421,16 @@ class PenciltestUI extends PenciltestUIComponent
     Edit: [
       'undo'
       'redo'
+      'moreHold'
+      'lessHold'
+      'copyFrame'
+      'cutFrame'
+      'pasteFrame'
+      'pasteStrokes'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
       'dropFrame'
-      'moreHold'
-      'lessHold'
     ]
     Playback: [
       'loop'
@@ -492,6 +523,8 @@ class PenciltestUI extends PenciltestUIComponent
         else
           self.hideMenu()
 
+        self.controller.useTool 'eraser' if event.button is 1
+
         trackFromEvent event
         document.body.addEventListener 'mousemove', mouseMoveListener
         document.body.addEventListener 'touchmove', mouseMoveListener
@@ -514,6 +547,7 @@ class PenciltestUI extends PenciltestUIComponent
         if event.type is 'touchend' and Utils.currentGesture
           self.doGesture Utils.describeGesture self.fieldBounds, 'final'
           Utils.clearGesture event
+        self.controller.useTool 'pencil' if event.button is 1
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
         document.body.removeEventListener 'mouseup', mouseUpListener
@@ -588,19 +622,20 @@ class PenciltestUI extends PenciltestUIComponent
               @keyBindings.keydown[hotkey] = null
 
     keyboardListener = (event) ->
-      combo = Utils.describeKeyCombo event
-      actionName = self.keyBindings[event.type][combo]
+      if !window.pauseKeyboardListeners
+        combo = Utils.describeKeyCombo event
+        actionName = self.keyBindings[event.type][combo]
 
-      if actionName or actionName is null
-        event.preventDefault()
+        if actionName or actionName is null
+          event.preventDefault()
 
-        if actionName
-          self.doAppAction actionName
+          if actionName
+            self.doAppAction actionName
 
-      # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
+        # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
-    document.body.addEventListener 'keydown', keyboardListener
-    document.body.addEventListener 'keyup', keyboardListener
+    document.body.addEventListener 'keydown', (event) -> keyboardListener(event)
+    document.body.addEventListener 'keyup', (event) -> keyboardListener(event)
 
   addOtherListeners: ->
     self = @
