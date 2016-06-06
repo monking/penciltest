@@ -190,21 +190,23 @@ class PenciltestUI extends PenciltestUIComponent
     frameRate:
       label: "Frame Rate"
       listener: ->
+        self = @
         Utils.prompt 'frames per second: ', @options.frameRate, (rate) ->
-          if rate then @setOptions frameRate: Number rate
+          if rate then self.setOptions frameRate: Number rate
       action: -> @singleFrameDuration = 1 / @options.frameRate
     frameHold:
       label: "Default Frame Hold"
       listener: ->
-        Utils.prompt 'default exposures per drawing: ', @options.frameHold, (hold) ->
+        self = @
+        Utils.prompt 'default exposures per drawing: ', self.options.frameHold, (hold) ->
           if hold
-            oldHold = @options.frameHold
-            @setOptions frameHold: Number hold
+            oldHold = self.options.frameHold
+            self.setOptions frameHold: Number hold
             Utils.confirm 'update hold for existing frames in proportion to new setting??: ', ->
-              magnitudeDelta = @options.frameHold / oldHold
-              for frame in @film.frames
+              magnitudeDelta = self.options.frameHold / oldHold
+              for frame in self.film.frames
                 frame.hold = Math.round frame.hold * magnitudeDelta
-              @drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
+              self.drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
       hotkey: ['H']
@@ -362,8 +364,9 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
+        self = @
         Utils.prompt 'Audio file URL: ', @state.audioURL, (audioURL) ->
-          @loadAudio audioURL if audioURL?
+          self.loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
       listener: ->
