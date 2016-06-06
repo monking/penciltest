@@ -36,7 +36,7 @@ Utils =
   confirm: (message, callback) ->
     callback() if window.confirm message
 
-  prompt: (message, defaultValue, callback, promptInput) ->
+  prompt: (message, defaultValue, callback, promptInput, shouldSubmitOnChange) ->
     window.pauseKeyboardListeners = true # FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
     promptModal = document.createElement 'div'
     promptModalCss =
@@ -78,14 +78,19 @@ Utils =
       closePromptModal()
     promptForm.appendChild promptCancelButton
 
-    promptAcceptButton = document.createElement 'input'
-    promptAcceptButton.type = 'submit'
-    promptAcceptButton.value = 'Accept'
-    promptForm.addEventListener 'submit', (event) ->
-      event.preventDefault()
-      closePromptModal()
-      callback promptInput.value
-    promptForm.appendChild promptAcceptButton
+    if shouldSubmitOnChange
+      promptInput.addEventListener 'change', ->
+        closePromptModal()
+        callback promptInput.value
+    else
+      promptAcceptButton = document.createElement 'input'
+      promptAcceptButton.type = 'submit'
+      promptAcceptButton.value = 'Accept'
+      promptForm.addEventListener 'submit', (event) ->
+        event.preventDefault()
+        closePromptModal()
+        callback promptInput.value
+      promptForm.appendChild promptAcceptButton
 
     document.body.appendChild promptModal
     promptInput.focus()
@@ -115,16 +120,17 @@ Utils =
       callback(selected)
     @prompt message, null, promptCallback, selectInput
 
-  promptForFile: (message, callback) ->
+  promptForFile: (message, callback, acceptTypes) ->
     fileInput = document.createElement 'input'
     fileInput.type = 'file'
+    fileInput.accept = String(acceptTypes) if acceptTypes
     loadFile = ->
       for file in fileInput.files
         fileReader = new FileReader()
         fileReader.addEventListener 'load', (event) ->
           callback event.target.result
         fileReader.readAsText file
-    @prompt message, null, loadFile, fileInput
+    @prompt message, null, loadFile, fileInput, true
 
   keyCodeNames:
     8   : 'Backspace'

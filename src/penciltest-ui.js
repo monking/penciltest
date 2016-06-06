@@ -526,9 +526,10 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        var dataUrl;
+        var dataUrl, fileName;
         dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify(this.film));
-        return Utils.downloadFromUrl(dataUrl, this.film.name + '.json');
+        fileName = (this.film.name || 'untitled') + '.penciltest.json';
+        return Utils.downloadFromUrl(dataUrl, fileName);
       }
     },
     importFilm: {
@@ -540,7 +541,7 @@ PenciltestUI = (function(_super) {
         self = this;
         return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
           return self.setFilm(JSON.parse(filmJSON));
-        });
+        }, '.json,application/json');
       }
     },
     linkAudio: {

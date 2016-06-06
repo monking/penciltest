@@ -351,7 +351,8 @@ class PenciltestUI extends PenciltestUIComponent
       cancelComplement: true
       listener: ->
         dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify @film)
-        Utils.downloadFromUrl dataUrl, @film.name + '.json'
+        fileName = (@film.name || 'untitled') + '.penciltest.json'
+        Utils.downloadFromUrl dataUrl, fileName
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
@@ -360,6 +361,7 @@ class PenciltestUI extends PenciltestUIComponent
         self = @
         Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
           self.setFilm JSON.parse filmJSON
+        , '.json,application/json'
     linkAudio:
       label: "Link Audio"
       hotkey: ['Alt+A']

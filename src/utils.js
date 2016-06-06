@@ -58,7 +58,7 @@ Utils = {
       return callback();
     }
   },
-  prompt: function(message, defaultValue, callback, promptInput) {
+  prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
     var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
@@ -108,15 +108,22 @@ Utils = {
       return closePromptModal();
     });
     promptForm.appendChild(promptCancelButton);
-    promptAcceptButton = document.createElement('input');
-    promptAcceptButton.type = 'submit';
-    promptAcceptButton.value = 'Accept';
-    promptForm.addEventListener('submit', function(event) {
-      event.preventDefault();
-      closePromptModal();
-      return callback(promptInput.value);
-    });
-    promptForm.appendChild(promptAcceptButton);
+    if (shouldSubmitOnChange) {
+      promptInput.addEventListener('change', function() {
+        closePromptModal();
+        return callback(promptInput.value);
+      });
+    } else {
+      promptAcceptButton = document.createElement('input');
+      promptAcceptButton.type = 'submit';
+      promptAcceptButton.value = 'Accept';
+      promptForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        closePromptModal();
+        return callback(promptInput.value);
+      });
+      promptForm.appendChild(promptAcceptButton);
+    }
     document.body.appendChild(promptModal);
     return promptInput.focus();
   },
@@ -150,10 +157,13 @@ Utils = {
     };
     return this.prompt(message, null, promptCallback, selectInput);
   },
-  promptForFile: function(message, callback) {
+  promptForFile: function(message, callback, acceptTypes) {
     var fileInput, loadFile;
     fileInput = document.createElement('input');
     fileInput.type = 'file';
+    if (acceptTypes) {
+      fileInput.accept = String(acceptTypes);
+    }
     loadFile = function() {
       var file, fileReader, _i, _len, _ref, _results;
       _ref = fileInput.files;
@@ -168,7 +178,7 @@ Utils = {
       }
       return _results;
     };
-    return this.prompt(message, null, loadFile, fileInput);
+    return this.prompt(message, null, loadFile, fileInput, true);
   },
   keyCodeNames: {
     8: 'Backspace',
