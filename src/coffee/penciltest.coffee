@@ -299,7 +299,8 @@ class Penciltest
     hasSelectionOnThisFrame = @selection && @selection.frames[frameIndex]
 
     for stroke, strokeIndex in @film.frames[frameIndex].strokes
-      isSelected = hasSelectionOnThisFrame && @selection.frames[frameIndex].strokes.indexOf strokeIndex != -1
+      isSelected = hasSelectionOnThisFrame && @selection.frames[frameIndex].strokes.indexOf(strokeIndex) != -1
+      console.log strokeIndex, isSelected
       @renderer.setLineOverrides selectionOverrides if isSelected
       @renderer.path @scaleStroke stroke, @zoomFactor
       if isSelected

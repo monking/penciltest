@@ -363,7 +363,8 @@ Penciltest = (function() {
     _ref = this.film.frames[frameIndex].strokes;
     for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
       stroke = _ref[strokeIndex];
-      isSelected = hasSelectionOnThisFrame && this.selection.frames[frameIndex].strokes.indexOf(strokeIndex !== -1);
+      isSelected = hasSelectionOnThisFrame && this.selection.frames[frameIndex].strokes.indexOf(strokeIndex) !== -1;
+      console.log(strokeIndex, isSelected);
       if (isSelected) {
         this.renderer.setLineOverrides(selectionOverrides);
       }
