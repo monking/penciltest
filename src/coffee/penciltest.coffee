@@ -143,7 +143,8 @@ class Penciltest
     toolBehavior = {}
     switch @state.toolStack[0]
       when 'selection'
-        self.selection = {frames: {}} if modifiers.begin && !modifiers.shift && !modifiers.control
+        if !self.selection || (modifiers.begin && !modifiers.shift && !modifiers.control)
+          self.selection = {frames: {}}
         self.selection.frames[self.current.frameNumber] ?= {strokes:[]}
         toolBehavior.color = 'green'
         toolBehavior.action = (strokeIndex) ->
@@ -291,10 +292,13 @@ class Penciltest
     return if !@width or !@height
 
     @renderer.setLineOverrides overrides if overrides
-    selectionOverrides = Utils.inherit({
-      color: [0, 255, 0]
-      weight: 10
-    }, overrides)
+    selectionOverrides = Utils.inherit(
+      {
+        color: [0, 255, 0]
+        weight: 10
+      }
+      overrides
+    )
 
     hasSelectionOnThisFrame = @selection && @selection.frames[frameIndex]
 
@@ -338,28 +342,37 @@ class Penciltest
     if @state.toolStack[0] == 'eraser'
       @drawCurrentFrame()
 
-  copyFrame: (frame = @getCurrentFrame()) ->
-    if frame.strokes.length
-      @copyBuffer = Utils.clone frame
+  copy: () ->
+    if !@selection
+      @selection = {frames:{}}
+      @selection.frames[@current.frameNumber] = {}
 
-  pasteFrame: ->
-    if @copyBuffer
-      newFrameIndex = @current.frameNumber + 1
-      @film.frames.splice newFrameIndex, 0, Utils.clone(@copyBuffer)
-      @buildFilmMeta()
-      @goToFrame(newFrameIndex)
+    @copyBuffer = {strokes:[]}
 
-  pasteStrokes: ->
+    for selectedFrameIndex, selectedFrame of @selection.frames
+      if selectedFrame.strokes
+        for strokeIndex in selectedFrame.strokes
+          @copyBuffer.strokes.push Utils.clone @film.frames[selectedFrameIndex].strokes[strokeIndex]
+      else
+        @copyBuffer.strokes.concat Utils.clone @film.frames[selectedFrameIndex].strokes
+
+  paste: ->
     if @copyBuffer
-      @film.frames[@current.frameNumber].strokes = @film.frames[@current.frameNumber].strokes.concat(Utils.clone(@copyBuffer.strokes))
+      @film.frames[@current.frameNumber].strokes = @film.frames[@current.frameNumber].strokes.concat Utils.clone @copyBuffer.strokes
       @drawCurrentFrame()
 
-  cutFrame: ->
-    droppedFrame = @dropFrame()
-    @copyFrame droppedFrame if droppedFrame.strokes.length
+  cut: ->
+    @copy()
 
-  dropFrame: ->
-    droppedFrame = @getCurrentFrame()
+    for selectedFrameIndex, selectedFrame of @selection.frames
+      if selectedFrame.strokes
+        for selectedStrokeIndex in [(selectedFrame.strokes.length - 1)..0]
+          @getCurrentFrame().strokes.splice selectedFrame.strokes[selectedStrokeIndex], 1
+      else
+        @dropFrame selectedFrameIndex
+
+  dropFrame: (frameIndex = @current.frameIndex) ->
+    droppedFrame = @film.frames[frameIndex]
     @film.frames.splice @current.frameNumber, 1
     @current.frameNumber-- if @current.frameNumber >= @film.frames.length and @current.frameNumber > 0
     if @film.frames.length is 0

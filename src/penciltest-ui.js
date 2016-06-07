@@ -188,25 +188,18 @@ PenciltestUI = (function(_super) {
         return this.stop();
       }
     },
-    copyFrame: {
-      label: "Copy Frame",
+    copy: {
+      label: "Copy",
       hotkey: ['C'],
       listener: function() {
-        return this.copyFrame();
+        return this.copy();
       }
     },
-    pasteFrame: {
-      label: "Paste Frame",
+    paste: {
+      label: "Paste",
       hotkey: ['V'],
       listener: function() {
-        return this.pasteFrame();
-      }
-    },
-    pasteStrokes: {
-      label: "Paste Strokes",
-      hotkey: ['Shift+V'],
-      listener: function() {
-        return this.pasteStrokes();
+        return this.paste();
       }
     },
     insertFrameBefore: {
@@ -344,13 +337,13 @@ PenciltestUI = (function(_super) {
         return this.dropFrame();
       }
     },
-    cutFrame: {
-      label: "Cut Frame",
+    cut: {
+      label: "Cut",
       hotkey: ['X'],
       gesture: /3 down from center top/,
       cancelComplement: true,
       listener: function() {
-        return this.cutFrame();
+        return this.cut();
       }
     },
     smoothing: {
@@ -620,7 +613,8 @@ PenciltestUI = (function(_super) {
       label: "Clear Selection",
       hotkey: ['D'],
       listener: function() {
-        return this.selection = null;
+        this.selection = null;
+        return this.drawCurrentFrame();
       }
     },
     toggleFullscreen: {
@@ -634,7 +628,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copy', 'cut', 'paste', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],

@@ -132,21 +132,16 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
-    copyFrame:
-      label: "Copy Frame"
+    copy:
+      label: "Copy"
       hotkey: ['C']
       listener: ->
-        @copyFrame()
-    pasteFrame:
-      label: "Paste Frame"
+        @copy()
+    paste:
+      label: "Paste"
       hotkey: ['V']
       listener: ->
-        @pasteFrame()
-    pasteStrokes:
-      label: "Paste Strokes"
-      hotkey: ['Shift+V']
-      listener: ->
-        @pasteStrokes()
+        @paste()
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
@@ -226,12 +221,12 @@ class PenciltestUI extends PenciltestUIComponent
       gesture: /4 down from center top/
       cancelComplement: true
       listener: -> @dropFrame()
-    cutFrame:
-      label: "Cut Frame"
+    cut:
+      label: "Cut"
       hotkey: ['X']
       gesture: /3 down from center top/
       cancelComplement: true
-      listener: -> @cutFrame()
+      listener: -> @cut()
     smoothing:
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
@@ -412,7 +407,9 @@ class PenciltestUI extends PenciltestUIComponent
     clearSelection:
       label: "Clear Selection"
       hotkey: ['D']
-      listener: -> @selection = null
+      listener: ->
+        @selection = null
+        @drawCurrentFrame()
     toggleFullscreen:
       label: "Fullscreen"
       listener: ->
@@ -435,10 +432,9 @@ class PenciltestUI extends PenciltestUIComponent
       'redo'
       'moreHold'
       'lessHold'
-      'copyFrame'
-      'cutFrame'
-      'pasteFrame'
-      'pasteStrokes'
+      'copy'
+      'cut'
+      'paste'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
