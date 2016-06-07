@@ -6,8 +6,6 @@ class Penciltest
 
   modes:
     DRAWING: 'drawing'
-    SELECTING: 'selecting'
-    ERASING: 'erasing'
     BUSY: 'working'
     PLAYING: 'playing'
 
@@ -133,7 +131,7 @@ class Penciltest
     @clearRedo()
     @unsavedChanges = true
 
-  track: (x,y, modifiers) ->
+  track: (x,y, modifiers = {}) ->
     self = @
     coords =
       x: x
@@ -292,20 +290,21 @@ class Penciltest
   drawFrame: (frameIndex, overrides) ->
     return if !@width or !@height
 
-    regularOverrides = overrides || {}
-    @renderer.setLineOverrides regularOverrides
+    @renderer.setLineOverrides overrides if overrides
     selectionOverrides = Utils.inherit({
       color: [0, 255, 0]
       weight: 10
-    }, regularOverrides)
+    }, overrides)
 
-    hasSelectionOnThisFrame = @selection && @selection.frames[frameIndex] && 
+    hasSelectionOnThisFrame = @selection && @selection.frames[frameIndex]
 
     for stroke, strokeIndex in @film.frames[frameIndex].strokes
       isSelected = hasSelectionOnThisFrame && @selection.frames[frameIndex].strokes.indexOf strokeIndex != -1
       @renderer.setLineOverrides selectionOverrides if isSelected
       @renderer.path @scaleStroke stroke, @zoomFactor
-      @renderer.setLineOverrides regularOverrides if isSelected
+      if isSelected
+        @renderer.clearLineOverrides()
+        @renderer.setLineOverrides overrides if overrides
 
     @renderer.clearLineOverrides()
 
@@ -511,7 +510,7 @@ class Penciltest
       self.ui.appActions.renderer.action()
 
       oldLineOverrides = self.renderer.overrides
-      renderLineOverrides = 
+      renderLineOverrides =
         weight: gifLineWidth
 
       baseFrameDelay = 1000 / self.options.frameRate
@@ -704,7 +703,7 @@ class Penciltest
   getFilmDimensions: ->
     aspect = @film.aspect or '1:1'
     aspectParts = aspect.split ':'
-    dimensions = 
+    dimensions =
       width: @film.width
       aspect: aspectParts[0] / aspectParts[1]
     dimensions.height = Math.ceil dimensions.width / dimensions.aspect

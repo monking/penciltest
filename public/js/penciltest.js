@@ -9840,8 +9840,6 @@ var Penciltest;
 Penciltest = (function() {
   Penciltest.prototype.modes = {
     DRAWING: 'drawing',
-    SELECTING: 'selecting',
-    ERASING: 'erasing',
     BUSY: 'working',
     PLAYING: 'playing'
   };
@@ -9977,6 +9975,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.track = function(x, y, modifiers) {
     var coords, currentFrame, done, isMarkingTool, makeMark, point, realSelectRadius, screenPoint, screenSelectRadius, segment, self, stroke, strokeIndex, toolBehavior, _base, _i, _j, _len, _len1, _name, _ref;
+    if (modifiers == null) {
+      modifiers = {};
+    }
     self = this;
     coords = {
       x: x,
@@ -10180,35 +10181,33 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
-    var hasSelectionOnThisFrame, isSelected, regularOverrides, selectionOverrides, stroke, strokeIndex;
+    var hasSelectionOnThisFrame, isSelected, selectionOverrides, stroke, strokeIndex, _i, _len, _ref;
     if (!this.width || !this.height) {
       return;
     }
-    regularOverrides = overrides || {};
-    this.renderer.setLineOverrides(regularOverrides);
+    if (overrides) {
+      this.renderer.setLineOverrides(overrides);
+    }
     selectionOverrides = Utils.inherit({
       color: [0, 255, 0],
       weight: 10
-    }, regularOverrides);
-    hasSelectionOnThisFrame = this.selection && this.selection.frames[frameIndex] && (function() {
-      var _i, _len, _ref, _results;
-      _ref = this.film.frames[frameIndex].strokes;
-      _results = [];
-      for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
-        stroke = _ref[strokeIndex];
-        isSelected = hasSelectionOnThisFrame && this.selection.frames[frameIndex].strokes.indexOf(strokeIndex !== -1);
-        if (isSelected) {
-          this.renderer.setLineOverrides(selectionOverrides);
-        }
-        this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
-        if (isSelected) {
-          _results.push(this.renderer.setLineOverrides(regularOverrides));
-        } else {
-          _results.push(void 0);
+    }, overrides);
+    hasSelectionOnThisFrame = this.selection && this.selection.frames[frameIndex];
+    _ref = this.film.frames[frameIndex].strokes;
+    for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
+      stroke = _ref[strokeIndex];
+      isSelected = hasSelectionOnThisFrame && this.selection.frames[frameIndex].strokes.indexOf(strokeIndex !== -1);
+      if (isSelected) {
+        this.renderer.setLineOverrides(selectionOverrides);
+      }
+      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
+      if (isSelected) {
+        this.renderer.clearLineOverrides();
+        if (overrides) {
+          this.renderer.setLineOverrides(overrides);
         }
       }
-      return _results;
-    }).call(this);
+    }
     return this.renderer.clearLineOverrides();
   };
 

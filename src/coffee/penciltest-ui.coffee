@@ -510,8 +510,8 @@ class PenciltestUI extends PenciltestUIComponent
       pageCoords = getEventPageXY event
 
       modifiers =
-        begin: event.type == 'mousedown' || event.type == 'touchstart', 
-        alt: event.altKey, 
+        begin: event.type == 'mousedown' || event.type == 'touchstart',
+        alt: event.altKey,
         shift: event.shiftKey
         control: event.controkKey
         meta: event.metaKey
