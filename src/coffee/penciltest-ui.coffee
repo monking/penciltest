@@ -33,9 +33,9 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatus:
         className: 'film-status'
         parent: 'statusRight'
-      toggleTool:
+      cycleTool:
         tagName: 'button'
-        className: 'toggle-tool fa fa-pencil'
+        className: 'cycle-tool fa fa-pencil'
         parent: 'statusRight'
       toggleMenu:
         tagName: 'button'
@@ -403,6 +403,24 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @useTool if @state.toolStack[0] == 'eraser' then @state.toolStack[1] else 'eraser'
         @ui.updateStatus()
+    cycleTool:
+      label: "Next Tool"
+      hotkey: [';']
+      listener: ->
+        @useTool @state.toolStack[@state.toolStack.length - 1]
+        @ui.updateStatus()
+    clearSelection:
+      label: "Clear Selection"
+      hotkey: ['D']
+      listener: -> @selection = null
+    toggleFullscreen:
+      label: "Fullscreen"
+      listener: ->
+        (
+          document.documentElement.requestFullscreen or
+          document.documentElement.webkitRequestFullScreen or
+          document.documentElement.mozRequestFullScreen
+        ).call(document.documentElement)
 
   menuOptions: [
     _icons: [
@@ -491,9 +509,17 @@ class PenciltestUI extends PenciltestUIComponent
     trackFromEvent = (event) ->
       pageCoords = getEventPageXY event
 
+      modifiers =
+        begin: event.type == 'mousedown' || event.type == 'touchstart', 
+        alt: event.altKey, 
+        shift: event.shiftKey
+        control: event.controkKey
+        meta: event.metaKey
+
       self.controller.track(
         pageCoords.x - self.controller.fieldContainer.offsetLeft,
-        pageCoords.y - self.controller.fieldContainer.offsetTop
+        pageCoords.y - self.controller.fieldContainer.offsetTop,
+        modifiers
       )
 
     mouseDownListener = (event) ->
@@ -547,9 +573,9 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.removeEventListener 'touchend', mouseUpListener
         self.controller.lift()
 
-    toggleToolListener = (event) ->
+    cycleToolListener = (event) ->
       event.preventDefault()
-      self.appActions.eraser.listener.call self.controller
+      self.doAppAction 'cycleTool'
 
     contextMenuListener = (event) ->
       event.preventDefault()
@@ -558,7 +584,7 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
-    @components.toggleTool.getElement().addEventListener 'click', toggleToolListener
+    @components.cycleTool.getElement().addEventListener 'click', cycleToolListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
     @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
 
@@ -673,7 +699,11 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatusMarkup += "</div>"
 
       @components.filmStatus.setHTML filmStatusMarkup
-      @components.toggleTool.getElement().className = "toggle-tool fa fa-#{@controller.state.toolStack[0]}"# FIXME: use a helper to do this
+      toolClassNames =
+        pencil: 'fa-pencil'
+        eraser: 'fa-eraser'
+        selection: 'fa-object-group'
+      @components.cycleTool.getElement().className = "cycle-tool fa #{toolClassNames[@controller.state.toolStack[0]]}"
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible

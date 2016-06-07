@@ -8858,9 +8858,9 @@ PenciltestUI = (function(_super) {
         className: 'film-status',
         parent: 'statusRight'
       },
-      toggleTool: {
+      cycleTool: {
         tagName: 'button',
-        className: 'toggle-tool fa fa-pencil',
+        className: 'cycle-tool fa fa-pencil',
         parent: 'statusRight'
       },
       toggleMenu: {
@@ -9419,6 +9419,27 @@ PenciltestUI = (function(_super) {
         this.useTool(this.state.toolStack[0] === 'eraser' ? this.state.toolStack[1] : 'eraser');
         return this.ui.updateStatus();
       }
+    },
+    cycleTool: {
+      label: "Next Tool",
+      hotkey: [';'],
+      listener: function() {
+        this.useTool(this.state.toolStack[this.state.toolStack.length - 1]);
+        return this.ui.updateStatus();
+      }
+    },
+    clearSelection: {
+      label: "Clear Selection",
+      hotkey: ['D'],
+      listener: function() {
+        return this.selection = null;
+      }
+    },
+    toggleFullscreen: {
+      label: "Fullscreen",
+      listener: function() {
+        return (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen || document.documentElement.mozRequestFullScreen).call(document.documentElement);
+      }
     }
   };
 
@@ -9464,7 +9485,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.addInputListeners = function() {
-    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
+    var contextMenuListener, cycleToolListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, trackFromEvent;
     self = this;
     getEventPageXY = function(event) {
       var eventLocation;
@@ -9479,9 +9500,16 @@ PenciltestUI = (function(_super) {
       };
     };
     trackFromEvent = function(event) {
-      var pageCoords;
+      var modifiers, pageCoords;
       pageCoords = getEventPageXY(event);
-      return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
+      modifiers = {
+        begin: event.type === 'mousedown' || event.type === 'touchstart',
+        alt: event.altKey,
+        shift: event.shiftKey,
+        control: event.controkKey,
+        meta: event.metaKey
+      };
+      return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop, modifiers);
     };
     mouseDownListener = function(event) {
       if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -9546,9 +9574,9 @@ PenciltestUI = (function(_super) {
         return self.controller.lift();
       }
     };
-    toggleToolListener = function(event) {
+    cycleToolListener = function(event) {
       event.preventDefault();
-      return self.appActions.eraser.listener.call(self.controller);
+      return self.doAppAction('cycleTool');
     };
     contextMenuListener = function(event) {
       event.preventDefault();
@@ -9557,7 +9585,7 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
+    this.components.cycleTool.getElement().addEventListener('click', cycleToolListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
       return self.doAppAction('describeKeyboardShortcuts');
@@ -9697,7 +9725,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.updateStatus = function() {
-    var appStatusMarkup, filmStatusMarkup, _ref;
+    var appStatusMarkup, filmStatusMarkup, toolClassNames, _ref;
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
@@ -9712,7 +9740,12 @@ PenciltestUI = (function(_super) {
       }
       filmStatusMarkup += "</div>";
       this.components.filmStatus.setHTML(filmStatusMarkup);
-      return this.components.toggleTool.getElement().className = "toggle-tool fa fa-" + this.controller.state.toolStack[0];
+      toolClassNames = {
+        pencil: 'fa-pencil',
+        eraser: 'fa-eraser',
+        selection: 'fa-object-group'
+      };
+      return this.components.cycleTool.getElement().className = "cycle-tool fa " + toolClassNames[this.controller.state.toolStack[0]];
     }
   };
 
@@ -9807,6 +9840,7 @@ var Penciltest;
 Penciltest = (function() {
   Penciltest.prototype.modes = {
     DRAWING: 'drawing',
+    SELECTING: 'selecting',
     ERASING: 'erasing',
     BUSY: 'working',
     PLAYING: 'playing'
@@ -9835,7 +9869,7 @@ Penciltest = (function() {
   Penciltest.prototype.state = {
     version: '0.2.2',
     mode: Penciltest.prototype.modes.DRAWING,
-    toolStack: ['pencil', 'eraser']
+    toolStack: ['pencil', 'eraser', 'selection']
   };
 
   Penciltest.prototype.current = {
@@ -9847,7 +9881,15 @@ Penciltest = (function() {
   };
 
   function Penciltest(options) {
+    var tool, _i, _len, _ref;
     this.state = Utils.inherit(this.getStoredData('app', 'state'), Penciltest.prototype.state);
+    _ref = Penciltest.prototype.state.toolStack;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      tool = _ref[_i];
+      if (this.state.toolStack.indexOf(tool) === -1) {
+        this.state.toolStack.push(tool);
+      }
+    }
     this.options = Utils.inherit(this.getStoredData('app', 'options'), options, Penciltest.prototype.options);
     this.container = document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
@@ -9933,40 +9975,53 @@ Penciltest = (function() {
     return this.unsavedChanges = true;
   };
 
-  Penciltest.prototype.track = function(x, y) {
-    var coords, currentFrame, done, makeMark, point, realEraseRadius, screenEraseRadius, screenPoint, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref;
+  Penciltest.prototype.track = function(x, y, modifiers) {
+    var coords, currentFrame, done, isMarkingTool, makeMark, point, realSelectRadius, screenPoint, screenSelectRadius, segment, self, stroke, strokeIndex, toolBehavior, _base, _i, _j, _len, _len1, _name, _ref;
+    self = this;
     coords = {
       x: x,
       y: y
     };
-    if (this.state.toolStack[0] === 'eraser') {
-      screenPoint = [x, y];
-      point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
-      done = false;
-      currentFrame = this.getCurrentFrame();
-      screenEraseRadius = 10;
-      this.drawCurrentFrame();
-      _ref = currentFrame.strokes;
-      for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
-        stroke = _ref[strokeIndex];
-        for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
-          segment = stroke[_j];
-          realEraseRadius = screenEraseRadius / this.zoomFactor;
-          if (Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius) {
-            currentFrame.strokes.splice(strokeIndex, 1);
-            this.drawCurrentFrame();
-            done = true;
-          }
-          if (done) {
-            break;
-          }
+    isMarkingTool = false;
+    currentFrame = this.getCurrentFrame();
+    toolBehavior = {};
+    switch (this.state.toolStack[0]) {
+      case 'selection':
+        if (modifiers.begin && !modifiers.shift && !modifiers.control) {
+          self.selection = {
+            frames: {}
+          };
         }
-        if (done) {
-          break;
+        if ((_base = self.selection.frames)[_name = self.current.frameNumber] == null) {
+          _base[_name] = {
+            strokes: []
+          };
         }
-      }
-      return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
-    } else {
+        toolBehavior.color = 'green';
+        toolBehavior.action = function(strokeIndex) {
+          var strokeIndexInSelection;
+          strokeIndexInSelection = self.selection.frames[self.current.frameNumber].strokes.indexOf(strokeIndex);
+          if (modifiers.control) {
+            if (strokeIndexInSelection !== -1) {
+              return self.selection.frames[self.current.frameNumber].strokes.splice(strokeIndexInSelection, 1);
+            }
+          } else {
+            if (strokeIndexInSelection === -1) {
+              return self.selection.frames[self.current.frameNumber].strokes.push(strokeIndex);
+            }
+          }
+        };
+        break;
+      case 'eraser':
+        toolBehavior.color = 'red';
+        toolBehavior.action = function(strokeIndex) {
+          return currentFrame.strokes.splice(strokeIndex, 1);
+        };
+        break;
+      default:
+        isMarkingTool = true;
+    }
+    if (isMarkingTool) {
       makeMark = false;
       if (this.currentStrokeIndex == null) {
         this.markPoint = coords;
@@ -9983,6 +10038,32 @@ Penciltest = (function() {
       if (makeMark) {
         return this.mark(this.markPoint.x, this.markPoint.y);
       }
+    } else {
+      screenPoint = [x, y];
+      point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
+      done = false;
+      screenSelectRadius = 10;
+      this.drawCurrentFrame();
+      _ref = currentFrame.strokes;
+      for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
+        stroke = _ref[strokeIndex];
+        for (_j = 0, _len1 = stroke.length; _j < _len1; _j++) {
+          segment = stroke[_j];
+          realSelectRadius = screenSelectRadius / this.zoomFactor;
+          if (Math.abs(point[0] - segment[0]) < realSelectRadius && Math.abs(point[1] - segment[1]) < realSelectRadius) {
+            toolBehavior.action(strokeIndex);
+            this.drawCurrentFrame();
+            done = true;
+          }
+          if (done) {
+            break;
+          }
+        }
+        if (done) {
+          break;
+        }
+      }
+      return this.renderer.rect(screenPoint[0] - screenSelectRadius, screenPoint[1] - screenSelectRadius, screenSelectRadius * 2, screenSelectRadius * 2, null, toolBehavior.color);
     }
   };
 
@@ -10099,18 +10180,35 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
-    var stroke, _i, _len, _ref;
+    var hasSelectionOnThisFrame, isSelected, regularOverrides, selectionOverrides, stroke, strokeIndex;
     if (!this.width || !this.height) {
       return;
     }
-    if (overrides) {
-      this.renderer.setLineOverrides(overrides);
-    }
-    _ref = this.film.frames[frameIndex].strokes;
-    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-      stroke = _ref[_i];
-      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
-    }
+    regularOverrides = overrides || {};
+    this.renderer.setLineOverrides(regularOverrides);
+    selectionOverrides = Utils.inherit({
+      color: [0, 255, 0],
+      weight: 10
+    }, regularOverrides);
+    hasSelectionOnThisFrame = this.selection && this.selection.frames[frameIndex] && (function() {
+      var _i, _len, _ref, _results;
+      _ref = this.film.frames[frameIndex].strokes;
+      _results = [];
+      for (strokeIndex = _i = 0, _len = _ref.length; _i < _len; strokeIndex = ++_i) {
+        stroke = _ref[strokeIndex];
+        isSelected = hasSelectionOnThisFrame && this.selection.frames[frameIndex].strokes.indexOf(strokeIndex !== -1);
+        if (isSelected) {
+          this.renderer.setLineOverrides(selectionOverrides);
+        }
+        this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
+        if (isSelected) {
+          _results.push(this.renderer.setLineOverrides(regularOverrides));
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    }).call(this);
     return this.renderer.clearLineOverrides();
   };
 

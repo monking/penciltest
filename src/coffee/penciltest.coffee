@@ -6,6 +6,7 @@ class Penciltest
 
   modes:
     DRAWING: 'drawing'
+    SELECTING: 'selecting'
     ERASING: 'erasing'
     BUSY: 'working'
     PLAYING: 'playing'
@@ -31,7 +32,7 @@ class Penciltest
   state:
     version: '0.2.2'
     mode: Penciltest.prototype.modes.DRAWING
-    toolStack: ['pencil','eraser']
+    toolStack: ['pencil','eraser','selection']
 
   # metadata generated while interpreting the film data
   current:
@@ -46,6 +47,9 @@ class Penciltest
       @getStoredData 'app', 'state'
       Penciltest.prototype.state
     )
+    for tool in Penciltest.prototype.state.toolStack
+      if @state.toolStack.indexOf(tool) == -1
+        @state.toolStack.push tool
 
     @options = Utils.inherit( # set options without triggering actions
       @getStoredData 'app', 'options'
@@ -129,30 +133,38 @@ class Penciltest
     @clearRedo()
     @unsavedChanges = true
 
-  track: (x,y) ->
+  track: (x,y, modifiers) ->
+    self = @
     coords =
       x: x
       y: y
 
-    if @state.toolStack[0] == 'eraser'
-      screenPoint = [x, y]
-      point = @scaleCoordinates screenPoint, 1 / @zoomFactor
-      done = false
-      currentFrame = @getCurrentFrame()
-      screenEraseRadius = 10
-      @drawCurrentFrame()
-      for stroke, strokeIndex in currentFrame.strokes
-        for segment in stroke
-          realEraseRadius = screenEraseRadius / @zoomFactor
-          if Math.abs(point[0] - segment[0]) < realEraseRadius && Math.abs(point[1] - segment[1]) < realEraseRadius
-            currentFrame.strokes.splice strokeIndex, 1
-            @drawCurrentFrame()
-            done = true
-          if done then break
-        if done then break
-      @renderer.rect screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red'
+    isMarkingTool = false;
+    currentFrame = @getCurrentFrame()
 
-    else
+    toolBehavior = {}
+    switch @state.toolStack[0]
+      when 'selection'
+        self.selection = {frames: {}} if modifiers.begin && !modifiers.shift && !modifiers.control
+        self.selection.frames[self.current.frameNumber] ?= {strokes:[]}
+        toolBehavior.color = 'green'
+        toolBehavior.action = (strokeIndex) ->
+          strokeIndexInSelection = self.selection.frames[self.current.frameNumber].strokes.indexOf strokeIndex
+          if modifiers.control
+            if strokeIndexInSelection != -1
+              self.selection.frames[self.current.frameNumber].strokes.splice strokeIndexInSelection, 1
+              # self.drawCurrentFrame()
+          else
+            if strokeIndexInSelection == -1
+              self.selection.frames[self.current.frameNumber].strokes.push strokeIndex
+              # self.drawCurrentFrame()
+      when 'eraser'
+        toolBehavior.color = 'red'
+        toolBehavior.action = (strokeIndex) ->
+          currentFrame.strokes.splice strokeIndex, 1
+      else isMarkingTool = true;
+
+    if isMarkingTool
       makeMark = false
 
       if not @currentStrokeIndex?
@@ -170,6 +182,22 @@ class Penciltest
         makeMark = true
 
       @mark @markPoint.x, @markPoint.y if makeMark
+    else
+      screenPoint = [x, y]
+      point = @scaleCoordinates screenPoint, 1 / @zoomFactor
+      done = false
+      screenSelectRadius = 10
+      @drawCurrentFrame()
+      for stroke, strokeIndex in currentFrame.strokes
+        for segment in stroke
+          realSelectRadius = screenSelectRadius / @zoomFactor
+          if Math.abs(point[0] - segment[0]) < realSelectRadius && Math.abs(point[1] - segment[1]) < realSelectRadius
+            toolBehavior.action strokeIndex
+            @drawCurrentFrame()
+            done = true
+          if done then break
+        if done then break
+      @renderer.rect screenPoint[0] - screenSelectRadius, screenPoint[1] - screenSelectRadius, screenSelectRadius * 2, screenSelectRadius * 2, null, toolBehavior.color
 
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()
@@ -264,10 +292,20 @@ class Penciltest
   drawFrame: (frameIndex, overrides) ->
     return if !@width or !@height
 
-    @renderer.setLineOverrides overrides if overrides
+    regularOverrides = overrides || {}
+    @renderer.setLineOverrides regularOverrides
+    selectionOverrides = Utils.inherit({
+      color: [0, 255, 0]
+      weight: 10
+    }, regularOverrides)
 
-    for stroke in @film.frames[frameIndex].strokes
+    hasSelectionOnThisFrame = @selection && @selection.frames[frameIndex] && 
+
+    for stroke, strokeIndex in @film.frames[frameIndex].strokes
+      isSelected = hasSelectionOnThisFrame && @selection.frames[frameIndex].strokes.indexOf strokeIndex != -1
+      @renderer.setLineOverrides selectionOverrides if isSelected
       @renderer.path @scaleStroke stroke, @zoomFactor
+      @renderer.setLineOverrides regularOverrides if isSelected
 
     @renderer.clearLineOverrides()
 

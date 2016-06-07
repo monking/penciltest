@@ -46,9 +46,9 @@ PenciltestUI = (function(_super) {
         className: 'film-status',
         parent: 'statusRight'
       },
-      toggleTool: {
+      cycleTool: {
         tagName: 'button',
-        className: 'toggle-tool fa fa-pencil',
+        className: 'cycle-tool fa fa-pencil',
         parent: 'statusRight'
       },
       toggleMenu: {
@@ -607,6 +607,27 @@ PenciltestUI = (function(_super) {
         this.useTool(this.state.toolStack[0] === 'eraser' ? this.state.toolStack[1] : 'eraser');
         return this.ui.updateStatus();
       }
+    },
+    cycleTool: {
+      label: "Next Tool",
+      hotkey: [';'],
+      listener: function() {
+        this.useTool(this.state.toolStack[this.state.toolStack.length - 1]);
+        return this.ui.updateStatus();
+      }
+    },
+    clearSelection: {
+      label: "Clear Selection",
+      hotkey: ['D'],
+      listener: function() {
+        return this.selection = null;
+      }
+    },
+    toggleFullscreen: {
+      label: "Fullscreen",
+      listener: function() {
+        return (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen || document.documentElement.mozRequestFullScreen).call(document.documentElement);
+      }
     }
   };
 
@@ -652,7 +673,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.addInputListeners = function() {
-    var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
+    var contextMenuListener, cycleToolListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, trackFromEvent;
     self = this;
     getEventPageXY = function(event) {
       var eventLocation;
@@ -667,9 +688,16 @@ PenciltestUI = (function(_super) {
       };
     };
     trackFromEvent = function(event) {
-      var pageCoords;
+      var modifiers, pageCoords;
       pageCoords = getEventPageXY(event);
-      return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
+      modifiers = {
+        begin: event.type === 'mousedown' || event.type === 'touchstart',
+        alt: event.altKey,
+        shift: event.shiftKey,
+        control: event.controkKey,
+        meta: event.metaKey
+      };
+      return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop, modifiers);
     };
     mouseDownListener = function(event) {
       if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -734,9 +762,9 @@ PenciltestUI = (function(_super) {
         return self.controller.lift();
       }
     };
-    toggleToolListener = function(event) {
+    cycleToolListener = function(event) {
       event.preventDefault();
-      return self.appActions.eraser.listener.call(self.controller);
+      return self.doAppAction('cycleTool');
     };
     contextMenuListener = function(event) {
       event.preventDefault();
@@ -745,7 +773,7 @@ PenciltestUI = (function(_super) {
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
     this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
+    this.components.cycleTool.getElement().addEventListener('click', cycleToolListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
       return self.doAppAction('describeKeyboardShortcuts');
@@ -885,7 +913,7 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.updateStatus = function() {
-    var appStatusMarkup, filmStatusMarkup, _ref;
+    var appStatusMarkup, filmStatusMarkup, toolClassNames, _ref;
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
@@ -900,7 +928,12 @@ PenciltestUI = (function(_super) {
       }
       filmStatusMarkup += "</div>";
       this.components.filmStatus.setHTML(filmStatusMarkup);
-      return this.components.toggleTool.getElement().className = "toggle-tool fa fa-" + this.controller.state.toolStack[0];
+      toolClassNames = {
+        pencil: 'fa-pencil',
+        eraser: 'fa-eraser',
+        selection: 'fa-object-group'
+      };
+      return this.components.cycleTool.getElement().className = "cycle-tool fa " + toolClassNames[this.controller.state.toolStack[0]];
     }
   };
 
