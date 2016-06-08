@@ -550,7 +550,7 @@ PenciltestUI = (function(_super) {
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
+        return Utils.prompt('Audio file URL: ', (this.film.audio ? this.film.audio.url : ''), function(audioURL) {
           if (audioURL != null) {
             return self.loadAudio(audioURL);
           }

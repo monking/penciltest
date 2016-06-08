@@ -367,7 +367,7 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+A']
       listener: ->
         self = @
-        Utils.prompt 'Audio file URL: ', @state.audioURL, (audioURL) ->
+        Utils.prompt 'Audio file URL: ', (if @film.audio then @film.audio.url else ''), (audioURL) ->
           self.loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
