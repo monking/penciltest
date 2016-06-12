@@ -350,9 +350,16 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify @film)
+        # self = @
+        blob = new Blob([JSON.stringify @film], {type:'application/json'})
+        url = window.URL.createObjectURL blob
         fileName = (@film.name || 'untitled') + '.penciltest.json'
-        Utils.downloadFromUrl dataUrl, fileName
+        Utils.downloadFromUrl url, fileName
+        # reader = new FileReader()
+        # reader.addEventListener 'load', ->
+        #   console.log reader.result.length # XXX
+        #   return # XXX
+        # reader.readAsDataURL(blob)
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
