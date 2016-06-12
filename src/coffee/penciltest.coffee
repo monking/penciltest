@@ -446,14 +446,16 @@ class Penciltest
 
   renderGif: ->
     self = @
+    defaultGifConfigurationString = 
     doTheThing = (gifConfigurationString) ->
-      gifConfiguration = (gifConfigurationString || '512 2').split ' '
+      gifConfiguration = (gifConfigurationString || defaultGifConfigurationString).split ' '
       # configure for rendering
       # dimensions = [64, 64]
       dimensions = self.getFilmDimensions()
       # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
       maxGifDimension = parseInt gifConfiguration[0], 10
       gifLineWidth = parseInt gifConfiguration[1], 10
+      showFrameCounter = gifConfiguration[1] == 'yes'
       if dimensions.width > maxGifDimension
         dimensions.width = maxGifDimension
         dimensions.height = maxGifDimension / dimensions.aspect
@@ -489,6 +491,7 @@ class Penciltest
       for frameIndex in [0...self.film.frames.length]
         self.renderer.setLineOverrides renderLineOverrides
         self.goToFrame frameIndex
+        self.renderer.text frameIndex, '10px Verdana', 'bottom right'
         gifEncoder.setDelay baseFrameDelay * self.getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
         gifEncoder.addFrame self.renderer.context
 
@@ -555,7 +558,7 @@ class Penciltest
       self.forceDimensions = null
       self.resize()
 
-    Utils.prompt 'GIF size & lineWidth', '512 2', doTheThing
+    Utils.prompt 'GIF size & lineWidth', defaultGifConfigurationString, doTheThing
 
   selectFilmName: (message, callback) ->
     filmNames = @getFilmNames()

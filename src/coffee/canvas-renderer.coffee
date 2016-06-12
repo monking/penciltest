@@ -32,6 +32,10 @@ class CanvasRenderer extends RendererInterface
 
     @updateStrokeStyle()
 
+  text: (message, font, alignmentString) ->
+    @context.font = font
+    @context.fillText message, 10, 10
+
   updateStrokeStyle: ->
     if @context
       @context.fillStyle = null # FIXME: rename this function, or move this elsewhere?

@@ -41,6 +41,9 @@ class RendererInterface
   rect: (x, y, width, height, backgroundColor, strokeColor) ->
     null
 
+  text: (message, font, alignmentString) ->
+    null
+
   setLineOverrides: ( options ) ->
     @overrides = options
     @currentLineOptions = Utils.inherit(
