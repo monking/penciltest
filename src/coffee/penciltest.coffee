@@ -10,6 +10,10 @@ class Penciltest
     BUSY: 'working'
     PLAYING: 'playing'
 
+  undoable:
+    MARK: 'mark'
+    ERASE: 'erase'
+
   availableRenderers:
     canvas: CanvasRenderer
     svg: SVGRenderer
@@ -27,6 +31,7 @@ class Penciltest
     renderer: 'canvas'
     onionSkinOpacity: 0.5
     background: 'white'
+    undoBufferLength: 0
 
   state:
     version: '0.2.3'
@@ -126,7 +131,6 @@ class Penciltest
     if @state.mode is Penciltest.prototype.modes.DRAWING
       @renderer.render()
 
-    @clearRedo()
     @unsavedChanges = true
 
   track: (x,y) ->
@@ -296,6 +300,12 @@ class Penciltest
       last = @markBuffer.pop()
       @mark last.x, last.y
       @markBuffer = []
+    @addUndoableAction
+      undo: ->
+      redo: ->
+      data: [
+        @currentStrokeIndex
+      ]
     @currentStrokeIndex = null
     if @state.toolStack[0] == 'eraser'
       @drawCurrentFrame()
@@ -373,21 +383,30 @@ class Penciltest
     else
       Utils.log 'Unable to alter film while playing'
 
+  addUndoableAction: (type, data) ->
+    @undoBuffer ?= []
+    historyItem = {
+
+    }
+    @undoBuffer.unshift [type, data]
+    @undoBuffer.pop() if @options.undoBufferLength > 0 && @undoBuffer.length > @options.undoBufferLength
+    @redoBuffer = []
+
   undo: ->
-    if @getCurrentFrame().strokes and @getCurrentFrame().strokes.length
-      @redoQueue ?= []
-      @redoQueue.push @getCurrentFrame().strokes.pop()
+    if @undoBuffer and @undoBuffer.length
+      action = @undoBuffer.shift()
+      @redoBuffer.unshift action
+      # TODO: do action
       @unsavedChanges = true
       @drawCurrentFrame()
 
   redo: ->
-    if @redoQueue and @redoQueue.length
-      @getCurrentFrame().strokes.push @redoQueue.pop()
+    if @redoBuffer and @redoBuffer.length
+      action = @redoBuffer.shift()
+      @undoBuffer.unshift action
+      # TODO: do action
       @unsavedChanges = true
       @drawCurrentFrame()
-
-  clearRedo: ->
-    @redoQueue = []
 
   setCurrentFrameHold: (newHold) ->
     @getCurrentFrame().hold = Math.max 1, newHold

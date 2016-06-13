@@ -9815,6 +9815,11 @@ Penciltest = (function() {
     PLAYING: 'playing'
   };
 
+  Penciltest.prototype.undoable = {
+    MARK: 'mark',
+    ERASE: 'erase'
+  };
+
   Penciltest.prototype.availableRenderers = {
     canvas: CanvasRenderer,
     svg: SVGRenderer
@@ -9832,7 +9837,8 @@ Penciltest = (function() {
     onionSkinRange: 4,
     renderer: 'canvas',
     onionSkinOpacity: 0.5,
-    background: 'white'
+    background: 'white',
+    undoBufferLength: 0
   };
 
   Penciltest.prototype.state = {
@@ -9932,7 +9938,6 @@ Penciltest = (function() {
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       this.renderer.render();
     }
-    this.clearRedo();
     return this.unsavedChanges = true;
   };
 
@@ -10154,6 +10159,11 @@ Penciltest = (function() {
       this.mark(last.x, last.y);
       this.markBuffer = [];
     }
+    this.addUndoableAction({
+      undo: function() {},
+      redo: function() {},
+      data: [this.currentStrokeIndex]
+    });
     this.currentStrokeIndex = null;
     if (this.state.toolStack[0] === 'eraser') {
       return this.drawCurrentFrame();
@@ -10269,27 +10279,37 @@ Penciltest = (function() {
     }
   };
 
+  Penciltest.prototype.addUndoableAction = function(type, data) {
+    var historyItem;
+    if (this.undoBuffer == null) {
+      this.undoBuffer = [];
+    }
+    historyItem = {};
+    this.undoBuffer.unshift([type, data]);
+    if (this.options.undoBufferLength > 0 && this.undoBuffer.length > this.options.undoBufferLength) {
+      this.undoBuffer.pop();
+    }
+    return this.redoBuffer = [];
+  };
+
   Penciltest.prototype.undo = function() {
-    if (this.getCurrentFrame().strokes && this.getCurrentFrame().strokes.length) {
-      if (this.redoQueue == null) {
-        this.redoQueue = [];
-      }
-      this.redoQueue.push(this.getCurrentFrame().strokes.pop());
+    var action;
+    if (this.undoBuffer && this.undoBuffer.length) {
+      action = this.undoBuffer.shift();
+      this.redoBuffer.unshift(action);
       this.unsavedChanges = true;
       return this.drawCurrentFrame();
     }
   };
 
   Penciltest.prototype.redo = function() {
-    if (this.redoQueue && this.redoQueue.length) {
-      this.getCurrentFrame().strokes.push(this.redoQueue.pop());
+    var action;
+    if (this.redoBuffer && this.redoBuffer.length) {
+      action = this.redoBuffer.shift();
+      this.undoBuffer.unshift(action);
       this.unsavedChanges = true;
       return this.drawCurrentFrame();
     }
-  };
-
-  Penciltest.prototype.clearRedo = function() {
-    return this.redoQueue = [];
   };
 
   Penciltest.prototype.setCurrentFrameHold = function(newHold) {
