@@ -236,7 +236,7 @@ Utils =
 
     positionDescription.x + ' ' + positionDescription.y
 
-  describeMotion: (startCoordinates, endCoordinates) ->
+  describeMotion: (startCoordinates, endCoordinates, bounds) ->
     motionThreshold = 10
 
     delta =
@@ -250,14 +250,15 @@ Utils =
         description = 'still'
     else if delta.absX > delta.absY
       description = if delta.x > 0 then 'right' else 'left'
+      description += ' ' + (delta.x / bounds.width / 2)
     else
       description = if delta.y > 0 then 'down' else 'up'
-
+      description += ' ' + (delta.y / bounds.height / 2) 
     description
 
   describeGesture: (gestureBounds, extra = '') ->
     description = @currentGesture.touches
-    description += ' ' + Utils.describeMotion( @currentGesture.origin, @currentGesture.last )
+    description += ' ' + Utils.describeMotion( @currentGesture.origin, @currentGesture.last , gestureBounds)
     description += ' from ' + Utils.describePosition( @currentGesture.origin, gestureBounds )
     if extra then description += " #{extra}"
 

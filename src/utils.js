@@ -316,7 +316,7 @@ Utils = {
     }
     return positionDescription.x + ' ' + positionDescription.y;
   },
-  describeMotion: function(startCoordinates, endCoordinates) {
+  describeMotion: function(startCoordinates, endCoordinates, bounds) {
     var delta, description, motionThreshold;
     motionThreshold = 10;
     delta = {
@@ -329,8 +329,10 @@ Utils = {
       description = 'still';
     } else if (delta.absX > delta.absY) {
       description = delta.x > 0 ? 'right' : 'left';
+      description += ' ' + (delta.x / bounds.width / 2);
     } else {
       description = delta.y > 0 ? 'down' : 'up';
+      description += ' ' + (delta.y / bounds.height / 2);
     }
     return description;
   },
@@ -340,7 +342,7 @@ Utils = {
       extra = '';
     }
     description = this.currentGesture.touches;
-    description += ' ' + Utils.describeMotion(this.currentGesture.origin, this.currentGesture.last);
+    description += ' ' + Utils.describeMotion(this.currentGesture.origin, this.currentGesture.last, gestureBounds);
     description += ' from ' + Utils.describePosition(this.currentGesture.origin, gestureBounds);
     if (extra) {
       description += " " + extra;

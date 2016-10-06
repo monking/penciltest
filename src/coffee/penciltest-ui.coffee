@@ -119,7 +119,7 @@ class PenciltestUI extends PenciltestUIComponent
     firstFrame:
       label: "First Frame"
       hotkey: ['0','Home','PgUp']
-      gesture: /2 left from .* (bottom|middle)/
+      gesture: /2 left .* from (bottom|middle) right end/
       cancelComplement: true
       listener: ->
         @goToFrame 0
@@ -127,11 +127,20 @@ class PenciltestUI extends PenciltestUIComponent
     lastFrame:
       label: "Last Frame"
       hotkey: ['$','End','PgDn']
-      gesture: /2 right from .* (bottom|middle)/
+      gesture: /2 right .* from (bottom|middle) left end/
       cancelComplement: true
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
+    scrubFrame:
+      label: "Scrub Frame"
+      gesture: /2 (left|right) ([0-9.-]*) from .* bottom scrub/
+      listener: (direction, progress) ->
+        if @isScrubbing
+          @goToFrame Math.round(progress * 30 + @scrubFrameStart)
+        else
+          @scrubFrameStart = @current.frameNumber
+          @isScrubbing = true
     copyFrame:
       label: "Copy Frame"
       hotkey: ['C']
@@ -215,7 +224,7 @@ class PenciltestUI extends PenciltestUIComponent
     onionSkin:
       label: "Onion Skin"
       hotkey: ['O']
-      gesture: /2 down from center (bottom|middle)/
+      gesture: /2 down .* from center (bottom|middle) .* end/
       title: "show previous and next frames in red and blue"
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
@@ -223,13 +232,13 @@ class PenciltestUI extends PenciltestUIComponent
     dropFrame:
       label: "Drop Frame"
       hotkey: ['Shift+X']
-      gesture: /4 down from center top/
+      gesture: /4 down .* from center top .* end/
       cancelComplement: true
       listener: -> @dropFrame()
     cutFrame:
       label: "Cut Frame"
       hotkey: ['X']
-      gesture: /3 down from center top/
+      gesture: /3 down .* from center top .* end/
       cancelComplement: true
       listener: -> @cutFrame()
     smoothing:
@@ -271,7 +280,7 @@ class PenciltestUI extends PenciltestUIComponent
     loop:
       label: "Loop"
       hotkey: ['L']
-      gesture: /2 up from center (bottom|middle)/
+      gesture: /2 up .* from center (bottom|middle) .* end/
       listener: ->
         @setOptions loop: not @options.loop
         @resize() # FIXME: should either not redraw, or redraw fine without this
@@ -283,7 +292,7 @@ class PenciltestUI extends PenciltestUIComponent
     loadFilm:
       label: "Load"
       hotkey: ['Alt+O']
-      gesture: /3 up from center (bottom|middle)/
+      gesture: /3 up .* from center (bottom|middle) .* end/
       listener: -> @loadFilm()
     newFilm:
       label: "New"
@@ -463,8 +472,8 @@ class PenciltestUI extends PenciltestUIComponent
     ]
   ]
 
-  doAppAction: (optionName) ->
-    @appActions[optionName].listener?.call @controller
+  doAppAction: (optionName, parameters = []) ->
+    @appActions[optionName].listener?.apply @controller, parameters
 
   menuWalker: (level) ->
     markup = ''
@@ -535,8 +544,9 @@ class PenciltestUI extends PenciltestUIComponent
       event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
         Utils.recordGesture event
-        Utils.describeGesture self.fieldBounds
-        # TODO: support continuous gestures, like scrubbing the timeline
+        gestureDescription = Utils.describeGesture self.fieldBounds, 'scrub'
+        if /^\d+ (up|down|left|right)/.test gestureDescription
+          self.doGesture gestureDescription
       else
         trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
@@ -545,7 +555,8 @@ class PenciltestUI extends PenciltestUIComponent
         return true # allow context menu
       else
         if event.type is 'touchend' and Utils.currentGesture
-          self.doGesture Utils.describeGesture self.fieldBounds, 'final'
+          self.controller.isScrubbing = false # TODO: generalize this
+          self.doGesture Utils.describeGesture self.fieldBounds, 'end'
           Utils.clearGesture event
         self.controller.useTool 'pencil' if event.button is 1
         document.body.removeEventListener 'mousemove', mouseMoveListener
@@ -571,9 +582,11 @@ class PenciltestUI extends PenciltestUIComponent
 
   doGesture: (gestureDescription) ->
     for name, action of @appActions
-      if action.gesture and action.gesture.test gestureDescription
-        @showFeedback action.label
-        return @doAppAction name
+      if action.gesture
+        gestureMatch = gestureDescription.match action.gesture
+        if gestureMatch
+          @showFeedback action.label
+          return @doAppAction name, gestureMatch.slice(1)
 
   updateMenuOption: (optionElement) ->
     optionName = optionElement.attributes.rel.value

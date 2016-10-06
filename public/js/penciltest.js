@@ -8434,7 +8434,7 @@ Utils = {
     }
     return positionDescription.x + ' ' + positionDescription.y;
   },
-  describeMotion: function(startCoordinates, endCoordinates) {
+  describeMotion: function(startCoordinates, endCoordinates, bounds) {
     var delta, description, motionThreshold;
     motionThreshold = 10;
     delta = {
@@ -8447,8 +8447,10 @@ Utils = {
       description = 'still';
     } else if (delta.absX > delta.absY) {
       description = delta.x > 0 ? 'right' : 'left';
+      description += ' ' + (delta.x / bounds.width / 2);
     } else {
       description = delta.y > 0 ? 'down' : 'up';
+      description += ' ' + (delta.y / bounds.height / 2);
     }
     return description;
   },
@@ -8458,7 +8460,7 @@ Utils = {
       extra = '';
     }
     description = this.currentGesture.touches;
-    description += ' ' + Utils.describeMotion(this.currentGesture.origin, this.currentGesture.last);
+    description += ' ' + Utils.describeMotion(this.currentGesture.origin, this.currentGesture.last, gestureBounds);
     description += ' from ' + Utils.describePosition(this.currentGesture.origin, gestureBounds);
     if (extra) {
       description += " " + extra;
@@ -8983,7 +8985,7 @@ PenciltestUI = (function(_super) {
     firstFrame: {
       label: "First Frame",
       hotkey: ['0', 'Home', 'PgUp'],
-      gesture: /2 left from .* (bottom|middle)/,
+      gesture: /2 left .* from (bottom|middle) right end/,
       cancelComplement: true,
       listener: function() {
         this.goToFrame(0);
@@ -8993,11 +8995,23 @@ PenciltestUI = (function(_super) {
     lastFrame: {
       label: "Last Frame",
       hotkey: ['$', 'End', 'PgDn'],
-      gesture: /2 right from .* (bottom|middle)/,
+      gesture: /2 right .* from (bottom|middle) left end/,
       cancelComplement: true,
       listener: function() {
         this.goToFrame(this.film.frames.length - 1);
         return this.stop();
+      }
+    },
+    scrubFrame: {
+      label: "Scrub Frame",
+      gesture: /2 (left|right) ([0-9.-]*) from .* bottom scrub/,
+      listener: function(direction, progress) {
+        if (this.isScrubbing) {
+          return this.goToFrame(Math.round(progress * 30 + this.scrubFrameStart));
+        } else {
+          this.scrubFrameStart = this.current.frameNumber;
+          return this.isScrubbing = true;
+        }
       }
     },
     copyFrame: {
@@ -9138,7 +9152,7 @@ PenciltestUI = (function(_super) {
     onionSkin: {
       label: "Onion Skin",
       hotkey: ['O'],
-      gesture: /2 down from center (bottom|middle)/,
+      gesture: /2 down .* from center (bottom|middle) .* end/,
       title: "show previous and next frames in red and blue",
       listener: function() {
         this.setOptions({
@@ -9150,7 +9164,7 @@ PenciltestUI = (function(_super) {
     dropFrame: {
       label: "Drop Frame",
       hotkey: ['Shift+X'],
-      gesture: /4 down from center top/,
+      gesture: /4 down .* from center top .* end/,
       cancelComplement: true,
       listener: function() {
         return this.dropFrame();
@@ -9159,7 +9173,7 @@ PenciltestUI = (function(_super) {
     cutFrame: {
       label: "Cut Frame",
       hotkey: ['X'],
-      gesture: /3 down from center top/,
+      gesture: /3 down .* from center top .* end/,
       cancelComplement: true,
       listener: function() {
         return this.cutFrame();
@@ -9231,7 +9245,7 @@ PenciltestUI = (function(_super) {
     loop: {
       label: "Loop",
       hotkey: ['L'],
-      gesture: /2 up from center (bottom|middle)/,
+      gesture: /2 up .* from center (bottom|middle) .* end/,
       listener: function() {
         this.setOptions({
           loop: !this.options.loop
@@ -9250,7 +9264,7 @@ PenciltestUI = (function(_super) {
     loadFilm: {
       label: "Load",
       hotkey: ['Alt+O'],
-      gesture: /3 up from center (bottom|middle)/,
+      gesture: /3 up .* from center (bottom|middle) .* end/,
       listener: function() {
         return this.loadFilm();
       }
@@ -9436,9 +9450,12 @@ PenciltestUI = (function(_super) {
     }
   ];
 
-  PenciltestUI.prototype.doAppAction = function(optionName) {
+  PenciltestUI.prototype.doAppAction = function(optionName, parameters) {
     var _ref;
-    return (_ref = this.appActions[optionName].listener) != null ? _ref.call(this.controller) : void 0;
+    if (parameters == null) {
+      parameters = [];
+    }
+    return (_ref = this.appActions[optionName].listener) != null ? _ref.apply(this.controller, parameters) : void 0;
   };
 
   PenciltestUI.prototype.menuWalker = function(level) {
@@ -9521,10 +9538,14 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      var gestureDescription;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
         Utils.recordGesture(event);
-        return Utils.describeGesture(self.fieldBounds);
+        gestureDescription = Utils.describeGesture(self.fieldBounds, 'scrub');
+        if (/^\d+ (up|down|left|right)/.test(gestureDescription)) {
+          return self.doGesture(gestureDescription);
+        }
       } else {
         if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
           return trackFromEvent(event);
@@ -9536,7 +9557,8 @@ PenciltestUI = (function(_super) {
         return true;
       } else {
         if (event.type === 'touchend' && Utils.currentGesture) {
-          self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
+          self.controller.isScrubbing = false;
+          self.doGesture(Utils.describeGesture(self.fieldBounds, 'end'));
           Utils.clearGesture(event);
         }
         if (event.button === 1) {
@@ -9568,13 +9590,16 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.doGesture = function(gestureDescription) {
-    var action, name, _ref;
+    var action, gestureMatch, name, _ref;
     _ref = this.appActions;
     for (name in _ref) {
       action = _ref[name];
-      if (action.gesture && action.gesture.test(gestureDescription)) {
-        this.showFeedback(action.label);
-        return this.doAppAction(name);
+      if (action.gesture) {
+        gestureMatch = gestureDescription.match(action.gesture);
+        if (gestureMatch) {
+          this.showFeedback(action.label);
+          return this.doAppAction(name, gestureMatch.slice(1));
+        }
       }
     }
   };
@@ -9836,7 +9861,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.3',
+    version: '0.2.4',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
