@@ -215,8 +215,9 @@ Penciltest = (function() {
     if (this.playDirection == null) {
       this.playDirection = 1;
     }
-    if (this.current.frameNumber < this.film.frames.length - 1) {
+    if (this.current.frameNumber < this.film.frames.length) {
       this.framesHeld = 0;
+      this.goToFrame(this.current.frameNumber);
     } else {
       this.framesHeld = -1;
       this.goToFrame(0);
