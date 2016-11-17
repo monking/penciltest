@@ -9331,10 +9331,13 @@ PenciltestUI = (function(_super) {
       hotkey: ['Alt+E'],
       cancelComplement: true,
       listener: function() {
-        var dataUrl, fileName;
-        dataUrl = 'data:application/json;base64,' + Utils.encodeBase64(JSON.stringify(this.film));
+        var blob, fileName, url;
+        blob = new Blob([JSON.stringify(this.film)], {
+          type: 'application/json'
+        });
+        url = window.URL.createObjectURL(blob);
         fileName = (this.film.name || 'untitled') + '.penciltest.json';
-        return Utils.downloadFromUrl(dataUrl, fileName);
+        return Utils.downloadFromUrl(url, fileName);
       }
     },
     importFilm: {
@@ -9355,7 +9358,7 @@ PenciltestUI = (function(_super) {
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('Audio file URL: ', this.state.audioURL, function(audioURL) {
+        return Utils.prompt('Audio file URL: ', (this.film.audio ? this.film.audio.url : ''), function(audioURL) {
           if (audioURL != null) {
             return self.loadAudio(audioURL);
           }
@@ -9859,7 +9862,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.2',
+    version: '0.2.3',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser', 'selection']
   };
