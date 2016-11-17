@@ -220,8 +220,9 @@ class Penciltest
   play: ->
     self = @
     @playDirection ?= 1
-    if @current.frameNumber < @film.frames.length - 1
+    if @current.frameNumber < @film.frames.length # i.e. it is a frame in the film (in case @current.frameNumber was
       @framesHeld = 0
+      @goToFrame @current.frameNumber # reset the audio position to the _beginning_ of the current frame
     else
       @framesHeld = -1
       @goToFrame 0
