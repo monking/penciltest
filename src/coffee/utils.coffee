@@ -68,10 +68,12 @@ Utils =
     promptForm.appendChild promptInput
 
     closePromptModal = ->
+      console.error('debug') # XXX
       promptModal.remove()
       window.pauseKeyboardListeners = false
 
     promptCancelButton = document.createElement 'button'
+    promptCancelButton.type = 'button'
     promptCancelButton.innerHTML = 'Cancel'
     promptCancelButton.addEventListener 'click', (event) ->
       event.preventDefault()
@@ -87,6 +89,7 @@ Utils =
       promptAcceptButton.type = 'submit'
       promptAcceptButton.value = 'Accept'
       promptForm.addEventListener 'submit', (event) ->
+        console.log(event.type) # XXX
         event.preventDefault()
         closePromptModal()
         callback promptInput.value

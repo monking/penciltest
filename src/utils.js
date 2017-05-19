@@ -98,10 +98,12 @@ Utils = {
     promptInput.style.display = 'block';
     promptForm.appendChild(promptInput);
     closePromptModal = function() {
+      console.error('debug');
       promptModal.remove();
       return window.pauseKeyboardListeners = false;
     };
     promptCancelButton = document.createElement('button');
+    promptCancelButton.type = 'button';
     promptCancelButton.innerHTML = 'Cancel';
     promptCancelButton.addEventListener('click', function(event) {
       event.preventDefault();
@@ -118,6 +120,7 @@ Utils = {
       promptAcceptButton.type = 'submit';
       promptAcceptButton.value = 'Accept';
       promptForm.addEventListener('submit', function(event) {
+        console.log(event.type);
         event.preventDefault();
         closePromptModal();
         return callback(promptInput.value);
