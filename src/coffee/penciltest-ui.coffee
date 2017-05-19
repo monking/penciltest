@@ -487,6 +487,8 @@ class PenciltestUI extends PenciltestUIComponent
   addInputListeners: ->
     self = @
 
+    @previousEvent = null
+
     getEventPageXY = (event) ->
       if /^touch/.test event.type
         eventLocation = event.touches[0]
@@ -504,6 +506,7 @@ class PenciltestUI extends PenciltestUIComponent
       )
 
     mouseDownListener = (event) ->
+      @previousEvent = event
       return if self.controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
@@ -532,6 +535,7 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', mouseUpListener
 
     mouseMoveListener = (event) ->
+      @previousEvent = event
       event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
         Utils.recordGesture event
@@ -541,6 +545,7 @@ class PenciltestUI extends PenciltestUIComponent
         trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
+      @previousEvent = event
       if event.type is 'mouseup' and event.button is 2
         return true # allow context menu
       else
@@ -559,8 +564,10 @@ class PenciltestUI extends PenciltestUIComponent
       self.appActions.eraser.listener.call self.controller
 
     contextMenuListener = (event) ->
+      console.log(@previousEvent, (if @previousEvent then @previousEvent.type else 'n/a')); # XXX
       event.preventDefault()
-      self.toggleMenu getEventPageXY event
+      if !@previousEvent || !@previousEvent.type.match(/^touch/)
+        self.toggleMenu getEventPageXY event
 
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener

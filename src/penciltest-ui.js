@@ -657,6 +657,7 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.addInputListeners = function() {
     var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
     self = this;
+    this.previousEvent = null;
     getEventPageXY = function(event) {
       var eventLocation;
       if (/^touch/.test(event.type)) {
@@ -675,6 +676,7 @@ PenciltestUI = (function(_super) {
       return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
     };
     mouseDownListener = function(event) {
+      this.previousEvent = event;
       if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
         return;
       }
@@ -709,6 +711,7 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      this.previousEvent = event;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
         Utils.recordGesture(event);
@@ -720,6 +723,7 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseUpListener = function(event) {
+      this.previousEvent = event;
       if (event.type === 'mouseup' && event.button === 2) {
         return true;
       } else {
@@ -742,8 +746,11 @@ PenciltestUI = (function(_super) {
       return self.appActions.eraser.listener.call(self.controller);
     };
     contextMenuListener = function(event) {
+      console.log(this.previousEvent, (this.previousEvent ? this.previousEvent.type : 'n/a'));
       event.preventDefault();
-      return self.toggleMenu(getEventPageXY(event));
+      if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
+        return self.toggleMenu(getEventPageXY(event));
+      }
     };
     this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
     this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
