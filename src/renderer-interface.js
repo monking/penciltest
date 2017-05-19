@@ -1,6 +1,6 @@
 
 /*
-global: document, window
+global: document
  */
 var RendererInterface;
 
@@ -10,8 +10,9 @@ RendererInterface = (function() {
     lineColor: [0, 0, 0],
     lineWeight: 1,
     lineOpacity: 1,
-    width: 960,
-    height: 540
+    lineCorner: 'round',
+    width: 1920,
+    height: 1080
   };
 
   function RendererInterface(options) {
@@ -41,15 +42,20 @@ RendererInterface = (function() {
     return null;
   };
 
+  RendererInterface.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
+    return null;
+  };
+
   RendererInterface.prototype.setLineOverrides = function(options) {
     this.overrides = options;
-    return this.currentLineOptions = Utils.inherit(options, this.overrides, this.defaultLineOptions());
+    return this.currentLineOptions = Utils.inherit(this.overrides, this.defaultLineOptions());
   };
 
   RendererInterface.prototype.defaultLineOptions = function() {
     return {
       color: this.options.lineColor,
       weight: this.options.lineWeight,
+      corner: this.options.lineCorner,
       opacity: this.options.lineOpacity
     };
   };

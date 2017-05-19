@@ -33,9 +33,9 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatus:
         className: 'film-status'
         parent: 'statusRight'
-      toggleTimeline:
+      toggleTool:
         tagName: 'button'
-        className: 'toggle-timeline fa fa-table'
+        className: 'toggle-tool fa fa-pencil'
         parent: 'statusRight'
       toggleMenu:
         tagName: 'button'
@@ -69,14 +69,19 @@ class PenciltestUI extends PenciltestUIComponent
     renderer:
       label: "Set Renderer"
       listener: ->
-        name = Utils.prompt 'renderer (svg, canvas): ', @options.renderer
-        if name of @availableRenderers
-          @setOptions renderer: name
+        self = @
+        rendererNames = []
+        for name, renderer of @availableRenderers
+          rendererNames.push name
+        Utils.select 'Set renderer', rendererNames, @options.renderer, (selected) ->
+          self.setOptions renderer: selected
       action: ->
         if @fieldElement
           @renderer?.destroy()
           @renderer = new @availableRenderers[ @options.renderer ](
             container: @fieldElement
+            width: if @forceDimensions then @forceDimensions.width else @width
+            height: if @forceDimensions then @forceDimensions.height else @height
           )
     playPause:
       label: "Play/Pause"
@@ -127,6 +132,21 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
+    copyFrame:
+      label: "Copy Frame"
+      hotkey: ['C']
+      listener: ->
+        @copyFrame()
+    pasteFrame:
+      label: "Paste Frame"
+      hotkey: ['V']
+      listener: ->
+        @pasteFrame()
+    pasteStrokes:
+      label: "Paste Strokes"
+      hotkey: ['Shift+V']
+      listener: ->
+        @pasteStrokes()
     insertFrameBefore:
       label: "Insert Frame Before"
       hotkey: ['Shift+I']
@@ -147,11 +167,12 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Insert Seconds"
       hotkey: ['Alt+Shift+I']
       listener: ->
-        seconds = Number Utils.prompt '# of seconds to insert: ', 1
-        first = @current.frameNumber + 1
-        last = @current.frameNumber + Math.floor @options.frameRate * seconds
-        @newFrame newIndex for newIndex in [first..last]
-        @goToFrame newIndex
+        self = @
+        Utils.prompt '# of seconds to insert: ', 1, (seconds) ->
+          first = self.current.frameNumber + 1
+          last = self.current.frameNumber + Math.floor self.options.frameRate * Number(seconds)
+          self.newFrame newIndex for newIndex in [first..last]
+          self.goToFrame newIndex
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
@@ -168,10 +189,27 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @redo()
     frameRate:
       label: "Frame Rate"
+      listener: ->
+        self = @
+        Utils.prompt 'frames per second: ', @options.frameRate, (rate) ->
+          if rate then self.setOptions frameRate: Number rate
       action: -> @singleFrameDuration = 1 / @options.frameRate
+    frameHold:
+      label: "Default Frame Hold"
+      listener: ->
+        self = @
+        Utils.prompt 'default exposures per drawing: ', self.options.frameHold, (hold) ->
+          if hold
+            oldHold = self.options.frameHold
+            self.setOptions frameHold: Number hold
+            Utils.confirm 'update hold for existing frames in proportion to new setting??: ', ->
+              magnitudeDelta = self.options.frameHold / oldHold
+              for frame in self.film.frames
+                frame.hold = Math.round frame.hold * magnitudeDelta
+              self.drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
       label: "Hide Cursor"
-      hotkey: ['C']
+      hotkey: ['H']
       listener: -> @setOptions hideCursor: not @options.hideCursor
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
@@ -184,15 +222,24 @@ class PenciltestUI extends PenciltestUIComponent
         @resize() # FIXME: should either not redraw, or redraw fine without this
     dropFrame:
       label: "Drop Frame"
-      hotkey: ['X','Backspace']
-      gesture: /3 down from center top/
+      hotkey: ['Shift+X']
+      gesture: /4 down from center top/
       cancelComplement: true
       listener: -> @dropFrame()
+    cutFrame:
+      label: "Cut Frame"
+      hotkey: ['X']
+      gesture: /3 down from center top/
+      cancelComplement: true
+      listener: -> @cutFrame()
     smoothing:
       label: "Smoothing..."
       title: "How much your lines will be smoothed as you draw"
       hotkey: ['Shift+S']
-      listener: -> @setOptions smoothing: Number Utils.prompt('Smoothing', @options.smoothing)
+      listener: ->
+        self = @
+        Utils.prompt 'Smoothing', @options.smoothing, (smoothing) ->
+          self.setOptions smoothing: Number smoothing
       action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
     smoothFrame:
       label: "Smooth Frame"
@@ -232,19 +279,68 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Save"
       hotkey: ['Alt+S']
       gesture: /3 still from center (bottom|middle)/
-      repeat: true
       listener: -> @saveFilm()
     loadFilm:
       label: "Load"
       hotkey: ['Alt+O']
       gesture: /3 up from center (bottom|middle)/
-      repeat: true
       listener: -> @loadFilm()
     newFilm:
       label: "New"
       hotkey: ['Alt+N']
-      repeat: true
-      listener: -> @newFilm() if Utils.confirm "This will BURN your current animation."
+      listener: ->
+        self = @
+        if @unsavedChanges
+          Utils.confirm "Unsaved changes will be lost.", -> self.newFilm()
+        else
+          @newFilm()
+    renderGif:
+      label: "Render GIF"
+      hotkey: ['Alt+G']
+      listener: -> @renderGif()
+    resizeFilm:
+      label: "Resize Film"
+      hotkey: ['Alt+R']
+      listener: ->
+        self = @
+        Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}", (dimensionsResponse) ->
+          dimensions = dimensionsResponse.split ' '
+          self.film.width = Number dimensions[0]
+          self.film.aspect = dimensions[1]
+          self.resize()
+    panFilm:
+      label: "Pan Film"
+      hotkey: ['P']
+      listener: ->
+        self = @
+        oldMode = @state.mode
+        @state.mode = Penciltest.prototype.modes.BUSY
+
+        startPoint = endPoint = deltaPoint = [0,0]
+        frameScale = @width / @film.width
+
+        dragStart = (event) ->
+          startPoint = endPoint = [event.clientX, event.clientY]
+          deltaPoint = [0, 0]
+          self.fieldElement.addEventListener 'mousemove', dragStep
+          self.fieldElement.addEventListener 'mouseup', dragEnd
+
+        dragStep = (event) ->
+          deltaPoint = [endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]]
+          immediateDeltaPoint =  [event.clientX - endPoint[0], event.clientY - endPoint[1]]
+          endPoint = [event.clientX, event.clientY]
+          self.pan [immediateDeltaPoint[0] / frameScale, immediateDeltaPoint[1] / frameScale]
+          self.drawCurrentFrame()
+
+        dragEnd = (event) ->
+          self.fieldElement.removeEventListener 'mouseup', dragEnd
+          self.fieldElement.removeEventListener 'mousedown', dragStart
+          self.fieldElement.removeEventListener 'mousemove', dragStep
+
+          self.state.mode = oldMode
+
+        @fieldElement.addEventListener 'mousedown', dragStart
+        @resize()
     deleteFilm:
       label: "Delete Film"
       hotkey: ['Alt+Backspace']
@@ -254,34 +350,32 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Alt+E']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO, 'active'
-        if open
-          @ui.components.textIO.value = JSON.stringify @film
-        else
-          @ui.components.textIO.value = ''
+        # self = @
+        blob = new Blob([JSON.stringify @film], {type:'application/json'})
+        url = window.URL.createObjectURL blob
+        fileName = (@film.name || 'untitled') + '.penciltest.json'
+        Utils.downloadFromUrl url, fileName
+        # reader = new FileReader()
+        # reader.addEventListener 'load', ->
+        #   console.log reader.result.length # XXX
+        #   return # XXX
+        # reader.readAsDataURL(blob)
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
       cancelComplement: true
       listener: ->
-        open = Utils.toggleClass @ui.components.textIO, 'active'
-        if open
-          @ui.components.textIO.value = ''
-        else
-          importJSON = @ui.components.textIO.value
-          try
-            @setFilm JSON.parse importJSON
-          @ui.components.textIO.value = ''
-    importAudio:
-      label: "Import Audio"
+        self = @
+        Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
+          self.setFilm JSON.parse filmJSON
+        , '.json,application/json'
+    linkAudio:
+      label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
-        audioURL = Utils.prompt 'Audio file URL: ', @state.audioURL
-        if audioURL?
-          @film.audio ?= {}
-          @film.audio.url = audioURL
-          @unsavedChanges = true
-          @loadAudio audioURL
+        self = @
+        Utils.prompt 'Audio file URL: ', (if @film.audio then @film.audio.url else ''), (audioURL) ->
+          self.loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
       listener: ->
@@ -310,6 +404,12 @@ class PenciltestUI extends PenciltestUIComponent
       action: ->
         @state = Utils.inherit {}, Penciltest.prototype.state
         @setOptions Utils.inherit {}, Penciltest.prototype.options
+    eraser:
+      label: "Eraser"
+      hotkey: ['E']
+      listener: ->
+        @useTool if @state.toolStack[0] == 'eraser' then @state.toolStack[1] else 'eraser'
+        @ui.updateStatus()
 
   menuOptions: [
     _icons: [
@@ -322,15 +422,20 @@ class PenciltestUI extends PenciltestUIComponent
     Edit: [
       'undo'
       'redo'
+      'moreHold'
+      'lessHold'
+      'copyFrame'
+      'cutFrame'
+      'pasteFrame'
+      'pasteStrokes'
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
       'dropFrame'
-      'moreHold'
-      'lessHold'
     ]
     Playback: [
       'loop'
+      'frameRate'
     ]
     Tools: [
       'hideCursor'
@@ -338,7 +443,7 @@ class PenciltestUI extends PenciltestUIComponent
       'smoothing'
       'smoothFrame'
       'smoothFilm'
-      'importAudio'
+      'linkAudio'
     ]
     Film: [
       'saveFilm'
@@ -346,8 +451,12 @@ class PenciltestUI extends PenciltestUIComponent
       'newFilm'
       'importFilm'
       'exportFilm'
+      'renderGif'
+      'resizeFilm'
+      'panFilm'
     ]
     Settings: [
+      'frameHold'
       'renderer'
       'describeKeyboardShortcuts'
       'reset'
@@ -395,6 +504,7 @@ class PenciltestUI extends PenciltestUIComponent
       )
 
     mouseDownListener = (event) ->
+      return if self.controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
         self.controller.cancelStroke()
@@ -412,6 +522,8 @@ class PenciltestUI extends PenciltestUIComponent
           return true # allow context menu
         else
           self.hideMenu()
+
+        self.controller.useTool 'eraser' if event.button is 1
 
         trackFromEvent event
         document.body.addEventListener 'mousemove', mouseMoveListener
@@ -435,11 +547,16 @@ class PenciltestUI extends PenciltestUIComponent
         if event.type is 'touchend' and Utils.currentGesture
           self.doGesture Utils.describeGesture self.fieldBounds, 'final'
           Utils.clearGesture event
+        self.controller.useTool 'pencil' if event.button is 1
         document.body.removeEventListener 'mousemove', mouseMoveListener
         document.body.removeEventListener 'touchmove', mouseMoveListener
         document.body.removeEventListener 'mouseup', mouseUpListener
         document.body.removeEventListener 'touchend', mouseUpListener
         self.controller.lift()
+
+    toggleToolListener = (event) ->
+      event.preventDefault()
+      self.appActions.eraser.listener.call self.controller
 
     contextMenuListener = (event) ->
       event.preventDefault()
@@ -448,6 +565,7 @@ class PenciltestUI extends PenciltestUIComponent
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
+    @components.toggleTool.getElement().addEventListener 'click', toggleToolListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
     @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
 
@@ -504,19 +622,20 @@ class PenciltestUI extends PenciltestUIComponent
               @keyBindings.keydown[hotkey] = null
 
     keyboardListener = (event) ->
-      combo = Utils.describeKeyCombo event
-      actionName = self.keyBindings[event.type][combo]
+      if !window.pauseKeyboardListeners
+        combo = Utils.describeKeyCombo event
+        actionName = self.keyBindings[event.type][combo]
 
-      if actionName or actionName is null
-        event.preventDefault()
+        if actionName or actionName is null
+          event.preventDefault()
 
-        if actionName
-          self.doAppAction actionName
+          if actionName
+            self.doAppAction actionName
 
-      # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
+        # Utils.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
-    document.body.addEventListener 'keydown', keyboardListener
-    document.body.addEventListener 'keyup', keyboardListener
+    document.body.addEventListener 'keydown', (event) -> keyboardListener(event)
+    document.body.addEventListener 'keyup', (event) -> keyboardListener(event)
 
   addOtherListeners: ->
     self = @
@@ -561,6 +680,7 @@ class PenciltestUI extends PenciltestUIComponent
       filmStatusMarkup += "</div>"
 
       @components.filmStatus.setHTML filmStatusMarkup
+      @components.toggleTool.getElement().className = "toggle-tool fa fa-#{@controller.state.toolStack[0]}"# FIXME: use a helper to do this
 
   showMenu: (coords = {x: 10, y: 10}) ->
     if not @menuIsVisible

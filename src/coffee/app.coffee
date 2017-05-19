@@ -8,5 +8,7 @@ window.addEventListener 'load', ->
   penciltest = new Penciltest
     container: '#penciltest'
 
+  window.p = penciltest
+
   window.addEventListener 'resize', ->
     penciltest.resize()

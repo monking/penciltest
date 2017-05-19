@@ -23,9 +23,25 @@ CanvasRenderer = (function(_super) {
     return this.context.lineTo(x, y);
   };
 
+  CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
+    CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
+    this.context.rect(x, y, width, height);
+    if (backgroundColor) {
+      this.context.fillStyle = backgroundColor;
+      this.context.fill();
+    }
+    if (strokeColor) {
+      this.context.strokeStyle = strokeColor;
+      this.context.stroke();
+    }
+    return this.updateStrokeStyle();
+  };
+
   CanvasRenderer.prototype.updateStrokeStyle = function() {
     if (this.context) {
-      this.context.lineWidth = this.currentLineOptions.lineWeight;
+      this.context.fillStyle = null;
+      this.context.lineWidth = this.currentLineOptions.weight;
+      this.context.lineJoin = this.currentLineOptions.corner;
       return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
     }
   };

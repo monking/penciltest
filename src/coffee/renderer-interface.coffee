@@ -1,5 +1,5 @@
 ###
-global: document, window
+global: document
 ###
 
 class RendererInterface
@@ -9,8 +9,9 @@ class RendererInterface
     lineColor: [0, 0, 0]
     lineWeight: 1
     lineOpacity: 1
-    width: 960
-    height: 540
+    lineCorner: 'round'
+    width: 1920
+    height: 1080
 
   constructor: (options) ->
     @options = Utils.inherit(
@@ -39,10 +40,12 @@ class RendererInterface
   lineTo: (x, y) ->
     null
 
+  rect: (x, y, width, height, backgroundColor, strokeColor) ->
+    null
+
   setLineOverrides: ( options ) ->
     @overrides = options
     @currentLineOptions = Utils.inherit(
-      options
       @overrides
       @defaultLineOptions()
     )
@@ -50,6 +53,7 @@ class RendererInterface
   defaultLineOptions: ->
     color: @options.lineColor
     weight: @options.lineWeight
+    corner: @options.lineCorner
     opacity: @options.lineOpacity
 
   clearLineOverrides: ->
