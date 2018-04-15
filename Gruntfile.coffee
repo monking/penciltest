@@ -49,8 +49,10 @@ module.exports = (grunt) ->
         files: ['src/coffee/**/*.coffee']
         tasks: ['coffee', 'concat']
 
-      styles:
-        files: ['style/**/*.{sass,scss}']
-        tasks: ['compass']
+      # styles:
+      #   files: ['style/**/*.{sass,scss}']
+      #   tasks: ['compass']
 
-  grunt.registerTask 'default', ['coffee', 'compass', 'concat']
+  # # disabling compass (for now) because rubygem dependencies are not building on sandbox - CL (Sun Apr 15 09:15:52 PDT 2018)
+  # grunt.registerTask 'default', ['coffee', 'compass', 'concat']
+  grunt.registerTask 'default', ['coffee', 'concat']
