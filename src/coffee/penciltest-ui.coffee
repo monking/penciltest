@@ -49,8 +49,9 @@ class PenciltestUI extends PenciltestUIComponent
         tagName: 'ul'
         className: 'menu'
         parent: this
-      textIO:
-        tagName: 'textarea'
+      help:
+        tagName: 'div'
+        className: 'help'
         parent: 'toolbar'
 
     for name, options of componentInfo
@@ -394,10 +395,10 @@ class PenciltestUI extends PenciltestUIComponent
         Utils.log "Shift Audio Later"
         @film.audio.offset++ if @film.audio
         @ui.updateStatus()
-    describeKeyboardShortcuts:
+    showInterfaceHelp:
       label: "Keyboard Shortcuts"
       hotkey: ['?']
-      listener: -> @ui.describeKeyboardShortcuts()
+      listener: -> @ui.showInterfaceHelp()
     reset:
       label: "Reset"
       title: "Clear settings; helpful if the app has stopped working."
@@ -458,7 +459,7 @@ class PenciltestUI extends PenciltestUIComponent
     Settings: [
       'frameHold'
       'renderer'
-      'describeKeyboardShortcuts'
+      'showInterfaceHelp'
       'reset'
     ]
   ]
@@ -564,17 +565,35 @@ class PenciltestUI extends PenciltestUIComponent
       self.appActions.eraser.listener.call self.controller
 
     contextMenuListener = (event) ->
-      console.log(@previousEvent, (if @previousEvent then @previousEvent.type else 'n/a')); # XXX
       event.preventDefault()
       if !@previousEvent || !@previousEvent.type.match(/^touch/)
         self.toggleMenu getEventPageXY event
+
+		# # doesn't work; Chrome warns: 
+		# # > [Intervention] Unable to preventDefault inside passive event listener
+		# # > due to target being treated as passive. See
+		# # > https://www.chromestatus.com/features/5093566007214080
+    # preventPinchZoomHandler = (event) => (
+    #   if event.cancelable && event.touches.length > 1
+    #     console.log(
+    #       "preventing pinch zoom, (%s, type: %s, cancelable: %s)",
+    #       (event.target instanceof Window ? 'window' : 'body'),
+    #       event.type,
+    #       event.cancelable
+    #     )
+    #     event.preventDefault()
+    # )
+    # window.addEventListener 'touchstart', preventPinchZoomHandler, true
+    # document.body.addEventListener 'touchstart', preventPinchZoomHandler, true
+    # window.addEventListener 'touchmove', preventPinchZoomHandler, true
+    # document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
 
     @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
     @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
     @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
     @components.toggleTool.getElement().addEventListener 'click', toggleToolListener
     @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
-    @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'describeKeyboardShortcuts'
+    @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'showInterfaceHelp'
 
   doGesture: (gestureDescription) ->
     for name, action of @appActions
@@ -651,24 +670,37 @@ class PenciltestUI extends PenciltestUIComponent
       self.controller.putStoredData 'app', 'state', self.controller.state
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
-  describeKeyboardShortcuts: ->
-    open = Utils.toggleClass @components.textIO.getElement(), 'active'
+  showInterfaceHelp: ->
+    gesturesMap = []
+
+    open = Utils.toggleClass @components.help.getElement(), 'active'
+
+    for child in @components.help.getElement().children
+      @components.help.getElement().removeChild(child)
+
     if open
-      helpDoc = 'Keyboard Shortcuts:\n'
+      keyboardDoc = 'Keyboard Shortcuts:\n'
 
       for name, action of @appActions
-        if not action.hotkey then continue
-
-        helpDoc += action.label or name
         if action.hotkey
-          helpDoc += " [#{action.hotkey.join ' or '}]"
-        if action.title
-          helpDoc += " - #{action.title}"
-        helpDoc += '\n'
+          keyboardDoc += action.label or name
+          if action.hotkey
+            keyboardDoc += " [#{action.hotkey.join ' or '}]"
+          if action.title
+            keyboardDoc += " - #{action.title}"
+          keyboardDoc += '\n'
 
-      @components.textIO.getElement().value = helpDoc
-    else
-      @components.textIO.getElement().value = ''
+        if action.gesture
+          gestureTerms = String(action.gesture).match(/([0-9]+)(.*)\/$/)
+          fingerCount = Number(gestureTerms[1])
+          unicodeDotCounters = ['', '\u2024', '\u2025', '\u2056', '\u2058', '\u2059']
+          gesturesMap.push "#{name}: #{unicodeDotCounters[fingerCount]} #{gestureTerms[2]}"
+
+      helpDoc = "Gestures:\n" + gesturesMap.join "\n"
+      helpDoc += "\n\n#{keyboardDoc}"
+    
+      helpTextNode = document.createTextNode(helpDoc)
+      @components.help.getElement().appendChild(helpTextNode)
 
   updateStatus: ->
     if @controller.options.showStatus

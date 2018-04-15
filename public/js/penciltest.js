@@ -8881,8 +8881,9 @@ PenciltestUI = (function(_super) {
         className: 'menu',
         parent: this
       },
-      textIO: {
-        tagName: 'textarea',
+      help: {
+        tagName: 'div',
+        className: 'help',
         parent: 'toolbar'
       }
     };
@@ -9403,11 +9404,11 @@ PenciltestUI = (function(_super) {
         return this.ui.updateStatus();
       }
     },
-    describeKeyboardShortcuts: {
+    showInterfaceHelp: {
       label: "Keyboard Shortcuts",
       hotkey: ['?'],
       listener: function() {
-        return this.ui.describeKeyboardShortcuts();
+        return this.ui.showInterfaceHelp();
       }
     },
     reset: {
@@ -9435,7 +9436,7 @@ PenciltestUI = (function(_super) {
       Playback: ['loop', 'frameRate'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
-      Settings: ['frameHold', 'renderer', 'describeKeyboardShortcuts', 'reset']
+      Settings: ['frameHold', 'renderer', 'showInterfaceHelp', 'reset']
     }
   ];
 
@@ -9561,7 +9562,6 @@ PenciltestUI = (function(_super) {
       return self.appActions.eraser.listener.call(self.controller);
     };
     contextMenuListener = function(event) {
-      console.log(this.previousEvent, (this.previousEvent ? this.previousEvent.type : 'n/a'));
       event.preventDefault();
       if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
         return self.toggleMenu(getEventPageXY(event));
@@ -9573,7 +9573,7 @@ PenciltestUI = (function(_super) {
     this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     return this.components.toggleHelp.getElement().addEventListener('click', function() {
-      return self.doAppAction('describeKeyboardShortcuts');
+      return self.doAppAction('showInterfaceHelp');
     });
   };
 
@@ -9683,29 +9683,41 @@ PenciltestUI = (function(_super) {
     });
   };
 
-  PenciltestUI.prototype.describeKeyboardShortcuts = function() {
-    var action, helpDoc, name, open, _ref;
-    open = Utils.toggleClass(this.components.textIO.getElement(), 'active');
+  PenciltestUI.prototype.showInterfaceHelp = function() {
+    var action, child, fingerCount, gestureTerms, gesturesMap, helpDoc, helpTextNode, keyboardDoc, name, open, unicodeDotCounters, _i, _len, _ref, _ref1;
+    gesturesMap = [];
+    open = Utils.toggleClass(this.components.help.getElement(), 'active');
+    _ref = this.components.help.getElement().children;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      child = _ref[_i];
+      this.components.help.getElement().removeChild(child);
+    }
     if (open) {
-      helpDoc = 'Keyboard Shortcuts:\n';
-      _ref = this.appActions;
-      for (name in _ref) {
-        action = _ref[name];
-        if (!action.hotkey) {
-          continue;
-        }
-        helpDoc += action.label || name;
+      keyboardDoc = 'Keyboard Shortcuts:\n';
+      _ref1 = this.appActions;
+      for (name in _ref1) {
+        action = _ref1[name];
         if (action.hotkey) {
-          helpDoc += " [" + (action.hotkey.join(' or ')) + "]";
+          keyboardDoc += action.label || name;
+          if (action.hotkey) {
+            keyboardDoc += " [" + (action.hotkey.join(' or ')) + "]";
+          }
+          if (action.title) {
+            keyboardDoc += " - " + action.title;
+          }
+          keyboardDoc += '\n';
         }
-        if (action.title) {
-          helpDoc += " - " + action.title;
+        if (action.gesture) {
+          gestureTerms = String(action.gesture).match(/([0-9]+)(.*)\/$/);
+          fingerCount = Number(gestureTerms[1]);
+          unicodeDotCounters = ['', '\u2024', '\u2025', '\u2056', '\u2058', '\u2059'];
+          gesturesMap.push("" + name + ": " + unicodeDotCounters[fingerCount] + " " + gestureTerms[2]);
         }
-        helpDoc += '\n';
       }
-      return this.components.textIO.getElement().value = helpDoc;
-    } else {
-      return this.components.textIO.getElement().value = '';
+      helpDoc = "Gestures:\n" + gesturesMap.join("\n");
+      helpDoc += "\n\n" + keyboardDoc;
+      helpTextNode = document.createTextNode(helpDoc);
+      return this.components.help.getElement().appendChild(helpTextNode);
     }
   };
 
@@ -9846,7 +9858,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.4',
+    version: '0.2.4 gestures',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };

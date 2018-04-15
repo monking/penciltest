@@ -16,16 +16,16 @@ module.exports = (grunt) ->
         dest   : 'src'
         ext    : '.js'
 
-    # compass:
-    #   compile:
-    #     options:
-    #       sassDir     : 'style'
-    #       imagesDir   : 'public/img'
-    #       cssDir      : 'public/css'
-    #       environment : 'production'
-    #       outputStyle : 'expanded'
-    #       config      : 'style/config.rb'
-    #       force       : true
+    compass:
+      compile:
+        options:
+          sassDir     : 'style'
+          imagesDir   : 'public/img'
+          cssDir      : 'public/css'
+          environment : 'production'
+          outputStyle : 'expanded'
+          config      : 'style/config.rb'
+          force       : true
 
     concat:
       dist:
@@ -49,8 +49,8 @@ module.exports = (grunt) ->
         files: ['src/coffee/**/*.coffee']
         tasks: ['coffee', 'concat']
 
-      # styles:
-      #   files: ['style/**/*.{sass,scss}']
-      #   tasks: ['compass']
+      styles:
+        files: ['style/**/*.{sass,scss}']
+        tasks: ['compass']
 
-  grunt.registerTask 'default', ['coffee', 'concat']
+  grunt.registerTask 'default', ['coffee', 'compass', 'concat']

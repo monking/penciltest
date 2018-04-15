@@ -190,8 +190,10 @@
   }
 
 
-  textarea {
+  .help {
     $width: 70%;
+    white-space: pre-wrap;
+    overflow: auto;
     position: fixed;
     width: $width;
     top: 0;
