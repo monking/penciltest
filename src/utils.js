@@ -98,7 +98,6 @@ Utils = {
     promptInput.style.display = 'block';
     promptForm.appendChild(promptInput);
     closePromptModal = function() {
-      console.error('debug');
       promptModal.remove();
       return window.pauseKeyboardListeners = false;
     };
@@ -120,7 +119,6 @@ Utils = {
       promptAcceptButton.type = 'submit';
       promptAcceptButton.value = 'Accept';
       promptForm.addEventListener('submit', function(event) {
-        console.log(event.type);
         event.preventDefault();
         closePromptModal();
         return callback(promptInput.value);
@@ -275,14 +273,25 @@ Utils = {
     sumPoints.y /= event.targetTouches.length;
     return sumPoints;
   },
-  recordGesture: function(event) {
+  diffPoints: function(point1, point2) {
+    return {
+      x: point1.x - point2.x,
+      y: point1.y - point2.y
+    };
+  },
+  recordGesture: function(event, bounds) {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
         origin: Utils.averageTouches(event)
       };
     }
-    return this.currentGesture.last = Utils.averageTouches(event);
+    this.currentGesture.last = Utils.averageTouches(event);
+    this.currentGesture.delta = Utils.diffPoints(this.currentGesture.last, this.currentGesture.origin);
+    return this.currentGesture.deltaNormalized = {
+      x: this.currentGesture.delta.x / bounds.width,
+      y: this.currentGesture.delta.y / bounds.height
+    };
   },
   clearGesture: function(event) {
     return this.currentGesture = null;

@@ -84,18 +84,25 @@ class PenciltestUI extends PenciltestUIComponent
             width: if @forceDimensions then @forceDimensions.width else @width
             height: if @forceDimensions then @forceDimensions.height else @height
           )
+    pageFlip:
+      label: "Page Flip"
+      gesture: /2 (left|right) from .* (bottom|middle)/
+      triggerOnMove: true
+      listener: ->
+        @goToFrame Math.floor(Utils.currentGesture.startFrameNumber + @film.frames.length * Utils.currentGesture.deltaNormalized.x * 2)
+        
     playPause:
       label: "Play/Pause"
       hotkey: ['Space']
       gesture: /2 still from center (bottom|middle)/
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         @playDirection = 1
         @togglePlay()
     playReverse:
       label: "Play in Reverse"
       hotkey: ['Shift+Space']
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         @playDirection = -1
         @togglePlay()
@@ -121,7 +128,7 @@ class PenciltestUI extends PenciltestUIComponent
       label: "First Frame"
       hotkey: ['0','Home','PgUp']
       gesture: /2 left from .* (bottom|middle)/
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         @goToFrame 0
         @stop()
@@ -129,7 +136,7 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Last Frame"
       hotkey: ['$','End','PgDn']
       gesture: /2 right from .* (bottom|middle)/
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         @goToFrame @film.frames.length - 1
         @stop()
@@ -225,13 +232,13 @@ class PenciltestUI extends PenciltestUIComponent
       label: "Drop Frame"
       hotkey: ['Shift+X']
       gesture: /4 down from center top/
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: -> @dropFrame()
     cutFrame:
       label: "Cut Frame"
       hotkey: ['X']
       gesture: /3 down from center top/
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: -> @cutFrame()
     smoothing:
       label: "Smoothing..."
@@ -264,6 +271,10 @@ class PenciltestUI extends PenciltestUIComponent
       gesture: /2 still from right middle/
       repeat: true
       listener: -> @setCurrentFrameHold @getCurrentFrame().hold + 1
+    toggleDebug:
+      label: "Toggle Debug"
+      title: "Verbose logs for debugging"
+      listener: -> @setOptions debug: not @options.debug
     showStatus:
       label: "Show Status"
       title: "hide the film status bar"
@@ -349,7 +360,7 @@ class PenciltestUI extends PenciltestUIComponent
     exportFilm:
       label: "Export"
       hotkey: ['Alt+E']
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         # self = @
         blob = new Blob([JSON.stringify @film], {type:'application/json'})
@@ -364,7 +375,7 @@ class PenciltestUI extends PenciltestUIComponent
     importFilm:
       label: "Import"
       hotkey: ['Alt+I']
-      cancelComplement: true
+      cancelComplementKeyEvent: true
       listener: ->
         self = @
         Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
@@ -436,7 +447,6 @@ class PenciltestUI extends PenciltestUIComponent
     ]
     Playback: [
       'loop'
-      'frameRate'
     ]
     Tools: [
       'hideCursor'
@@ -447,20 +457,22 @@ class PenciltestUI extends PenciltestUIComponent
       'linkAudio'
     ]
     Film: [
+      'frameRate'
+      'resizeFilm'
+      'panFilm'
+      'renderGif'
       'saveFilm'
       'loadFilm'
       'newFilm'
       'importFilm'
       'exportFilm'
-      'renderGif'
-      'resizeFilm'
-      'panFilm'
     ]
     Settings: [
       'frameHold'
       'renderer'
       'showInterfaceHelp'
       'reset'
+      'toggleDebug'
     ]
   ]
 
@@ -508,42 +520,45 @@ class PenciltestUI extends PenciltestUIComponent
 
     mouseDownListener = (event) ->
       @previousEvent = event
-      return if self.controller.state.mode != Penciltest.prototype.modes.DRAWING
+      return if @controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
       if event.type is 'touchstart' and event.touches.length > 1
-        self.controller.cancelStroke()
-        self.fieldBounds =
+        @controller.cancelStroke()
+        @fieldBounds =
           x: 0
           y: 0
-          width: self.controller.width
-          height: self.controller.height
+          width: @controller.width
+          height: @controller.height
         if not Utils.currentGesture
-          self.doAppAction 'undo'
+          @doAppAction 'undo'
         Utils.clearGesture()
-        Utils.recordGesture event
+        Utils.recordGesture event, @fieldBounds
+        Utils.currentGesture.startFrameNumber = @controller.current.frameNumber
       else
         if event.button is 2
           return true # allow context menu
         else
-          self.hideMenu()
+          @hideMenu()
 
-        self.controller.useTool 'eraser' if event.button is 1
+        @controller.useTool 'eraser' if event.button is 1
 
         trackFromEvent event
-        document.body.addEventListener 'mousemove', mouseMoveListener
-        document.body.addEventListener 'touchmove', mouseMoveListener
-        document.body.addEventListener 'mouseup', mouseUpListener
-        document.body.addEventListener 'touchend', mouseUpListener
+        @uiListeners.move = mouseMoveListener.bind @
+        @uiListeners.up = mouseUpListener.bind @
+
+        document.body.addEventListener 'mousemove', @uiListeners.move
+        document.body.addEventListener 'touchmove', @uiListeners.move
+        document.body.addEventListener 'mouseup', @uiListeners.up
+        document.body.addEventListener 'touchend', @uiListeners.up
 
     mouseMoveListener = (event) ->
-      @previousEvent = event
+      # @previousEvent = event
       event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
-        Utils.recordGesture event
-        Utils.describeGesture self.fieldBounds
-        # TODO: support continuous gestures, like scrubbing the timeline
+        Utils.recordGesture event, @fieldBounds
+        @progressGesture Utils.describeGesture @fieldBounds
       else
-        trackFromEvent event if self.controller.state.mode is Penciltest.prototype.modes.DRAWING
+        trackFromEvent event if @controller.state.mode is Penciltest.prototype.modes.DRAWING
 
     mouseUpListener = (event) ->
       @previousEvent = event
@@ -551,23 +566,23 @@ class PenciltestUI extends PenciltestUIComponent
         return true # allow context menu
       else
         if event.type is 'touchend' and Utils.currentGesture
-          self.doGesture Utils.describeGesture self.fieldBounds, 'final'
+          @doGesture Utils.describeGesture @fieldBounds, 'final'
           Utils.clearGesture event
-        self.controller.useTool 'pencil' if event.button is 1
-        document.body.removeEventListener 'mousemove', mouseMoveListener
-        document.body.removeEventListener 'touchmove', mouseMoveListener
-        document.body.removeEventListener 'mouseup', mouseUpListener
-        document.body.removeEventListener 'touchend', mouseUpListener
-        self.controller.lift()
+        @controller.useTool 'pencil' if event.button is 1
+        document.body.removeEventListener 'mousemove', @uiListeners.move
+        document.body.removeEventListener 'touchmove', @uiListeners.move
+        document.body.removeEventListener 'mouseup', @uiListeners.up
+        document.body.removeEventListener 'touchend', @uiListeners.up
+        @controller.lift()
 
     toggleToolListener = (event) ->
       event.preventDefault()
-      self.appActions.eraser.listener.call self.controller
+      @appActions.eraser.listener.call @controller
 
     contextMenuListener = (event) ->
       event.preventDefault()
       if !@previousEvent || !@previousEvent.type.match(/^touch/)
-        self.toggleMenu getEventPageXY event
+        @toggleMenu getEventPageXY event
 
 		# # doesn't work; Chrome warns: 
 		# # > [Intervention] Unable to preventDefault inside passive event listener
@@ -588,17 +603,28 @@ class PenciltestUI extends PenciltestUIComponent
     # window.addEventListener 'touchmove', preventPinchZoomHandler, true
     # document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
 
-    @controller.fieldElement.addEventListener 'mousedown', mouseDownListener
-    @controller.fieldElement.addEventListener 'touchstart', mouseDownListener
-    @controller.fieldElement.addEventListener 'contextmenu', contextMenuListener
-    @components.toggleTool.getElement().addEventListener 'click', toggleToolListener
-    @components.toggleMenu.getElement().addEventListener 'click', contextMenuListener
-    @components.toggleHelp.getElement().addEventListener 'click', -> self.doAppAction 'showInterfaceHelp'
+    @uiListeners =
+      fieldDown: mouseDownListener.bind @
+      context: contextMenuListener.bind @
+      tool: toggleToolListener.bind @
+      help: -> self.doAppAction 'showInterfaceHelp'
+
+    @controller.fieldElement.addEventListener 'mousedown', @uiListeners.fieldDown
+    @controller.fieldElement.addEventListener 'touchstart', @uiListeners.fieldDown
+    @controller.fieldElement.addEventListener 'contextmenu', @uiListeners.context
+    @components.toggleTool.getElement().addEventListener 'click', @uiListeners.tool
+    @components.toggleMenu.getElement().addEventListener 'click', @uiListeners.context
+    @components.toggleHelp.getElement().addEventListener 'click', @uiListeners.help
 
   doGesture: (gestureDescription) ->
     for name, action of @appActions
-      if action.gesture and action.gesture.test gestureDescription
-        @showFeedback action.label
+      if not action.triggerOnMove and action.gesture and action.gesture.test gestureDescription
+        @controller.options.debug && console.debug("action '%s' triggered by gesture '%s'", name, gestureDescription)
+        return @doAppAction name
+
+  progressGesture: (gestureDescription) ->
+    for name, action of @appActions
+      if action.triggerOnMove and action.gesture and action.gesture.test gestureDescription
         return @doAppAction name
 
   updateMenuOption: (optionElement) ->
@@ -637,14 +663,14 @@ class PenciltestUI extends PenciltestUIComponent
           if action.repeat
             @keyBindings.keydown[hotkey] = name
 
-            if action.cancelComplement
+            if action.cancelComplementKeyEvent
               @keyBindings.keyup[hotkey] = null
 
           else
 
             @keyBindings.keyup[hotkey] = name
 
-            if action.cancelComplement
+            if action.cancelComplementKeyEvent
               @keyBindings.keydown[hotkey] = null
 
     keyboardListener = (event) ->

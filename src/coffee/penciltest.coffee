@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.2.5'
+    version: '0.2.6'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 

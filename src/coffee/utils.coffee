@@ -68,7 +68,6 @@ Utils =
     promptForm.appendChild promptInput
 
     closePromptModal = ->
-      console.error('debug') # XXX
       promptModal.remove()
       window.pauseKeyboardListeners = false
 
@@ -89,7 +88,6 @@ Utils =
       promptAcceptButton.type = 'submit'
       promptAcceptButton.value = 'Accept'
       promptForm.addEventListener 'submit', (event) ->
-        console.log(event.type) # XXX
         event.preventDefault()
         closePromptModal()
         callback promptInput.value
@@ -211,13 +209,21 @@ Utils =
 
     sumPoints
 
-  recordGesture: (event) ->
+  diffPoints: (point1, point2) ->
+    x: point1.x - point2.x
+    y: point1.y - point2.y
+
+  recordGesture: (event, bounds) ->
     if not @currentGesture
       @currentGesture =
         touches: event.targetTouches.length
         origin: Utils.averageTouches event
 
     @currentGesture.last = Utils.averageTouches event
+    @currentGesture.delta = Utils.diffPoints @currentGesture.last, @currentGesture.origin
+    @currentGesture.deltaNormalized =
+      x: @currentGesture.delta.x / bounds.width
+      y: @currentGesture.delta.y / bounds.height
 
   clearGesture: (event) ->
     @currentGesture = null
