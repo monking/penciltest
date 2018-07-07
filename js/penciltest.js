@@ -8216,7 +8216,6 @@ Utils = {
     promptInput.style.display = 'block';
     promptForm.appendChild(promptInput);
     closePromptModal = function() {
-      console.error('debug');
       promptModal.remove();
       return window.pauseKeyboardListeners = false;
     };
@@ -8238,7 +8237,6 @@ Utils = {
       promptAcceptButton.type = 'submit';
       promptAcceptButton.value = 'Accept';
       promptForm.addEventListener('submit', function(event) {
-        console.log(event.type);
         event.preventDefault();
         closePromptModal();
         return callback(promptInput.value);
@@ -8393,14 +8391,25 @@ Utils = {
     sumPoints.y /= event.targetTouches.length;
     return sumPoints;
   },
-  recordGesture: function(event) {
+  diffPoints: function(point1, point2) {
+    return {
+      x: point1.x - point2.x,
+      y: point1.y - point2.y
+    };
+  },
+  recordGesture: function(event, bounds) {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
         origin: Utils.averageTouches(event)
       };
     }
-    return this.currentGesture.last = Utils.averageTouches(event);
+    this.currentGesture.last = Utils.averageTouches(event);
+    this.currentGesture.delta = Utils.diffPoints(this.currentGesture.last, this.currentGesture.origin);
+    return this.currentGesture.deltaNormalized = {
+      x: this.currentGesture.delta.x / bounds.width,
+      y: this.currentGesture.delta.y / bounds.height
+    };
   },
   clearGesture: function(event) {
     return this.currentGesture = null;
@@ -8939,11 +8948,19 @@ PenciltestUI = (function(_super) {
         }
       }
     },
+    pageFlip: {
+      label: "Page Flip",
+      gesture: /2 (left|right) from .* (bottom|middle)/,
+      triggerOnMove: true,
+      listener: function() {
+        return this.goToFrame(Math.floor(Utils.currentGesture.startFrameNumber + this.film.frames.length * Utils.currentGesture.deltaNormalized.x * 2));
+      }
+    },
     playPause: {
       label: "Play/Pause",
       hotkey: ['Space'],
       gesture: /2 still from center (bottom|middle)/,
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         this.playDirection = 1;
         return this.togglePlay();
@@ -8952,7 +8969,7 @@ PenciltestUI = (function(_super) {
     playReverse: {
       label: "Play in Reverse",
       hotkey: ['Shift+Space'],
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         this.playDirection = -1;
         return this.togglePlay();
@@ -8988,7 +9005,7 @@ PenciltestUI = (function(_super) {
       label: "First Frame",
       hotkey: ['0', 'Home', 'PgUp'],
       gesture: /2 left from .* (bottom|middle)/,
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         this.goToFrame(0);
         return this.stop();
@@ -8998,7 +9015,7 @@ PenciltestUI = (function(_super) {
       label: "Last Frame",
       hotkey: ['$', 'End', 'PgDn'],
       gesture: /2 right from .* (bottom|middle)/,
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         this.goToFrame(this.film.frames.length - 1);
         return this.stop();
@@ -9155,7 +9172,7 @@ PenciltestUI = (function(_super) {
       label: "Drop Frame",
       hotkey: ['Shift+X'],
       gesture: /4 down from center top/,
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         return this.dropFrame();
       }
@@ -9164,7 +9181,7 @@ PenciltestUI = (function(_super) {
       label: "Cut Frame",
       hotkey: ['X'],
       gesture: /3 down from center top/,
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         return this.cutFrame();
       }
@@ -9218,6 +9235,15 @@ PenciltestUI = (function(_super) {
       repeat: true,
       listener: function() {
         return this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
+      }
+    },
+    toggleDebug: {
+      label: "Toggle Debug",
+      title: "Verbose logs for debugging",
+      listener: function() {
+        return this.setOptions({
+          debug: !this.options.debug
+        });
       }
     },
     showStatus: {
@@ -9340,7 +9366,7 @@ PenciltestUI = (function(_super) {
     exportFilm: {
       label: "Export",
       hotkey: ['Alt+E'],
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         var blob, fileName, url;
         blob = new Blob([JSON.stringify(this.film)], {
@@ -9354,7 +9380,7 @@ PenciltestUI = (function(_super) {
     importFilm: {
       label: "Import",
       hotkey: ['Alt+I'],
-      cancelComplement: true,
+      cancelComplementKeyEvent: true,
       listener: function() {
         var self;
         self = this;
@@ -9433,10 +9459,10 @@ PenciltestUI = (function(_super) {
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
       Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
-      Playback: ['loop', 'frameRate'],
+      Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm', 'renderGif', 'resizeFilm', 'panFilm'],
-      Settings: ['frameHold', 'renderer', 'showInterfaceHelp', 'reset']
+      Film: ['frameRate', 'resizeFilm', 'panFilm', 'renderGif', 'saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
+      Settings: ['frameHold', 'renderer', 'showInterfaceHelp', 'reset', 'toggleDebug']
     }
   ];
 
@@ -9493,47 +9519,49 @@ PenciltestUI = (function(_super) {
     };
     mouseDownListener = function(event) {
       this.previousEvent = event;
-      if (self.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
+      if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
         return;
       }
       event.preventDefault();
       if (event.type === 'touchstart' && event.touches.length > 1) {
-        self.controller.cancelStroke();
-        self.fieldBounds = {
+        this.controller.cancelStroke();
+        this.fieldBounds = {
           x: 0,
           y: 0,
-          width: self.controller.width,
-          height: self.controller.height
+          width: this.controller.width,
+          height: this.controller.height
         };
         if (!Utils.currentGesture) {
-          self.doAppAction('undo');
+          this.doAppAction('undo');
         }
         Utils.clearGesture();
-        return Utils.recordGesture(event);
+        Utils.recordGesture(event, this.fieldBounds);
+        return Utils.currentGesture.startFrameNumber = this.controller.current.frameNumber;
       } else {
         if (event.button === 2) {
           return true;
         } else {
-          self.hideMenu();
+          this.hideMenu();
         }
         if (event.button === 1) {
-          self.controller.useTool('eraser');
+          this.controller.useTool('eraser');
         }
         trackFromEvent(event);
-        document.body.addEventListener('mousemove', mouseMoveListener);
-        document.body.addEventListener('touchmove', mouseMoveListener);
-        document.body.addEventListener('mouseup', mouseUpListener);
-        return document.body.addEventListener('touchend', mouseUpListener);
+        this.uiListeners.move = mouseMoveListener.bind(this);
+        this.uiListeners.up = mouseUpListener.bind(this);
+        document.body.addEventListener('mousemove', this.uiListeners.move);
+        document.body.addEventListener('touchmove', this.uiListeners.move);
+        document.body.addEventListener('mouseup', this.uiListeners.up);
+        return document.body.addEventListener('touchend', this.uiListeners.up);
       }
     };
     mouseMoveListener = function(event) {
-      this.previousEvent = event;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
-        Utils.recordGesture(event);
-        return Utils.describeGesture(self.fieldBounds);
+        Utils.recordGesture(event, this.fieldBounds);
+        return this.progressGesture(Utils.describeGesture(this.fieldBounds));
       } else {
-        if (self.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
+        if (this.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
           return trackFromEvent(event);
         }
       }
@@ -9544,37 +9572,43 @@ PenciltestUI = (function(_super) {
         return true;
       } else {
         if (event.type === 'touchend' && Utils.currentGesture) {
-          self.doGesture(Utils.describeGesture(self.fieldBounds, 'final'));
+          this.doGesture(Utils.describeGesture(this.fieldBounds, 'final'));
           Utils.clearGesture(event);
         }
         if (event.button === 1) {
-          self.controller.useTool('pencil');
+          this.controller.useTool('pencil');
         }
-        document.body.removeEventListener('mousemove', mouseMoveListener);
-        document.body.removeEventListener('touchmove', mouseMoveListener);
-        document.body.removeEventListener('mouseup', mouseUpListener);
-        document.body.removeEventListener('touchend', mouseUpListener);
-        return self.controller.lift();
+        document.body.removeEventListener('mousemove', this.uiListeners.move);
+        document.body.removeEventListener('touchmove', this.uiListeners.move);
+        document.body.removeEventListener('mouseup', this.uiListeners.up);
+        document.body.removeEventListener('touchend', this.uiListeners.up);
+        return this.controller.lift();
       }
     };
     toggleToolListener = function(event) {
       event.preventDefault();
-      return self.appActions.eraser.listener.call(self.controller);
+      return this.appActions.eraser.listener.call(this.controller);
     };
     contextMenuListener = function(event) {
       event.preventDefault();
       if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
-        return self.toggleMenu(getEventPageXY(event));
+        return this.toggleMenu(getEventPageXY(event));
       }
     };
-    this.controller.fieldElement.addEventListener('mousedown', mouseDownListener);
-    this.controller.fieldElement.addEventListener('touchstart', mouseDownListener);
-    this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
-    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
-    this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
-    return this.components.toggleHelp.getElement().addEventListener('click', function() {
-      return self.doAppAction('showInterfaceHelp');
-    });
+    this.uiListeners = {
+      fieldDown: mouseDownListener.bind(this),
+      context: contextMenuListener.bind(this),
+      tool: toggleToolListener.bind(this),
+      help: function() {
+        return self.doAppAction('showInterfaceHelp');
+      }
+    };
+    this.controller.fieldElement.addEventListener('mousedown', this.uiListeners.fieldDown);
+    this.controller.fieldElement.addEventListener('touchstart', this.uiListeners.fieldDown);
+    this.controller.fieldElement.addEventListener('contextmenu', this.uiListeners.context);
+    this.components.toggleTool.getElement().addEventListener('click', this.uiListeners.tool);
+    this.components.toggleMenu.getElement().addEventListener('click', this.uiListeners.context);
+    return this.components.toggleHelp.getElement().addEventListener('click', this.uiListeners.help);
   };
 
   PenciltestUI.prototype.doGesture = function(gestureDescription) {
@@ -9582,8 +9616,19 @@ PenciltestUI = (function(_super) {
     _ref = this.appActions;
     for (name in _ref) {
       action = _ref[name];
-      if (action.gesture && action.gesture.test(gestureDescription)) {
-        this.showFeedback(action.label);
+      if (!action.triggerOnMove && action.gesture && action.gesture.test(gestureDescription)) {
+        this.controller.options.debug && console.debug("action '%s' triggered by gesture '%s'", name, gestureDescription);
+        return this.doAppAction(name);
+      }
+    }
+  };
+
+  PenciltestUI.prototype.progressGesture = function(gestureDescription) {
+    var action, name, _ref;
+    _ref = this.appActions;
+    for (name in _ref) {
+      action = _ref[name];
+      if (action.triggerOnMove && action.gesture && action.gesture.test(gestureDescription)) {
         return this.doAppAction(name);
       }
     }
@@ -9638,12 +9683,12 @@ PenciltestUI = (function(_super) {
           hotkey = _ref1[_i];
           if (action.repeat) {
             this.keyBindings.keydown[hotkey] = name;
-            if (action.cancelComplement) {
+            if (action.cancelComplementKeyEvent) {
               this.keyBindings.keyup[hotkey] = null;
             }
           } else {
             this.keyBindings.keyup[hotkey] = name;
-            if (action.cancelComplement) {
+            if (action.cancelComplementKeyEvent) {
               this.keyBindings.keydown[hotkey] = null;
             }
           }
@@ -9858,7 +9903,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.5',
+    version: '0.2.6',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
