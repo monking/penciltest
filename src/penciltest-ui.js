@@ -895,6 +895,13 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.addOtherListeners = function() {
     var self;
     self = this;
+    document.body.addEventListener('wheel', function(event) {
+      if (event.deltaY > 0) {
+        return self.doAppAction('nextFrame');
+      } else {
+        return self.doAppAction('prevFrame');
+      }
+    });
     return window.addEventListener('beforeunload', function() {
       self.controller.putStoredData('app', 'options', self.controller.options);
       self.controller.putStoredData('app', 'state', self.controller.state);

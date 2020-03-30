@@ -691,6 +691,11 @@ class PenciltestUI extends PenciltestUIComponent
 
   addOtherListeners: ->
     self = @
+    document.body.addEventListener 'wheel', (event) ->
+      if event.deltaY > 0
+        self.doAppAction 'nextFrame'
+      else
+        self.doAppAction 'prevFrame'
     window.addEventListener 'beforeunload', ->
       self.controller.putStoredData 'app', 'options', self.controller.options
       self.controller.putStoredData 'app', 'state', self.controller.state
