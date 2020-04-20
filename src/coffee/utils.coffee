@@ -37,6 +37,7 @@ Utils =
     callback() if window.confirm message
 
   prompt: (message, defaultValue, callback, promptInput, shouldSubmitOnChange) ->
+    utils = @
     window.pauseKeyboardListeners = true # FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
     promptModal = document.createElement 'div'
     promptModalCss =
@@ -69,7 +70,21 @@ Utils =
 
     closePromptModal = ->
       promptModal.remove()
+      document.removeEventListener 'keydown', promptKeyListener
       window.pauseKeyboardListeners = false
+
+    submitPromptModal = ->
+      closePromptModal()
+      callback promptInput.value
+
+    promptKeyListener = (event) ->
+      keysDescription = utils.describeKeyCombo(event)
+      if keysDescription == 'Esc'
+        closePromptModal()
+      else if keysDescription == 'Enter'
+        submitPromptModal()
+
+    document.addEventListener 'keydown', promptKeyListener
 
     promptCancelButton = document.createElement 'button'
     promptCancelButton.type = 'button'
@@ -81,16 +96,14 @@ Utils =
 
     if shouldSubmitOnChange
       promptInput.addEventListener 'change', ->
-        closePromptModal()
-        callback promptInput.value
+        submitPromptModal()
     else
       promptAcceptButton = document.createElement 'input'
       promptAcceptButton.type = 'submit'
       promptAcceptButton.value = 'Accept'
       promptForm.addEventListener 'submit', (event) ->
         event.preventDefault()
-        closePromptModal()
-        callback promptInput.value
+        submitPromptModal()
       promptForm.appendChild promptAcceptButton
 
     document.body.appendChild promptModal
@@ -132,12 +145,16 @@ Utils =
           callback event.target.result
         fileReader.readAsText file
     @prompt message, null, loadFile, fileInput, true
+    fileInput.click()
 
   keyCodeNames:
     8   : 'Backspace'
+    9   : 'Tab'
+    13  : 'Enter'
     16  : 'Shift'
     17  : 'Ctrl'
     18  : 'Alt'
+    27  : 'Esc'
     32  : 'Space'
     33  : 'PgUp'
     34  : 'PgDn'

@@ -59,7 +59,8 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, property, submitPromptModal, utils, value;
+    utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
     promptModalCss = {
@@ -99,8 +100,23 @@ Utils = {
     promptForm.appendChild(promptInput);
     closePromptModal = function() {
       promptModal.remove();
+      document.removeEventListener('keydown', promptKeyListener);
       return window.pauseKeyboardListeners = false;
     };
+    submitPromptModal = function() {
+      closePromptModal();
+      return callback(promptInput.value);
+    };
+    promptKeyListener = function(event) {
+      var keysDescription;
+      keysDescription = utils.describeKeyCombo(event);
+      if (keysDescription === 'Esc') {
+        return closePromptModal();
+      } else if (keysDescription === 'Enter') {
+        return submitPromptModal();
+      }
+    };
+    document.addEventListener('keydown', promptKeyListener);
     promptCancelButton = document.createElement('button');
     promptCancelButton.type = 'button';
     promptCancelButton.innerHTML = 'Cancel';
@@ -111,8 +127,7 @@ Utils = {
     promptForm.appendChild(promptCancelButton);
     if (shouldSubmitOnChange) {
       promptInput.addEventListener('change', function() {
-        closePromptModal();
-        return callback(promptInput.value);
+        return submitPromptModal();
       });
     } else {
       promptAcceptButton = document.createElement('input');
@@ -120,8 +135,7 @@ Utils = {
       promptAcceptButton.value = 'Accept';
       promptForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        closePromptModal();
-        return callback(promptInput.value);
+        return submitPromptModal();
       });
       promptForm.appendChild(promptAcceptButton);
     }
@@ -179,13 +193,17 @@ Utils = {
       }
       return _results;
     };
-    return this.prompt(message, null, loadFile, fileInput, true);
+    this.prompt(message, null, loadFile, fileInput, true);
+    return fileInput.click();
   },
   keyCodeNames: {
     8: 'Backspace',
+    9: 'Tab',
+    13: 'Enter',
     16: 'Shift',
     17: 'Ctrl',
     18: 'Alt',
+    27: 'Esc',
     32: 'Space',
     33: 'PgUp',
     34: 'PgDn',

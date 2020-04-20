@@ -22,10 +22,10 @@ Penciltest = (function() {
     hideCursor: false,
     loop: true,
     showStatus: true,
-    frameRate: 24,
+    frameRate: 12,
     frameHold: 2,
     onionSkin: true,
-    smoothing: 3,
+    smoothing: 0,
     onionSkinRange: 4,
     renderer: 'canvas',
     onionSkinOpacity: 0.5,
@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.6',
+    version: '0.2.7',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -222,15 +222,15 @@ Penciltest = (function() {
       this.framesHeld = -1;
       this.goToFrame(0);
     }
-    stepListener = function() {
+    stepListener = function(firstStep) {
       var currentFrame, newIndex;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
-      if (self.framesHeld >= currentFrame.hold) {
+      newIndex = self.current.frameNumber + self.playDirection;
+      if (self.framesHeld >= currentFrame.hold || (firstStep && newIndex === self.film.frames.length)) {
         self.framesHeld = 0;
-        newIndex = self.current.frameNumber + self.playDirection;
         if (newIndex >= self.film.frames.length || newIndex < 0) {
-          if (self.options.loop) {
+          if (self.options.loop || firstStep) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
             self.goToFrame(newIndex);
             return self.seekAudioToFrame(0);
@@ -243,7 +243,7 @@ Penciltest = (function() {
       }
     };
     this.stop();
-    stepListener();
+    stepListener(true);
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
     this.state.mode = Penciltest.prototype.modes.PLAYING;
@@ -289,7 +289,7 @@ Penciltest = (function() {
         }
         if (this.current.frameNumber < this.film.frames.length - i) {
           this.drawFrame(this.current.frameNumber + i, {
-            color: [0, 0, 255],
+            color: [0, 255, 255],
             opacity: Math.pow(this.options.onionSkinOpacity, i)
           });
         }
@@ -500,7 +500,7 @@ Penciltest = (function() {
     this.film = {
       name: '',
       version: Penciltest.prototype.state.version,
-      aspect: '16:9',
+      aspect: '1:1',
       width: 1920,
       frames: []
     };

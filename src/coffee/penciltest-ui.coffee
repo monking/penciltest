@@ -65,8 +65,9 @@ class PenciltestUI extends PenciltestUIComponent
   appActions:
     showMenu:
       label: "Show Menu"
+      hotkey: ['Tab']
       gesture: /4 still/
-      listener: -> @ui.toggleMenu x: 0, y: 0
+      listener: -> @ui.toggleMenu(@ui.pointer.coords || {x: 10, y: 10})
     renderer:
       label: "Set Renderer"
       listener: ->
@@ -108,7 +109,7 @@ class PenciltestUI extends PenciltestUIComponent
         @togglePlay()
     nextFrame:
       label: "Next Frame"
-      hotkey: ['Right','.']
+      hotkey: ['D', 'J', 'Right','.']
       gesture: /2 still from right bottom/
       repeat: true
       listener: ->
@@ -117,7 +118,7 @@ class PenciltestUI extends PenciltestUIComponent
         @scrubAudio() if @audioElement
     prevFrame:
       label: "Previous Frame"
-      hotkey: ['Left',',']
+      hotkey: ['S', 'K', 'Left',',']
       gesture: /2 still from left bottom/
       repeat: true
       listener: ->
@@ -126,7 +127,7 @@ class PenciltestUI extends PenciltestUIComponent
         @scrubAudio() if @audioElement
     firstFrame:
       label: "First Frame"
-      hotkey: ['0','Home','PgUp']
+      hotkey: ['1', '0','Home','PgUp']
       gesture: /2 left from .* (bottom|middle)/
       cancelComplementKeyEvent: true
       listener: ->
@@ -141,7 +142,7 @@ class PenciltestUI extends PenciltestUIComponent
         @goToFrame @film.frames.length - 1
         @stop()
     copyFrame:
-      label: "Copy Frame"
+      label: "Copy Frame/Strokes"
       hotkey: ['C']
       listener: ->
         @copyFrame()
@@ -157,7 +158,7 @@ class PenciltestUI extends PenciltestUIComponent
         @pasteStrokes()
     insertFrameBefore:
       label: "Insert Frame Before"
-      hotkey: ['Shift+I']
+      hotkey: ['Shift+A', 'Shift+I']
       gesture: /2 still from left top/
       listener: ->
         newIndex = @current.frameNumber
@@ -165,7 +166,7 @@ class PenciltestUI extends PenciltestUIComponent
         @goToFrame newIndex
     insertFrameAfter:
       label: "Insert Frame After"
-      hotkey: ['I']
+      hotkey: ['Shift+D', 'I']
       gesture: /2 still from right top/
       listener: ->
         newIndex = @current.frameNumber + 1
@@ -184,14 +185,14 @@ class PenciltestUI extends PenciltestUIComponent
     undo:
       label: "Undo"
       title: "Remove the last line drawn"
-      hotkey: ['U','Alt+Z']
+      hotkey: ['Z']
       gesture: /3 still from left/
       repeat: true
       listener: -> @undo()
     redo:
       label: "Redo"
       title: "Put back a line removed by 'Undo'"
-      hotkey: ['R','Alt+Shift+Z']
+      hotkey: ['Shift+Z']
       gesture: /3 still from right/
       repeat: true
       listener: -> @redo()
@@ -222,7 +223,7 @@ class PenciltestUI extends PenciltestUIComponent
       action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
     onionSkin:
       label: "Onion Skin"
-      hotkey: ['O']
+      hotkey: ['F', 'O']
       gesture: /2 down from center (bottom|middle)/
       title: "show previous and next frames in red and blue"
       listener: ->
@@ -299,7 +300,7 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @loadFilm()
     newFilm:
       label: "New"
-      hotkey: ['Alt+N']
+      hotkey: ['N']
       listener: ->
         self = @
         if @unsavedChanges
@@ -308,7 +309,7 @@ class PenciltestUI extends PenciltestUIComponent
           @newFilm()
     renderGif:
       label: "Render GIF"
-      hotkey: ['Alt+G']
+      hotkey: ['G']
       listener: -> @renderGif()
     resizeFilm:
       label: "Resize Film"
@@ -359,7 +360,7 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @deleteFilm()
     exportFilm:
       label: "Export"
-      hotkey: ['Alt+E']
+      hotkey: ['Ctrl+S', 'Alt+E']
       cancelComplementKeyEvent: true
       listener: ->
         # self = @
@@ -374,7 +375,7 @@ class PenciltestUI extends PenciltestUIComponent
         # reader.readAsDataURL(blob)
     importFilm:
       label: "Import"
-      hotkey: ['Alt+I']
+      hotkey: ['Ctrl+O']
       cancelComplementKeyEvent: true
       listener: ->
         self = @
@@ -406,10 +407,10 @@ class PenciltestUI extends PenciltestUIComponent
         Utils.log "Shift Audio Later"
         @film.audio.offset++ if @film.audio
         @ui.updateStatus()
-    showInterfaceHelp:
-      label: "Keyboard Shortcuts"
+    toggleInterfaceHelp:
+      label: "Help"
       hotkey: ['?']
-      listener: -> @ui.showInterfaceHelp()
+      listener: -> @ui.toggleInterfaceHelp()
     reset:
       label: "Reset"
       title: "Clear settings; helpful if the app has stopped working."
@@ -470,7 +471,7 @@ class PenciltestUI extends PenciltestUIComponent
     Settings: [
       'frameHold'
       'renderer'
-      'showInterfaceHelp'
+      'toggleInterfaceHelp'
       'reset'
       'toggleDebug'
     ]
@@ -502,6 +503,8 @@ class PenciltestUI extends PenciltestUIComponent
 
     @previousEvent = null
 
+    @pointer = {};
+
     getEventPageXY = (event) ->
       if /^touch/.test event.type
         eventLocation = event.touches[0]
@@ -510,13 +513,9 @@ class PenciltestUI extends PenciltestUIComponent
 
       {x: eventLocation.pageX, y: eventLocation.pageY}
 
-    trackFromEvent = (event) ->
-      pageCoords = getEventPageXY event
+    trackFromEvent = (pageCoords) ->
 
-      self.controller.track(
-        pageCoords.x - self.controller.fieldContainer.offsetLeft,
-        pageCoords.y - self.controller.fieldContainer.offsetTop
-      )
+      self.pointer.coords = pageCoords;
 
     mouseDownListener = (event) ->
       @previousEvent = event
@@ -540,9 +539,13 @@ class PenciltestUI extends PenciltestUIComponent
         else
           @hideMenu()
 
-        @controller.useTool 'eraser' if event.button is 1
+        @controller.useTool 'eraser' if event.button is 1 # mouse middle button; can map stylus eraser to this
 
-        trackFromEvent event
+        pageCoords = getEventPageXY event
+        self.controller.track(
+          pageCoords.x - self.controller.fieldContainer.offsetLeft,
+          pageCoords.y - self.controller.fieldContainer.offsetTop
+        )
         @uiListeners.move = mouseMoveListener.bind @
         @uiListeners.up = mouseUpListener.bind @
 
@@ -558,7 +561,14 @@ class PenciltestUI extends PenciltestUIComponent
         Utils.recordGesture event, @fieldBounds
         @progressGesture Utils.describeGesture @fieldBounds
       else
-        trackFromEvent event if @controller.state.mode is Penciltest.prototype.modes.DRAWING
+        pageCoords = getEventPageXY event
+        @pointer.coords = pageCoords
+        console.log("updating coords") # XXX
+        if @controller.state.mode is Penciltest.prototype.modes.DRAWING
+          self.controller.track(
+            pageCoords.x - self.controller.fieldContainer.offsetLeft,
+            pageCoords.y - self.controller.fieldContainer.offsetTop
+          )
 
     mouseUpListener = (event) ->
       @previousEvent = event
@@ -584,10 +594,10 @@ class PenciltestUI extends PenciltestUIComponent
       if !@previousEvent || !@previousEvent.type.match(/^touch/)
         @toggleMenu getEventPageXY event
 
-		# # doesn't work; Chrome warns: 
-		# # > [Intervention] Unable to preventDefault inside passive event listener
-		# # > due to target being treated as passive. See
-		# # > https://www.chromestatus.com/features/5093566007214080
+    # # doesn't work; Chrome warns: 
+    # # > [Intervention] Unable to preventDefault inside passive event listener
+    # # > due to target being treated as passive. See
+    # # > https://www.chromestatus.com/features/5093566007214080
     # preventPinchZoomHandler = (event) => (
     #   if event.cancelable && event.touches.length > 1
     #     console.log(
@@ -607,7 +617,7 @@ class PenciltestUI extends PenciltestUIComponent
       fieldDown: mouseDownListener.bind @
       context: contextMenuListener.bind @
       tool: toggleToolListener.bind @
-      help: -> self.doAppAction 'showInterfaceHelp'
+      help: -> self.doAppAction 'toggleInterfaceHelp'
 
     @controller.fieldElement.addEventListener 'mousedown', @uiListeners.fieldDown
     @controller.fieldElement.addEventListener 'touchstart', @uiListeners.fieldDown
@@ -701,7 +711,7 @@ class PenciltestUI extends PenciltestUIComponent
       self.controller.putStoredData 'app', 'state', self.controller.state
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
-  showInterfaceHelp: ->
+  toggleInterfaceHelp: ->
     gesturesMap = []
 
     open = Utils.toggleClass @components.help.getElement(), 'active'
@@ -752,8 +762,11 @@ class PenciltestUI extends PenciltestUIComponent
       @components.filmStatus.setHTML filmStatusMarkup
       @components.toggleTool.getElement().className = "toggle-tool fa fa-#{@controller.state.toolStack[0]}"# FIXME: use a helper to do this
 
-  showMenu: (coords = {x: 10, y: 10}) ->
+  showMenu: (coords) ->
     if not @menuIsVisible
+      if not coords
+        coords = @pointer.coords || {x: 10, y: 10}
+
       @menuIsVisible = true
       menuElement = @components.menu.getElement()
       Utils.toggleClass menuElement, 'active', true

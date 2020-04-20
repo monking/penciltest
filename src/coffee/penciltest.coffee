@@ -19,17 +19,17 @@ class Penciltest
     hideCursor: false
     loop: true
     showStatus: true
-    frameRate: 24
+    frameRate: 12
     frameHold: 2
     onionSkin: true
-    smoothing: 3
+    smoothing: 0
     onionSkinRange: 4
     renderer: 'canvas'
     onionSkinOpacity: 0.5
     background: 'white'
 
   state:
-    version: '0.2.6'
+    version: '0.2.7'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -200,14 +200,14 @@ class Penciltest
       @framesHeld = -1
       @goToFrame 0
 
-    stepListener = ->
+    stepListener = (firstStep) ->
       self.framesHeld++
       currentFrame = self.getCurrentFrame()
-      if self.framesHeld >= currentFrame.hold
+      newIndex = self.current.frameNumber + self.playDirection
+      if self.framesHeld >= currentFrame.hold || ( firstStep && newIndex == self.film.frames.length )
         self.framesHeld = 0
-        newIndex = self.current.frameNumber + self.playDirection
         if newIndex >= self.film.frames.length or newIndex < 0
-          if self.options.loop
+          if self.options.loop || firstStep
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
             self.goToFrame newIndex
             self.seekAudioToFrame 0
@@ -217,7 +217,7 @@ class Penciltest
           self.goToFrame newIndex
 
     @stop()
-    stepListener()
+    stepListener(true)
     @playInterval = setInterval stepListener, 1000 / @options.frameRate
     @lift()
     @state.mode = Penciltest.prototype.modes.PLAYING
@@ -255,7 +255,7 @@ class Penciltest
           @drawFrame(
             @current.frameNumber + i
             {
-              color: [0, 0, 255],
+              color: [0, 255, 255],
               opacity: Math.pow @options.onionSkinOpacity, i
             }
           )
@@ -399,7 +399,7 @@ class Penciltest
     @film =
       name: ''
       version: Penciltest.prototype.state.version
-      aspect: '16:9'
+      aspect: '1:1'
       width: 1920
       frames: []
 
