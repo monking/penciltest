@@ -1,6 +1,8 @@
 # penciltest
 
-A traditional animation tool in the browser
+A traditional animation tool in the browser.
+
+- [demo](https://monking.github.io/penciltest/)
 
 ## features
 
