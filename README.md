@@ -29,3 +29,13 @@ The "undo" option simply removes the last stroke on a drawing. It cannot be
 recovered, except to load a saved film.
 
 This version has only been tested in Google Chrome (Linux, Mac, Android -- way back in 2016).
+
+## development
+
+To get set up, do:
+
+```
+npm install -g grunt-cli
+npm install
+grunt watch
+`

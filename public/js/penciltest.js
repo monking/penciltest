@@ -8177,7 +8177,8 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptModal, promptModalCss, property, value;
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, property, submitPromptModal, utils, value;
+    utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
     promptModalCss = {
@@ -8217,8 +8218,23 @@ Utils = {
     promptForm.appendChild(promptInput);
     closePromptModal = function() {
       promptModal.remove();
+      document.removeEventListener('keydown', promptKeyListener);
       return window.pauseKeyboardListeners = false;
     };
+    submitPromptModal = function() {
+      closePromptModal();
+      return callback(promptInput.value);
+    };
+    promptKeyListener = function(event) {
+      var keysDescription;
+      keysDescription = utils.describeKeyCombo(event);
+      if (keysDescription === 'Esc') {
+        return closePromptModal();
+      } else if (keysDescription === 'Enter') {
+        return submitPromptModal();
+      }
+    };
+    document.addEventListener('keydown', promptKeyListener);
     promptCancelButton = document.createElement('button');
     promptCancelButton.type = 'button';
     promptCancelButton.innerHTML = 'Cancel';
@@ -8229,8 +8245,7 @@ Utils = {
     promptForm.appendChild(promptCancelButton);
     if (shouldSubmitOnChange) {
       promptInput.addEventListener('change', function() {
-        closePromptModal();
-        return callback(promptInput.value);
+        return submitPromptModal();
       });
     } else {
       promptAcceptButton = document.createElement('input');
@@ -8238,8 +8253,7 @@ Utils = {
       promptAcceptButton.value = 'Accept';
       promptForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        closePromptModal();
-        return callback(promptInput.value);
+        return submitPromptModal();
       });
       promptForm.appendChild(promptAcceptButton);
     }
@@ -8297,13 +8311,17 @@ Utils = {
       }
       return _results;
     };
-    return this.prompt(message, null, loadFile, fileInput, true);
+    this.prompt(message, null, loadFile, fileInput, true);
+    return fileInput.click();
   },
   keyCodeNames: {
     8: 'Backspace',
+    9: 'Tab',
+    13: 'Enter',
     16: 'Shift',
     17: 'Ctrl',
     18: 'Alt',
+    27: 'Esc',
     32: 'Space',
     33: 'PgUp',
     34: 'PgDn',
@@ -8909,11 +8927,12 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.appActions = {
     showMenu: {
       label: "Show Menu",
+      hotkey: ['Tab'],
       gesture: /4 still/,
       listener: function() {
-        return this.ui.toggleMenu({
-          x: 0,
-          y: 0
+        return this.ui.toggleMenu(this.ui.pointer.coords || {
+          x: 10,
+          y: 10
         });
       }
     },
@@ -8977,7 +8996,7 @@ PenciltestUI = (function(_super) {
     },
     nextFrame: {
       label: "Next Frame",
-      hotkey: ['Right', '.'],
+      hotkey: ['D', 'J', 'Right', '.'],
       gesture: /2 still from right bottom/,
       repeat: true,
       listener: function() {
@@ -8990,7 +9009,7 @@ PenciltestUI = (function(_super) {
     },
     prevFrame: {
       label: "Previous Frame",
-      hotkey: ['Left', ','],
+      hotkey: ['S', 'K', 'Left', ','],
       gesture: /2 still from left bottom/,
       repeat: true,
       listener: function() {
@@ -9003,7 +9022,7 @@ PenciltestUI = (function(_super) {
     },
     firstFrame: {
       label: "First Frame",
-      hotkey: ['0', 'Home', 'PgUp'],
+      hotkey: ['1', '0', 'Home', 'PgUp'],
       gesture: /2 left from .* (bottom|middle)/,
       cancelComplementKeyEvent: true,
       listener: function() {
@@ -9022,7 +9041,7 @@ PenciltestUI = (function(_super) {
       }
     },
     copyFrame: {
-      label: "Copy Frame",
+      label: "Copy Frame/Strokes",
       hotkey: ['C'],
       listener: function() {
         return this.copyFrame();
@@ -9044,7 +9063,7 @@ PenciltestUI = (function(_super) {
     },
     insertFrameBefore: {
       label: "Insert Frame Before",
-      hotkey: ['Shift+I'],
+      hotkey: ['Shift+A', 'Shift+I'],
       gesture: /2 still from left top/,
       listener: function() {
         var newIndex;
@@ -9055,7 +9074,7 @@ PenciltestUI = (function(_super) {
     },
     insertFrameAfter: {
       label: "Insert Frame After",
-      hotkey: ['I'],
+      hotkey: ['Shift+D', 'I'],
       gesture: /2 still from right top/,
       listener: function() {
         var newIndex;
@@ -9084,7 +9103,7 @@ PenciltestUI = (function(_super) {
     undo: {
       label: "Undo",
       title: "Remove the last line drawn",
-      hotkey: ['U', 'Alt+Z'],
+      hotkey: ['Z'],
       gesture: /3 still from left/,
       repeat: true,
       listener: function() {
@@ -9094,7 +9113,7 @@ PenciltestUI = (function(_super) {
     redo: {
       label: "Redo",
       title: "Put back a line removed by 'Undo'",
-      hotkey: ['R', 'Alt+Shift+Z'],
+      hotkey: ['Shift+Z'],
       gesture: /3 still from right/,
       repeat: true,
       listener: function() {
@@ -9158,7 +9177,7 @@ PenciltestUI = (function(_super) {
     },
     onionSkin: {
       label: "Onion Skin",
-      hotkey: ['O'],
+      hotkey: ['F', 'O'],
       gesture: /2 down from center (bottom|middle)/,
       title: "show previous and next frames in red and blue",
       listener: function() {
@@ -9287,7 +9306,7 @@ PenciltestUI = (function(_super) {
     },
     newFilm: {
       label: "New",
-      hotkey: ['Alt+N'],
+      hotkey: ['N'],
       listener: function() {
         var self;
         self = this;
@@ -9302,7 +9321,7 @@ PenciltestUI = (function(_super) {
     },
     renderGif: {
       label: "Render GIF",
-      hotkey: ['Alt+G'],
+      hotkey: ['G'],
       listener: function() {
         return this.renderGif();
       }
@@ -9365,7 +9384,7 @@ PenciltestUI = (function(_super) {
     },
     exportFilm: {
       label: "Export",
-      hotkey: ['Alt+E'],
+      hotkey: ['Ctrl+S', 'Alt+E'],
       cancelComplementKeyEvent: true,
       listener: function() {
         var blob, fileName, url;
@@ -9379,7 +9398,7 @@ PenciltestUI = (function(_super) {
     },
     importFilm: {
       label: "Import",
-      hotkey: ['Alt+I'],
+      hotkey: ['Ctrl+O'],
       cancelComplementKeyEvent: true,
       listener: function() {
         var self;
@@ -9430,11 +9449,11 @@ PenciltestUI = (function(_super) {
         return this.ui.updateStatus();
       }
     },
-    showInterfaceHelp: {
-      label: "Keyboard Shortcuts",
+    toggleInterfaceHelp: {
+      label: "Help",
       hotkey: ['?'],
       listener: function() {
-        return this.ui.showInterfaceHelp();
+        return this.ui.toggleInterfaceHelp();
       }
     },
     reset: {
@@ -9462,7 +9481,7 @@ PenciltestUI = (function(_super) {
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
       Film: ['frameRate', 'resizeFilm', 'panFilm', 'renderGif', 'saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
-      Settings: ['frameHold', 'renderer', 'showInterfaceHelp', 'reset', 'toggleDebug']
+      Settings: ['frameHold', 'renderer', 'toggleInterfaceHelp', 'reset', 'toggleDebug']
     }
   ];
 
@@ -9500,6 +9519,7 @@ PenciltestUI = (function(_super) {
     var contextMenuListener, getEventPageXY, mouseDownListener, mouseMoveListener, mouseUpListener, self, toggleToolListener, trackFromEvent;
     self = this;
     this.previousEvent = null;
+    this.pointer = {};
     getEventPageXY = function(event) {
       var eventLocation;
       if (/^touch/.test(event.type)) {
@@ -9512,12 +9532,11 @@ PenciltestUI = (function(_super) {
         y: eventLocation.pageY
       };
     };
-    trackFromEvent = function(event) {
-      var pageCoords;
-      pageCoords = getEventPageXY(event);
-      return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
+    trackFromEvent = function(pageCoords) {
+      return self.pointer.coords = pageCoords;
     };
     mouseDownListener = function(event) {
+      var pageCoords;
       this.previousEvent = event;
       if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
         return;
@@ -9546,7 +9565,8 @@ PenciltestUI = (function(_super) {
         if (event.button === 1) {
           this.controller.useTool('eraser');
         }
-        trackFromEvent(event);
+        pageCoords = getEventPageXY(event);
+        self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
         this.uiListeners.move = mouseMoveListener.bind(this);
         this.uiListeners.up = mouseUpListener.bind(this);
         document.body.addEventListener('mousemove', this.uiListeners.move);
@@ -9556,13 +9576,17 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      var pageCoords;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
         Utils.recordGesture(event, this.fieldBounds);
         return this.progressGesture(Utils.describeGesture(this.fieldBounds));
       } else {
+        pageCoords = getEventPageXY(event);
+        this.pointer.coords = pageCoords;
+        console.log("updating coords");
         if (this.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
-          return trackFromEvent(event);
+          return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
         }
       }
     };
@@ -9600,7 +9624,7 @@ PenciltestUI = (function(_super) {
       context: contextMenuListener.bind(this),
       tool: toggleToolListener.bind(this),
       help: function() {
-        return self.doAppAction('showInterfaceHelp');
+        return self.doAppAction('toggleInterfaceHelp');
       }
     };
     this.controller.fieldElement.addEventListener('mousedown', this.uiListeners.fieldDown);
@@ -9719,6 +9743,13 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.addOtherListeners = function() {
     var self;
     self = this;
+    document.body.addEventListener('wheel', function(event) {
+      if (event.deltaY > 0) {
+        return self.doAppAction('nextFrame');
+      } else {
+        return self.doAppAction('prevFrame');
+      }
+    });
     return window.addEventListener('beforeunload', function() {
       self.controller.putStoredData('app', 'options', self.controller.options);
       self.controller.putStoredData('app', 'state', self.controller.state);
@@ -9728,7 +9759,7 @@ PenciltestUI = (function(_super) {
     });
   };
 
-  PenciltestUI.prototype.showInterfaceHelp = function() {
+  PenciltestUI.prototype.toggleInterfaceHelp = function() {
     var action, child, fingerCount, gestureTerms, gesturesMap, helpDoc, helpTextNode, keyboardDoc, name, open, unicodeDotCounters, _i, _len, _ref, _ref1;
     gesturesMap = [];
     open = Utils.toggleClass(this.components.help.getElement(), 'active');
@@ -9788,13 +9819,13 @@ PenciltestUI = (function(_super) {
 
   PenciltestUI.prototype.showMenu = function(coords) {
     var maxBottom, maxRight, menuElement, option, _i, _len, _ref, _results;
-    if (coords == null) {
-      coords = {
-        x: 10,
-        y: 10
-      };
-    }
     if (!this.menuIsVisible) {
+      if (!coords) {
+        coords = this.pointer.coords || {
+          x: 10,
+          y: 10
+        };
+      }
       this.menuIsVisible = true;
       menuElement = this.components.menu.getElement();
       Utils.toggleClass(menuElement, 'active', true);
@@ -9892,10 +9923,10 @@ Penciltest = (function() {
     hideCursor: false,
     loop: true,
     showStatus: true,
-    frameRate: 24,
+    frameRate: 12,
     frameHold: 2,
     onionSkin: true,
-    smoothing: 3,
+    smoothing: 0,
     onionSkinRange: 4,
     renderer: 'canvas',
     onionSkinOpacity: 0.5,
@@ -9903,7 +9934,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.6',
+    version: '0.2.7',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -10092,15 +10123,15 @@ Penciltest = (function() {
       this.framesHeld = -1;
       this.goToFrame(0);
     }
-    stepListener = function() {
+    stepListener = function(firstStep) {
       var currentFrame, newIndex;
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
-      if (self.framesHeld >= currentFrame.hold) {
+      newIndex = self.current.frameNumber + self.playDirection;
+      if (self.framesHeld >= currentFrame.hold || (firstStep && newIndex === self.film.frames.length)) {
         self.framesHeld = 0;
-        newIndex = self.current.frameNumber + self.playDirection;
         if (newIndex >= self.film.frames.length || newIndex < 0) {
-          if (self.options.loop) {
+          if (self.options.loop || firstStep) {
             newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
             self.goToFrame(newIndex);
             return self.seekAudioToFrame(0);
@@ -10113,7 +10144,7 @@ Penciltest = (function() {
       }
     };
     this.stop();
-    stepListener();
+    stepListener(true);
     this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
     this.lift();
     this.state.mode = Penciltest.prototype.modes.PLAYING;
@@ -10159,7 +10190,7 @@ Penciltest = (function() {
         }
         if (this.current.frameNumber < this.film.frames.length - i) {
           this.drawFrame(this.current.frameNumber + i, {
-            color: [0, 0, 255],
+            color: [0, 255, 255],
             opacity: Math.pow(this.options.onionSkinOpacity, i)
           });
         }
@@ -10370,7 +10401,7 @@ Penciltest = (function() {
     this.film = {
       name: '',
       version: Penciltest.prototype.state.version,
-      aspect: '16:9',
+      aspect: '1:1',
       width: 1920,
       frames: []
     };
