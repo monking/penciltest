@@ -25,7 +25,7 @@ Penciltest = (function() {
     frameRate: 12,
     frameHold: 2,
     onionSkin: true,
-    smoothing: 0,
+    smoothing: 1,
     onionSkinRange: 4,
     renderer: 'canvas',
     onionSkinOpacity: 0.5,
@@ -63,12 +63,12 @@ Penciltest = (function() {
     window.pt = this;
   }
 
-  Penciltest.prototype.setOptions = function(options) {
+  Penciltest.prototype.setOptions = function(newOptions) {
     var key, value, _results;
-    this.options = Utils.inherit(options, this.options || {}, Penciltest.prototype.state);
+    this.options = Utils.inherit(newOptions, this.options || {}, Penciltest.prototype.state);
     _results = [];
-    for (key in options) {
-      value = options[key];
+    for (key in newOptions) {
+      value = newOptions[key];
       if (key in this.ui.appActions && this.ui.appActions[key].action) {
         _results.push(this.ui.appActions[key].action.call(this));
       } else {
@@ -134,7 +134,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.track = function(x, y) {
-    var coords, currentFrame, done, makeMark, point, realEraseRadius, screenEraseRadius, screenPoint, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref;
+    var coords, currentFrame, done, point, realEraseRadius, screenEraseRadius, screenPoint, segment, stroke, strokeIndex, _i, _j, _len, _len1, _ref;
     coords = {
       x: x,
       y: y
@@ -167,22 +167,17 @@ Penciltest = (function() {
       }
       return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
     } else {
-      makeMark = false;
       if (this.currentStrokeIndex == null) {
         this.markPoint = coords;
         this.markBuffer = [];
-        makeMark = true;
       }
       this.markBuffer.push(coords);
       this.markPoint.x = (this.markPoint.x * this.options.smoothing + x) / (this.options.smoothing + 1);
       this.markPoint.y = (this.markPoint.y * this.options.smoothing + y) / (this.options.smoothing + 1);
       if (this.markBuffer.length > this.state.smoothDrawInterval) {
         this.markBuffer = [];
-        makeMark = true;
       }
-      if (makeMark) {
-        return this.mark(this.markPoint.x, this.markPoint.y);
-      }
+      return this.mark(this.markPoint.x, this.markPoint.y);
     }
   };
 

@@ -48,17 +48,20 @@ PenciltestUI = (function(_super) {
       },
       toggleTool: {
         tagName: 'button',
-        className: 'toggle-tool fa fa-pencil',
+        className: 'toggle-tool',
+        text: '🖉',
         parent: 'statusRight'
       },
       toggleMenu: {
         tagName: 'button',
-        className: 'toggle-menu fa fa-cog',
-        parent: 'statusRight'
+        className: 'toggle-menu',
+        parent: 'statusRight',
+        text: '⚙'
       },
       toggleHelp: {
         tagName: 'button',
-        className: 'toggle-help fa fa-question-circle',
+        text: '🯄',
+        className: 'toggle-help',
         parent: 'statusRight'
       },
       menu: {
@@ -135,6 +138,7 @@ PenciltestUI = (function(_super) {
     },
     playPause: {
       label: "Play/Pause",
+      text: '▶️',
       hotkey: ['Space'],
       gesture: /2 still from center (bottom|middle)/,
       cancelComplementKeyEvent: true,
@@ -154,6 +158,7 @@ PenciltestUI = (function(_super) {
     },
     nextFrame: {
       label: "Next Frame",
+      text: '➡️',
       hotkey: ['D', 'J', 'Right', '.'],
       gesture: /2 still from right bottom/,
       repeat: true,
@@ -167,6 +172,7 @@ PenciltestUI = (function(_super) {
     },
     prevFrame: {
       label: "Previous Frame",
+      text: '⬅️',
       hotkey: ['S', 'K', 'Left', ','],
       gesture: /2 still from left bottom/,
       repeat: true,
@@ -180,6 +186,7 @@ PenciltestUI = (function(_super) {
     },
     firstFrame: {
       label: "First Frame",
+      text: '⏮️',
       hotkey: ['1', '0', 'Home', 'PgUp'],
       gesture: /2 left from .* (bottom|middle)/,
       cancelComplementKeyEvent: true,
@@ -190,6 +197,7 @@ PenciltestUI = (function(_super) {
     },
     lastFrame: {
       label: "Last Frame",
+      text: '⏭️',
       hotkey: ['$', 'End', 'PgDn'],
       gesture: /2 right from .* (bottom|middle)/,
       cancelComplementKeyEvent: true,
@@ -658,14 +666,15 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.menuWalker = function(level) {
-    var group, groupName, key, label, markup, title, _i, _len;
+    var group, groupName, key, label, markup, text, title, _i, _len;
     markup = '';
     for (_i = 0, _len = level.length; _i < _len; _i++) {
       key = level[_i];
       if (typeof key === 'string') {
         label = this.appActions[key].label;
         title = this.appActions[key].title;
-        markup += "<li rel=\"" + key + "\" title=\"" + title + "\"><label>" + label + "</label></li>";
+        text = this.appActions[key].text || '';
+        markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + text + "<label>" + label + "</label></li>";
       } else {
         for (groupName in key) {
           group = key[groupName];
@@ -751,7 +760,6 @@ PenciltestUI = (function(_super) {
       } else {
         pageCoords = getEventPageXY(event);
         this.pointer.coords = pageCoords;
-        console.log("updating coords");
         if (this.controller.state.mode === Penciltest.prototype.modes.DRAWING) {
           return self.controller.track(pageCoords.x - self.controller.fieldContainer.offsetLeft, pageCoords.y - self.controller.fieldContainer.offsetTop);
         }
@@ -927,40 +935,49 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.toggleInterfaceHelp = function() {
-    var action, child, fingerCount, gestureTerms, gesturesMap, helpDoc, helpTextNode, keyboardDoc, name, open, unicodeDotCounters, _i, _len, _ref, _ref1;
-    gesturesMap = [];
-    open = Utils.toggleClass(this.components.help.getElement(), 'active');
-    _ref = this.components.help.getElement().children;
-    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-      child = _ref[_i];
-      this.components.help.getElement().removeChild(child);
-    }
+    var action, fingerCount, gestureTerms, gesturesActionDefElement, gesturesActionTermElement, gesturesDocElement, gesturesHeadingElement, helpElement, keyboardActionDefElement, keyboardActionTermElement, keyboardDocElement, keyboardHeadingElement, name, open, unicodeDotCounters, _ref;
+    helpElement = this.components.help.getElement();
+    open = Utils.toggleClass(helpElement, 'active');
+    helpElement.innerHTML = '';
     if (open) {
-      keyboardDoc = 'Keyboard Shortcuts:\n';
-      _ref1 = this.appActions;
-      for (name in _ref1) {
-        action = _ref1[name];
+      gesturesHeadingElement = document.createElement('H3');
+      gesturesHeadingElement.innerText = 'Gestures:';
+      gesturesDocElement = document.createElement('DL');
+      keyboardHeadingElement = document.createElement('H3');
+      keyboardHeadingElement.innerText = 'Keyboard Shortcuts:';
+      keyboardDocElement = document.createElement('DL');
+      _ref = this.appActions;
+      for (name in _ref) {
+        action = _ref[name];
         if (action.hotkey) {
-          keyboardDoc += action.label || name;
+          keyboardActionTermElement = document.createElement('DT');
+          keyboardActionDefElement = document.createElement('DD');
+          keyboardActionTermElement.innerText = action.label || name;
           if (action.hotkey) {
-            keyboardDoc += " [" + (action.hotkey.join(' or ')) + "]";
+            keyboardActionDefElement.innerText = action.hotkey.join(' or ');
           }
           if (action.title) {
-            keyboardDoc += " - " + action.title;
+            keyboardActionTermElement.innerHTML += "<small>" + action.title + "</small>";
           }
-          keyboardDoc += '\n';
+          keyboardDocElement.appendChild(keyboardActionTermElement);
+          keyboardDocElement.appendChild(keyboardActionDefElement);
         }
         if (action.gesture) {
+          gesturesActionTermElement = document.createElement('DT');
+          gesturesActionDefElement = document.createElement('DD');
+          gesturesActionTermElement.innerText = action.label || name;
           gestureTerms = String(action.gesture).match(/([0-9]+)(.*)\/$/);
           fingerCount = Number(gestureTerms[1]);
           unicodeDotCounters = ['', '\u2024', '\u2025', '\u2056', '\u2058', '\u2059'];
-          gesturesMap.push("" + name + ": " + unicodeDotCounters[fingerCount] + " " + gestureTerms[2]);
+          gesturesActionDefElement.innerText = "" + unicodeDotCounters[fingerCount] + " " + gestureTerms[2];
+          gesturesDocElement.appendChild(gesturesActionTermElement);
+          gesturesDocElement.appendChild(gesturesActionDefElement);
         }
       }
-      helpDoc = "Gestures:\n" + gesturesMap.join("\n");
-      helpDoc += "\n\n" + keyboardDoc;
-      helpTextNode = document.createTextNode(helpDoc);
-      return this.components.help.getElement().appendChild(helpTextNode);
+      helpElement.appendChild(gesturesHeadingElement);
+      helpElement.appendChild(gesturesDocElement);
+      helpElement.appendChild(keyboardHeadingElement);
+      return helpElement.appendChild(keyboardDocElement);
     }
   };
 
