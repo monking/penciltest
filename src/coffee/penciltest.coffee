@@ -22,14 +22,14 @@ class Penciltest
     frameRate: 12
     frameHold: 2
     onionSkin: true
-    smoothing: 0
+    smoothing: 1
     onionSkinRange: 4
     renderer: 'canvas'
     onionSkinOpacity: 0.5
     background: 'white'
 
   state:
-    version: '0.2.7'
+    version: '0.2.8'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -72,14 +72,14 @@ class Penciltest
 
     window.pt = @
 
-  setOptions: (options) ->
+  setOptions: (newOptions) ->
     @options = Utils.inherit(
-      options
+      newOptions
       @options or {}
       Penciltest.prototype.state
     )
 
-    for key, value of options
+    for key, value of newOptions
       @ui.appActions[key].action.call @ if key of @ui.appActions and @ui.appActions[key].action
 
   buildContainer: ->
@@ -153,23 +153,21 @@ class Penciltest
       @renderer.rect screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red'
 
     else
-      makeMark = false
-
       if not @currentStrokeIndex?
         @markPoint = coords
         @markBuffer = []
-        makeMark = true
 
       @markBuffer.push coords
 
+      # TODO  Mark multiple points per @options.smoothing
       @markPoint.x = (@markPoint.x * @options.smoothing + x) / (@options.smoothing + 1)
       @markPoint.y = (@markPoint.y * @options.smoothing + y) / (@options.smoothing + 1)
 
+      # TODO  Use previous mark for velocity, to interpolate `smoothing`×
       if @markBuffer.length > @state.smoothDrawInterval
         @markBuffer = []
-        makeMark = true
 
-      @mark @markPoint.x, @markPoint.y if makeMark
+      @mark @markPoint.x, @markPoint.y
 
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()

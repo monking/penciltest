@@ -35,15 +35,18 @@ class PenciltestUI extends PenciltestUIComponent
         parent: 'statusRight'
       toggleTool:
         tagName: 'button'
-        className: 'toggle-tool fa fa-pencil'
+        className: 'toggle-tool'
+        text: '🖉' # U+1F589
         parent: 'statusRight'
       toggleMenu:
         tagName: 'button'
-        className: 'toggle-menu fa fa-cog'
+        className: 'toggle-menu'
         parent: 'statusRight'
+        text: '⚙' #U+2699
       toggleHelp:
         tagName: 'button'
-        className: 'toggle-help fa fa-question-circle'
+        text: '🯄'
+        className: 'toggle-help'
         parent: 'statusRight'
       menu:
         tagName: 'ul'
@@ -94,6 +97,7 @@ class PenciltestUI extends PenciltestUIComponent
         
     playPause:
       label: "Play/Pause"
+      text: '▶️'
       hotkey: ['Space']
       gesture: /2 still from center (bottom|middle)/
       cancelComplementKeyEvent: true
@@ -109,6 +113,7 @@ class PenciltestUI extends PenciltestUIComponent
         @togglePlay()
     nextFrame:
       label: "Next Frame"
+      text: '➡️'
       hotkey: ['D', 'J', 'Right','.']
       gesture: /2 still from right bottom/
       repeat: true
@@ -118,6 +123,7 @@ class PenciltestUI extends PenciltestUIComponent
         @scrubAudio() if @audioElement
     prevFrame:
       label: "Previous Frame"
+      text: '⬅️'
       hotkey: ['S', 'K', 'Left',',']
       gesture: /2 still from left bottom/
       repeat: true
@@ -127,6 +133,7 @@ class PenciltestUI extends PenciltestUIComponent
         @scrubAudio() if @audioElement
     firstFrame:
       label: "First Frame"
+      text: '⏮️'
       hotkey: ['1', '0','Home','PgUp']
       gesture: /2 left from .* (bottom|middle)/
       cancelComplementKeyEvent: true
@@ -135,6 +142,7 @@ class PenciltestUI extends PenciltestUIComponent
         @stop()
     lastFrame:
       label: "Last Frame"
+      text: '⏭️'
       hotkey: ['$','End','PgDn']
       gesture: /2 right from .* (bottom|middle)/
       cancelComplementKeyEvent: true
@@ -486,7 +494,8 @@ class PenciltestUI extends PenciltestUIComponent
       if typeof key is 'string'
         label = @appActions[key].label
         title = @appActions[key].title
-        markup += "<li rel=\"#{key}\" title=\"#{title}\"><label>#{label}</label></li>"
+        text = @appActions[key].text or ''
+        markup += "<li rel=\"#{key}\" title=\"#{title}\">#{text}<label>#{label}</label></li>"
       else
         for groupName, group of key
           if groupName is '_icons'
@@ -563,7 +572,6 @@ class PenciltestUI extends PenciltestUIComponent
       else
         pageCoords = getEventPageXY event
         @pointer.coords = pageCoords
-        console.log("updating coords") # XXX
         if @controller.state.mode is Penciltest.prototype.modes.DRAWING
           self.controller.track(
             pageCoords.x - self.controller.fieldContainer.offsetLeft,
@@ -712,36 +720,48 @@ class PenciltestUI extends PenciltestUIComponent
       event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
 
   toggleInterfaceHelp: ->
-    gesturesMap = []
+    helpElement = @components.help.getElement()
+    open = Utils.toggleClass helpElement, 'active'
 
-    open = Utils.toggleClass @components.help.getElement(), 'active'
-
-    for child in @components.help.getElement().children
-      @components.help.getElement().removeChild(child)
+    helpElement.innerHTML = ''
+    #for child in helpElement.children
+    #  helpElement.removeChild(child)
 
     if open
-      keyboardDoc = 'Keyboard Shortcuts:\n'
+      gesturesHeadingElement = document.createElement('H3')
+      gesturesHeadingElement.innerText = 'Gestures:'
+      gesturesDocElement = document.createElement('DL')
+      keyboardHeadingElement = document.createElement('H3')
+      keyboardHeadingElement.innerText = 'Keyboard Shortcuts:'
+      keyboardDocElement = document.createElement('DL')
 
       for name, action of @appActions
         if action.hotkey
-          keyboardDoc += action.label or name
+          keyboardActionTermElement = document.createElement('DT')
+          keyboardActionDefElement = document.createElement('DD')
+          keyboardActionTermElement.innerText = action.label or name
           if action.hotkey
-            keyboardDoc += " [#{action.hotkey.join ' or '}]"
+            keyboardActionDefElement.innerText = action.hotkey.join ' or '
           if action.title
-            keyboardDoc += " - #{action.title}"
-          keyboardDoc += '\n'
+            keyboardActionTermElement.innerHTML += "<small>#{action.title}</small>"
+          keyboardDocElement.appendChild keyboardActionTermElement
+          keyboardDocElement.appendChild keyboardActionDefElement
 
         if action.gesture
+          gesturesActionTermElement = document.createElement('DT')
+          gesturesActionDefElement = document.createElement('DD')
+          gesturesActionTermElement.innerText = action.label or name
           gestureTerms = String(action.gesture).match(/([0-9]+)(.*)\/$/)
           fingerCount = Number(gestureTerms[1])
           unicodeDotCounters = ['', '\u2024', '\u2025', '\u2056', '\u2058', '\u2059']
-          gesturesMap.push "#{name}: #{unicodeDotCounters[fingerCount]} #{gestureTerms[2]}"
+          gesturesActionDefElement.innerText = "#{unicodeDotCounters[fingerCount]} #{gestureTerms[2]}"
+          gesturesDocElement.appendChild gesturesActionTermElement
+          gesturesDocElement.appendChild gesturesActionDefElement
 
-      helpDoc = "Gestures:\n" + gesturesMap.join "\n"
-      helpDoc += "\n\n#{keyboardDoc}"
-    
-      helpTextNode = document.createTextNode(helpDoc)
-      @components.help.getElement().appendChild(helpTextNode)
+      helpElement.appendChild gesturesHeadingElement
+      helpElement.appendChild gesturesDocElement
+      helpElement.appendChild keyboardHeadingElement
+      helpElement.appendChild keyboardDocElement
 
   updateStatus: ->
     if @controller.options.showStatus

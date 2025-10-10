@@ -139,11 +139,11 @@ Utils =
     fileInput.type = 'file'
     fileInput.accept = String(acceptTypes) if acceptTypes
     loadFile = ->
-      for file in fileInput.files
-        fileReader = new FileReader()
-        fileReader.addEventListener 'load', (event) ->
-          callback event.target.result
-        fileReader.readAsText file
+        for file in fileInput.files
+          fileReader = new FileReader()
+          fileReader.addEventListener 'load', (event) ->
+            callback event.target.result
+          fileReader.readAsText file
     @prompt message, null, loadFile, fileInput, true
     fileInput.click()
 
