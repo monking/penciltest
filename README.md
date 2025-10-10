@@ -6,9 +6,9 @@ A traditional animation tool in the browser.
 
 ## features
 
-- render to GIF
 - onion skin
-- save and load films
+- save and load films to [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
+- render to GIF (using [GIFEncoder](https://github.com/antimatter15/jsgif))
 
 ## usage
 
