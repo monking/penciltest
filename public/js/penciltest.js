@@ -8290,8 +8290,11 @@ Utils = {
     };
     return this.prompt(message, null, promptCallback, selectInput);
   },
-  promptForFile: function(message, callback, acceptTypes) {
+  promptForFile: function(message, callback, acceptTypes, returnBlobURLs) {
     var fileInput, loadFile;
+    if (returnBlobURLs == null) {
+      returnBlobURLs = false;
+    }
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     if (acceptTypes) {
@@ -8299,17 +8302,23 @@ Utils = {
     }
     loadFile = function() {
       var file, fileReader, _i, _len, _ref, _results;
-      _ref = fileInput.files;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        file = _ref[_i];
-        fileReader = new FileReader();
-        fileReader.addEventListener('load', function(event) {
-          return callback(event.target.result);
+      if (returnBlobURLs) {
+        return Array.from(fileInput.files).map(function(file) {
+          return URL.createObjectURL(file);
         });
-        _results.push(fileReader.readAsText(file));
+      } else {
+        _ref = fileInput.files;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          file = _ref[_i];
+          fileReader = new FileReader();
+          fileReader.addEventListener('load', function(event) {
+            return callback(event.target.result);
+          });
+          _results.push(fileReader.readAsText(file));
+        }
+        return _results;
       }
-      return _results;
     };
     this.prompt(message, null, loadFile, fileInput, true);
     return fileInput.click();
@@ -8555,6 +8564,7 @@ PenciltestUIComponent = (function() {
   PenciltestUIComponent.prototype.options = {
     tagName: 'div',
     className: null,
+    text: null,
     id: null,
     parent: document.body
   };
@@ -8572,6 +8582,9 @@ PenciltestUIComponent = (function() {
     }
     if (this.options.id) {
       this.el.container.id = this.options.id;
+    }
+    if (this.options.text) {
+      this.el.container.innerText = this.options.text;
     }
     return this.appendTo(this.options.parent);
   };
@@ -9415,9 +9428,18 @@ PenciltestUI = (function(_super) {
         var self;
         self = this;
         return Utils.prompt('Audio file URL: ', (this.film.audio ? this.film.audio.url : ''), function(audioURL) {
-          if (audioURL != null) {
-            return self.loadAudio(audioURL);
-          }
+          return Utils.promptForFile('(optional, UNSTABLE) Load a captions/subtitle (WebVTT) file', function(vttObjectURLs) {
+            var _ref;
+            console.log(vttObjectURLs);
+            if ((vttObjectURLs != null ? vttObjectURLs.length : void 0) > 0) {
+              self.film.captions = {
+                url: vttObjectURLs[0]
+              };
+            }
+            if (audioURL != null) {
+              return self.loadAudio(audioURL, (_ref = self.film.captions) != null ? _ref.url : void 0);
+            }
+          }, '.vtt,text/vtt', true);
         });
       }
     },
@@ -9934,7 +9956,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.7',
+    version: '0.3.0a',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -10596,10 +10618,11 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setFilm = function(film) {
+    var _ref;
     this.film = film;
     this.buildFilmMeta();
     if (this.film.audio && this.film.audio.url) {
-      this.loadAudio(this.film.audio.url);
+      this.loadAudio(this.film.audio.url, (_ref = this.film.captions) != null ? _ref.url : void 0);
     } else {
       this.destroyAudio();
     }
@@ -10656,7 +10679,7 @@ Penciltest = (function() {
     return frame.hold / this.options.frameRate;
   };
 
-  Penciltest.prototype.loadAudio = function(audioURL) {
+  Penciltest.prototype.loadAudio = function(audioURL, captionsUrl) {
     var _base;
     if ((_base = this.film).audio == null) {
       _base.audio = {};
@@ -10665,11 +10688,20 @@ Penciltest = (function() {
     this.film.audio.offset = 0;
     this.unsavedChanges = true;
     if (!this.audioElement) {
-      this.audioElement = document.createElement('audio');
+      this.audioElement = document.createElement('video');
       this.audioElement.preload = true;
-      this.fieldContainer.appendChild(this.audioElement);
+      this.container.appendChild(this.audioElement);
     } else {
       this.pauseAudio();
+    }
+    if (captionsUrl) {
+      this.captionTrackElement = document.createElement('track');
+      this.captionTrackElement.setAttribute('default', true);
+      this.captionTrackElement.setAttribute('kind', 'captions');
+      this.captionTrackElement.setAttribute('src', captionsUrl);
+      this.captionTrackElement.setAttribute('srclang', 'en');
+      this.audioElement.setAttribute('controls', true);
+      this.audioElement.appendChild(this.captionTrackElement);
     }
     return this.audioElement.src = audioURL;
   };

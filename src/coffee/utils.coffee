@@ -134,16 +134,20 @@ Utils =
       callback(selected)
     @prompt message, null, promptCallback, selectInput
 
-  promptForFile: (message, callback, acceptTypes) ->
+  promptForFile: (message, callback, acceptTypes, returnBlobURLs = false) ->
     fileInput = document.createElement 'input'
     fileInput.type = 'file'
     fileInput.accept = String(acceptTypes) if acceptTypes
     loadFile = ->
-      for file in fileInput.files
-        fileReader = new FileReader()
-        fileReader.addEventListener 'load', (event) ->
-          callback event.target.result
-        fileReader.readAsText file
+      if returnBlobURLs
+        return Array.from(fileInput.files).map (file) ->
+          return URL.createObjectURL(file)
+      else
+        for file in fileInput.files
+          fileReader = new FileReader()
+          fileReader.addEventListener 'load', (event) ->
+            callback event.target.result
+          fileReader.readAsText file
     @prompt message, null, loadFile, fileInput, true
     fileInput.click()
 

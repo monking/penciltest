@@ -573,9 +573,18 @@ PenciltestUI = (function(_super) {
         var self;
         self = this;
         return Utils.prompt('Audio file URL: ', (this.film.audio ? this.film.audio.url : ''), function(audioURL) {
-          if (audioURL != null) {
-            return self.loadAudio(audioURL);
-          }
+          return Utils.promptForFile('(optional, UNSTABLE) Load a captions/subtitle (WebVTT) file', function(vttObjectURLs) {
+            var _ref;
+            console.log(vttObjectURLs);
+            if ((vttObjectURLs != null ? vttObjectURLs.length : void 0) > 0) {
+              self.film.captions = {
+                url: vttObjectURLs[0]
+              };
+            }
+            if (audioURL != null) {
+              return self.loadAudio(audioURL, (_ref = self.film.captions) != null ? _ref.url : void 0);
+            }
+          }, '.vtt,text/vtt', true);
         });
       }
     },

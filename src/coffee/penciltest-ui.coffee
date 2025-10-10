@@ -388,7 +388,12 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         self = @
         Utils.prompt 'Audio file URL: ', (if @film.audio then @film.audio.url else ''), (audioURL) ->
-          self.loadAudio audioURL if audioURL?
+          #Utils.prompt '(optional) captions URL: ', (self.film.captions?.url or ''), (inputCaptionsUrl) ->
+          Utils.promptForFile '(optional, UNSTABLE) Load a captions/subtitle (WebVTT) file', (vttObjectURLs) ->
+            console.log vttObjectURLs # XXX
+            self.film.captions = { url: vttObjectURLs[0] } if vttObjectURLs?.length > 0
+            self.loadAudio audioURL, self.film.captions?.url if audioURL?
+          , '.vtt,text/vtt', true
     unloadAudio:
       label: "Unload Audio"
       listener: ->

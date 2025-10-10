@@ -3,6 +3,7 @@ class PenciltestUIComponent
   options:
     tagName: 'div'
     className: null
+    text: null
     id: null
     parent: document.body # DOM Element or PenciltestUIComponent
 
@@ -16,6 +17,7 @@ class PenciltestUIComponent
     @el.container = document.createElement @options.tagName
     @el.container.className = @options.className if @options.className
     @el.container.id = @options.id if @options.id
+    @el.container.innerText = @options.text if @options.text
 
     @appendTo @options.parent
 

@@ -4,6 +4,7 @@ PenciltestUIComponent = (function() {
   PenciltestUIComponent.prototype.options = {
     tagName: 'div',
     className: null,
+    text: null,
     id: null,
     parent: document.body
   };
@@ -21,6 +22,9 @@ PenciltestUIComponent = (function() {
     }
     if (this.options.id) {
       this.el.container.id = this.options.id;
+    }
+    if (this.options.text) {
+      this.el.container.innerText = this.options.text;
     }
     return this.appendTo(this.options.parent);
   };

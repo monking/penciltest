@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.2.7'
+    version: '0.3.0a'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -576,7 +576,7 @@ class Penciltest
     @film = film
     @buildFilmMeta()
     if @film.audio and @film.audio.url
-      @loadAudio @film.audio.url
+      @loadAudio @film.audio.url, @film.captions?.url
     else
       @destroyAudio()
     @goToFrame 0
@@ -616,17 +616,25 @@ class Penciltest
     frame = @film.frames[frameNumber]
     frame.hold / @options.frameRate
 
-  loadAudio: (audioURL) ->
+  loadAudio: (audioURL, captionsUrl) ->
     @film.audio ?= {}
     @film.audio.url = audioURL
     @film.audio.offset = 0
     @unsavedChanges = true
     if not @audioElement # TODO: abstract away from browser
-      @audioElement = document.createElement 'audio'
+      @audioElement = document.createElement 'video' # TODO (C) 2025-03-27 Load captions
       @audioElement.preload = true
-      @fieldContainer.appendChild @audioElement
+      @container.appendChild @audioElement
     else
       @pauseAudio()
+    if captionsUrl
+      @captionTrackElement = document.createElement 'track'
+      @captionTrackElement.setAttribute 'default', true
+      @captionTrackElement.setAttribute 'kind', 'captions'
+      @captionTrackElement.setAttribute 'src', captionsUrl
+      @captionTrackElement.setAttribute 'srclang', 'en'
+      @audioElement.setAttribute 'controls', true
+      @audioElement.appendChild @captionTrackElement
     @audioElement.src = audioURL
 
   destroyAudio: ->

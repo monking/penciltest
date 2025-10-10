@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.7',
+    version: '0.3.0a',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -695,10 +695,11 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setFilm = function(film) {
+    var _ref;
     this.film = film;
     this.buildFilmMeta();
     if (this.film.audio && this.film.audio.url) {
-      this.loadAudio(this.film.audio.url);
+      this.loadAudio(this.film.audio.url, (_ref = this.film.captions) != null ? _ref.url : void 0);
     } else {
       this.destroyAudio();
     }
@@ -755,7 +756,7 @@ Penciltest = (function() {
     return frame.hold / this.options.frameRate;
   };
 
-  Penciltest.prototype.loadAudio = function(audioURL) {
+  Penciltest.prototype.loadAudio = function(audioURL, captionsUrl) {
     var _base;
     if ((_base = this.film).audio == null) {
       _base.audio = {};
@@ -764,11 +765,20 @@ Penciltest = (function() {
     this.film.audio.offset = 0;
     this.unsavedChanges = true;
     if (!this.audioElement) {
-      this.audioElement = document.createElement('audio');
+      this.audioElement = document.createElement('video');
       this.audioElement.preload = true;
-      this.fieldContainer.appendChild(this.audioElement);
+      this.container.appendChild(this.audioElement);
     } else {
       this.pauseAudio();
+    }
+    if (captionsUrl) {
+      this.captionTrackElement = document.createElement('track');
+      this.captionTrackElement.setAttribute('default', true);
+      this.captionTrackElement.setAttribute('kind', 'captions');
+      this.captionTrackElement.setAttribute('src', captionsUrl);
+      this.captionTrackElement.setAttribute('srclang', 'en');
+      this.audioElement.setAttribute('controls', true);
+      this.audioElement.appendChild(this.captionTrackElement);
     }
     return this.audioElement.src = audioURL;
   };

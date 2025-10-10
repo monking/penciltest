@@ -172,8 +172,11 @@ Utils = {
     };
     return this.prompt(message, null, promptCallback, selectInput);
   },
-  promptForFile: function(message, callback, acceptTypes) {
+  promptForFile: function(message, callback, acceptTypes, returnBlobURLs) {
     var fileInput, loadFile;
+    if (returnBlobURLs == null) {
+      returnBlobURLs = false;
+    }
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     if (acceptTypes) {
@@ -181,17 +184,23 @@ Utils = {
     }
     loadFile = function() {
       var file, fileReader, _i, _len, _ref, _results;
-      _ref = fileInput.files;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        file = _ref[_i];
-        fileReader = new FileReader();
-        fileReader.addEventListener('load', function(event) {
-          return callback(event.target.result);
+      if (returnBlobURLs) {
+        return Array.from(fileInput.files).map(function(file) {
+          return URL.createObjectURL(file);
         });
-        _results.push(fileReader.readAsText(file));
+      } else {
+        _ref = fileInput.files;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          file = _ref[_i];
+          fileReader = new FileReader();
+          fileReader.addEventListener('load', function(event) {
+            return callback(event.target.result);
+          });
+          _results.push(fileReader.readAsText(file));
+        }
+        return _results;
       }
-      return _results;
     };
     this.prompt(message, null, loadFile, fileInput, true);
     return fileInput.click();
