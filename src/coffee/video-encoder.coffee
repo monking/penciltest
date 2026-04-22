@@ -6,7 +6,7 @@ module.exports = PenciltestVideoEncoder
 
 class PenciltestVideoEncoder
 
-  constructor: (filmFilePath) ->
+  constructor: (sceneFilePath) ->
     @penciltest = new Penciltest
-    film = require filmFilePath
-    @penciltest.setFilm film
+    scene = require sceneFilePath
+    @penciltest.setScene scene

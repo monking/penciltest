@@ -42,8 +42,8 @@ PenciltestUI = (function(_super) {
         className: 'app-status',
         parent: 'statusLeft'
       },
-      filmStatus: {
-        className: 'film-status',
+      sceneStatus: {
+        className: 'scene-status',
         parent: 'statusRight'
       },
       toggleTool: {
@@ -133,7 +133,7 @@ PenciltestUI = (function(_super) {
       gesture: /2 (left|right) from .* (bottom|middle)/,
       triggerOnMove: true,
       listener: function() {
-        return this.goToFrame(Math.floor(Utils.currentGesture.startFrameNumber + this.film.frames.length * Utils.currentGesture.deltaNormalized.x * 2));
+        return this.goToFrame(Math.floor(Utils.currentGesture.startFrameNumber + this.scene.frames.length * Utils.currentGesture.deltaNormalized.x * 2));
       }
     },
     playPause: {
@@ -202,7 +202,7 @@ PenciltestUI = (function(_super) {
       gesture: /2 right from .* (bottom|middle)/,
       cancelComplementKeyEvent: true,
       listener: function() {
-        this.goToFrame(this.film.frames.length - 1);
+        this.goToFrame(this.scene.frames.length - 1);
         return this.stop();
       }
     },
@@ -318,7 +318,7 @@ PenciltestUI = (function(_super) {
             return Utils.confirm('update hold for existing frames in proportion to new setting??: ', function() {
               var frame, magnitudeDelta, _i, _len, _ref;
               magnitudeDelta = self.options.frameHold / oldHold;
-              _ref = self.film.frames;
+              _ref = self.scene.frames;
               for (_i = 0, _len = _ref.length; _i < _len; _i++) {
                 frame = _ref[_i];
                 frame.hold = Math.round(frame.hold * magnitudeDelta);
@@ -351,6 +351,15 @@ PenciltestUI = (function(_super) {
           onionSkin: !this.options.onionSkin
         });
         return this.resize();
+      }
+    },
+    clearFrame: {
+      label: "Clear Frame",
+      hotkey: ['Backspace'],
+      gesture: /3 down from center middle/,
+      cancelComplementKeyEvent: true,
+      listener: function() {
+        return this.clearStrokes();
       }
     },
     dropFrame: {
@@ -396,12 +405,12 @@ PenciltestUI = (function(_super) {
         return this.smoothFrame(this.current.frameNumber);
       }
     },
-    smoothFilm: {
+    smoothScene: {
       label: "Smooth All Frames",
-      title: "Redraw all frames in the film with the current smoothing setting",
+      title: "Redraw all frames in the scene with the current smoothing setting",
       hotkey: ['Alt+Shift+M'],
       listener: function() {
-        return this.smoothFilm();
+        return this.smoothScene();
       }
     },
     lessHold: {
@@ -433,7 +442,7 @@ PenciltestUI = (function(_super) {
     },
     showStatus: {
       label: "Show Status",
-      title: "hide the film status bar",
+      title: "hide the scene status bar",
       listener: function() {
         return this.setOptions({
           showStatus: !this.options.showStatus
@@ -454,23 +463,23 @@ PenciltestUI = (function(_super) {
         return this.resize();
       }
     },
-    saveFilm: {
+    saveScene: {
       label: "Save",
       hotkey: ['Alt+S'],
       gesture: /3 still from center (bottom|middle)/,
       listener: function() {
-        return this.saveFilm();
+        return this.saveScene();
       }
     },
-    loadFilm: {
+    loadScene: {
       label: "Load",
       hotkey: ['Alt+O'],
       gesture: /3 up from center (bottom|middle)/,
       listener: function() {
-        return this.loadFilm();
+        return this.loadScene();
       }
     },
-    newFilm: {
+    newScene: {
       label: "New",
       hotkey: ['N'],
       listener: function() {
@@ -478,10 +487,10 @@ PenciltestUI = (function(_super) {
         self = this;
         if (this.unsavedChanges) {
           return Utils.confirm("Unsaved changes will be lost.", function() {
-            return self.newFilm();
+            return self.newScene();
           });
         } else {
-          return this.newFilm();
+          return this.newScene();
         }
       }
     },
@@ -492,23 +501,23 @@ PenciltestUI = (function(_super) {
         return this.renderGif();
       }
     },
-    resizeFilm: {
-      label: "Resize Film",
+    resizeScene: {
+      label: "Resize Scene",
       hotkey: ['Alt+R'],
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('Film width & aspect', "" + this.film.width + " " + this.film.aspect, function(dimensionsResponse) {
+        return Utils.prompt('Scene width & aspect (W/H)', "" + this.scene.width + " " + this.scene.aspect, function(dimensionsResponse) {
           var dimensions;
           dimensions = dimensionsResponse.split(' ');
-          self.film.width = Number(dimensions[0]);
-          self.film.aspect = dimensions[1];
+          self.scene.width = Number(dimensions[0]);
+          self.scene.aspect = dimensions[1];
           return self.resize();
         });
       }
     },
-    panFilm: {
-      label: "Pan Film",
+    panScene: {
+      label: "Pan Scene",
       hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
@@ -516,7 +525,7 @@ PenciltestUI = (function(_super) {
         oldMode = this.state.mode;
         this.state.mode = Penciltest.prototype.modes.BUSY;
         startPoint = endPoint = deltaPoint = [0, 0];
-        frameScale = this.width / this.film.width;
+        frameScale = this.width / this.scene.width;
         dragStart = function(event) {
           startPoint = endPoint = [event.clientX, event.clientY];
           deltaPoint = [0, 0];
@@ -541,36 +550,36 @@ PenciltestUI = (function(_super) {
         return this.resize();
       }
     },
-    deleteFilm: {
-      label: "Delete Film",
+    deleteScene: {
+      label: "Delete Scene",
       hotkey: ['Alt+Backspace'],
       listener: function() {
-        return this.deleteFilm();
+        return this.deleteScene();
       }
     },
-    exportFilm: {
+    exportScene: {
       label: "Export",
       hotkey: ['Ctrl+S', 'Alt+E'],
       cancelComplementKeyEvent: true,
       listener: function() {
         var blob, fileName, url;
-        blob = new Blob([JSON.stringify(this.film)], {
+        blob = new Blob([JSON.stringify(this.scene)], {
           type: 'application/json'
         });
         url = window.URL.createObjectURL(blob);
-        fileName = (this.film.name || 'untitled') + '.penciltest.json';
+        fileName = (this.scene.name || 'untitled') + '.penciltest.json';
         return Utils.downloadFromUrl(url, fileName);
       }
     },
-    importFilm: {
+    importScene: {
       label: "Import",
       hotkey: ['Ctrl+O'],
       cancelComplementKeyEvent: true,
       listener: function() {
         var self;
         self = this;
-        return Utils.promptForFile('Load a film JSON file', function(filmJSON) {
-          return self.setFilm(JSON.parse(filmJSON));
+        return Utils.promptForFile('Load a scene JSON file', function(sceneJSON) {
+          return self.setScene(JSON.parse(sceneJSON));
         }, '.json,application/json');
       }
     },
@@ -580,7 +589,7 @@ PenciltestUI = (function(_super) {
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('Audio file URL: ', (this.film.audio ? this.film.audio.url : ''), function(audioURL) {
+        return Utils.prompt('Audio file URL: ', (this.scene.audio ? this.scene.audio.url : ''), function(audioURL) {
           if (audioURL != null) {
             return self.loadAudio(audioURL);
           }
@@ -598,8 +607,8 @@ PenciltestUI = (function(_super) {
       hotkey: ['['],
       listener: function() {
         Utils.log("Shift Audio Earlier");
-        if (this.film.audio) {
-          this.film.audio.offset--;
+        if (this.scene.audio) {
+          this.scene.audio.offset--;
         }
         return this.ui.updateStatus();
       }
@@ -609,8 +618,8 @@ PenciltestUI = (function(_super) {
       hotkey: [']'],
       listener: function() {
         Utils.log("Shift Audio Later");
-        if (this.film.audio) {
-          this.film.audio.offset++;
+        if (this.scene.audio) {
+          this.scene.audio.offset++;
         }
         return this.ui.updateStatus();
       }
@@ -643,10 +652,10 @@ PenciltestUI = (function(_super) {
   PenciltestUI.prototype.menuOptions = [
     {
       _icons: ['firstFrame', 'prevFrame', 'playPause', 'nextFrame', 'lastFrame'],
-      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'dropFrame'],
+      Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'clearFrame', 'dropFrame'],
       Playback: ['loop'],
-      Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothFilm', 'linkAudio'],
-      Film: ['frameRate', 'resizeFilm', 'panFilm', 'renderGif', 'saveFilm', 'loadFilm', 'newFilm', 'importFilm', 'exportFilm'],
+      Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothScene', 'linkAudio'],
+      Scene: ['frameRate', 'resizeScene', 'panScene', 'renderGif', 'saveScene', 'loadScene', 'newScene', 'importScene', 'exportScene'],
       Settings: ['frameHold', 'renderer', 'toggleInterfaceHelp', 'reset', 'toggleDebug']
     }
   ];
@@ -837,9 +846,20 @@ PenciltestUI = (function(_super) {
     self = this;
     this.menuItems = this.components.menu.getElement().querySelectorAll('LI');
     menuOptionListener = function(event) {
-      var optionName;
-      if (/\bgroup\b/.test(this.className)) {
-        return Utils.toggleClass(this, 'collapsed');
+      var item, optionName, _i, _len, _ref, _results;
+      if (this.classList.contains('group')) {
+        Utils.toggleClass(this, 'collapsed');
+        _ref = self.menuItems;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          item = _ref[_i];
+          if (item !== this && item.classList.contains('group') && !item.classList.contains('collapsed')) {
+            _results.push(item.classList.add('collapsed'));
+          } else {
+            _results.push(void 0);
+          }
+        }
+        return _results;
       } else if (this.attributes.rel) {
         event.preventDefault();
         optionName = this.attributes.rel.value;
@@ -910,6 +930,9 @@ PenciltestUI = (function(_super) {
     var self;
     self = this;
     document.body.addEventListener('wheel', function(event) {
+      if (self.menuIsVisible) {
+        return;
+      }
       if (event.deltaY > 0) {
         return self.doAppAction('nextFrame');
       } else {
@@ -973,21 +996,21 @@ PenciltestUI = (function(_super) {
   };
 
   PenciltestUI.prototype.updateStatus = function() {
-    var appStatusMarkup, filmStatusMarkup, _ref;
+    var appStatusMarkup, sceneStatusMarkup, _ref;
     if (this.controller.options.showStatus) {
       appStatusMarkup = "v" + Penciltest.prototype.state.version;
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
       this.components.appStatus.setHTML(appStatusMarkup);
-      filmStatusMarkup = "<div class=\"frame\">";
-      filmStatusMarkup += "" + this.controller.options.frameRate + " FPS";
-      filmStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
-      filmStatusMarkup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.film.frames.length;
-      filmStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
-      if ((_ref = this.controller.film.audio) != null ? _ref.offset : void 0) {
-        filmStatusMarkup += " " + (this.controller.film.audio.offset >= 0 ? '+' : '') + this.controller.film.audio.offset;
+      sceneStatusMarkup = "<div class=\"frame\">";
+      sceneStatusMarkup += "" + this.controller.options.frameRate + " FPS";
+      sceneStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
+      sceneStatusMarkup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.scene.frames.length;
+      sceneStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
+      if ((_ref = this.controller.scene.audio) != null ? _ref.offset : void 0) {
+        sceneStatusMarkup += " " + (this.controller.scene.audio.offset >= 0 ? '+' : '') + this.controller.scene.audio.offset;
       }
-      filmStatusMarkup += "</div>";
-      this.components.filmStatus.setHTML(filmStatusMarkup);
+      sceneStatusMarkup += "</div>";
+      this.components.sceneStatus.setHTML(sceneStatusMarkup);
       return this.components.toggleTool.getElement().className = "toggle-tool fa fa-" + this.controller.state.toolStack[0];
     }
   };

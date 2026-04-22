@@ -10,22 +10,19 @@ Utils = {
     return JSON.parse(JSON.stringify(object));
   },
   toggleClass: function(element, className, presence) {
-    var added, classIndex, classes;
+    var added;
     if (presence == null) {
       presence = null;
     }
     added = false;
-    classes = element.className.split(/\s+/);
-    classIndex = classes.indexOf(className);
-    if (classIndex > -1) {
+    if (element.classList.contains(className)) {
       if (presence !== true) {
-        classes.splice(classIndex, 1);
+        element.classList.remove(className);
       }
     } else if (presence !== false) {
-      classes.push(className);
+      element.classList.add(className);
       added = true;
     }
-    element.className = classes.join(' ');
     return added;
   },
   inherit: function() {

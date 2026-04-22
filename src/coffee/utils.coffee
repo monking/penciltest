@@ -8,15 +8,12 @@ Utils =
     return JSON.parse(JSON.stringify(object))
 
   toggleClass: (element, className, presence = null) ->
-    added = false
-    classes = element.className.split /\s+/
-    classIndex = classes.indexOf className
-    if classIndex > -1
-      classes.splice classIndex, 1 if presence isnt true
+    added=false
+    if element.classList.contains className
+      element.classList.remove className if presence isnt true
     else if presence isnt false
-      classes.push className
+      element.classList.add className
       added = true
-    element.className = classes.join ' '
     added
 
   inherit: (child = {}, ancestors...) ->
@@ -115,7 +112,7 @@ Utils =
   # @return selected string or boolean false
   select: (message, options, defaultValue, callback) ->
     # TODO: a real selectable list
-    # TODO: update the application core to handle async prompts (e.g. selectFilmNames)
+    # TODO: update the application core to handle async prompts (e.g. selectSceneNames)
     selectInput = document.createElement 'select'
     for option, index in options
       optionElement = document.createElement 'option'

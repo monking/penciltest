@@ -49,7 +49,7 @@
   display: inline-block;
   vertical-align: middle;
 }
-.penciltest-ui .toolbar .status .app-status, .penciltest-ui .toolbar .status .film-status {
+.penciltest-ui .toolbar .status .app-status, .penciltest-ui .toolbar .status .scene-status {
   margin: 0 0.5em;
 }
 .penciltest-ui .toolbar .status button {

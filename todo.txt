@@ -1,0 +1,6 @@
+(A) 2026-04-22 (canvas) Fix render filling areas inappropriately. Currently no appropriate fill, yes?  uuid:d5a66d06-b0e3-42b8-a3de-fe6f8db91799
+(B) 2026-04-22 (canvas) Render line uniform darkness first and always. Fixes faint line appearing darker on subsequent renders.  uuid:610aa833-5351-4014-8fd2-edd12ddb6118
+(B) 2026-04-22 Save unnamed draft automatically, and load automatically if it exists at app start.  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1
+(C) 2026-04-22 Port off CoffeeScript to JavaScript ES6+  uuid:265aea6e-2e7e-4946-960f-00f733691231
+x 2026-04-22 2026-04-22 Collapse other menu groups when expanding any other.  uuid:7b0e3eb3-1a4b-48b6-b59b-074110e86d4e
+x 2026-04-22 2026-04-22 Do not let mousewheel control frames while menu is open.  uuid:ec4cb486-929c-41b9-abd0-7008e38a454f

@@ -30,8 +30,8 @@ class PenciltestUI extends PenciltestUIComponent
       appStatus:
         className: 'app-status'
         parent: 'statusLeft'
-      filmStatus:
-        className: 'film-status'
+      sceneStatus:
+        className: 'scene-status'
         parent: 'statusRight'
       toggleTool:
         tagName: 'button'
@@ -93,7 +93,7 @@ class PenciltestUI extends PenciltestUIComponent
       gesture: /2 (left|right) from .* (bottom|middle)/
       triggerOnMove: true
       listener: ->
-        @goToFrame Math.floor(Utils.currentGesture.startFrameNumber + @film.frames.length * Utils.currentGesture.deltaNormalized.x * 2)
+        @goToFrame Math.floor(Utils.currentGesture.startFrameNumber + @scene.frames.length * Utils.currentGesture.deltaNormalized.x * 2)
         
     playPause:
       label: "Play/Pause"
@@ -147,7 +147,7 @@ class PenciltestUI extends PenciltestUIComponent
       gesture: /2 right from .* (bottom|middle)/
       cancelComplementKeyEvent: true
       listener: ->
-        @goToFrame @film.frames.length - 1
+        @goToFrame @scene.frames.length - 1
         @stop()
     copyFrame:
       label: "Copy Frame/Strokes"
@@ -221,7 +221,7 @@ class PenciltestUI extends PenciltestUIComponent
             self.setOptions frameHold: Number hold
             Utils.confirm 'update hold for existing frames in proportion to new setting??: ', ->
               magnitudeDelta = self.options.frameHold / oldHold
-              for frame in self.film.frames
+              for frame in self.scene.frames
                 frame.hold = Math.round frame.hold * magnitudeDelta
               self.drawCurrentFrame() # FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
     hideCursor:
@@ -237,6 +237,12 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @setOptions onionSkin: not @options.onionSkin
         @resize() # FIXME: should either not redraw, or redraw fine without this
+    clearFrame:
+      label: "Clear Frame"
+      hotkey: ['Backspace']
+      gesture: /3 down from center middle/
+      cancelComplementKeyEvent: true
+      listener: -> @clearStrokes()
     dropFrame:
       label: "Drop Frame"
       hotkey: ['Shift+X']
@@ -263,11 +269,11 @@ class PenciltestUI extends PenciltestUIComponent
       title: "Draw the frame again, with current smoothing settings"
       hotkey: ['Shift+M']
       listener: -> @smoothFrame @current.frameNumber
-    smoothFilm:
+    smoothScene:
       label: "Smooth All Frames"
-      title: "Redraw all frames in the film with the current smoothing setting"
+      title: "Redraw all frames in the scene with the current smoothing setting"
       hotkey: ['Alt+Shift+M']
-      listener: -> @smoothFilm()
+      listener: -> @smoothScene()
     lessHold:
       label: "Shorter Frame Hold"
       hotkey: ['Down', '-']
@@ -286,7 +292,7 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @setOptions debug: not @options.debug
     showStatus:
       label: "Show Status"
-      title: "hide the film status bar"
+      title: "hide the scene status bar"
       listener: -> @setOptions showStatus: not @options.showStatus
       action: -> Utils.toggleClass @ui.components.statusBar.getElement(), 'hidden', not @options.showStatus
     loop:
@@ -296,41 +302,41 @@ class PenciltestUI extends PenciltestUIComponent
       listener: ->
         @setOptions loop: not @options.loop
         @resize() # FIXME: should either not redraw, or redraw fine without this
-    saveFilm:
+    saveScene:
       label: "Save"
       hotkey: ['Alt+S']
       gesture: /3 still from center (bottom|middle)/
-      listener: -> @saveFilm()
-    loadFilm:
+      listener: -> @saveScene()
+    loadScene:
       label: "Load"
       hotkey: ['Alt+O']
       gesture: /3 up from center (bottom|middle)/
-      listener: -> @loadFilm()
-    newFilm:
+      listener: -> @loadScene()
+    newScene:
       label: "New"
       hotkey: ['N']
       listener: ->
         self = @
         if @unsavedChanges
-          Utils.confirm "Unsaved changes will be lost.", -> self.newFilm()
+          Utils.confirm "Unsaved changes will be lost.", -> self.newScene()
         else
-          @newFilm()
+          @newScene()
     renderGif:
       label: "Render GIF"
       hotkey: ['G']
       listener: -> @renderGif()
-    resizeFilm:
-      label: "Resize Film"
+    resizeScene:
+      label: "Resize Scene"
       hotkey: ['Alt+R']
       listener: ->
         self = @
-        Utils.prompt 'Film width & aspect', "#{@film.width} #{@film.aspect}", (dimensionsResponse) ->
+        Utils.prompt 'Scene width & aspect (W/H)', "#{@scene.width} #{@scene.aspect}", (dimensionsResponse) ->
           dimensions = dimensionsResponse.split ' '
-          self.film.width = Number dimensions[0]
-          self.film.aspect = dimensions[1]
+          self.scene.width = Number dimensions[0]
+          self.scene.aspect = dimensions[1]
           self.resize()
-    panFilm:
-      label: "Pan Film"
+    panScene:
+      label: "Pan Scene"
       hotkey: ['P']
       listener: ->
         self = @
@@ -338,7 +344,7 @@ class PenciltestUI extends PenciltestUIComponent
         @state.mode = Penciltest.prototype.modes.BUSY
 
         startPoint = endPoint = deltaPoint = [0,0]
-        frameScale = @width / @film.width
+        frameScale = @width / @scene.width
 
         dragStart = (event) ->
           startPoint = endPoint = [event.clientX, event.clientY]
@@ -362,40 +368,40 @@ class PenciltestUI extends PenciltestUIComponent
 
         @fieldElement.addEventListener 'mousedown', dragStart
         @resize()
-    deleteFilm:
-      label: "Delete Film"
+    deleteScene:
+      label: "Delete Scene"
       hotkey: ['Alt+Backspace']
-      listener: -> @deleteFilm()
-    exportFilm:
+      listener: -> @deleteScene()
+    exportScene:
       label: "Export"
       hotkey: ['Ctrl+S', 'Alt+E']
       cancelComplementKeyEvent: true
       listener: ->
         # self = @
-        blob = new Blob([JSON.stringify @film], {type:'application/json'})
+        blob = new Blob([JSON.stringify @scene], {type:'application/json'})
         url = window.URL.createObjectURL blob
-        fileName = (@film.name || 'untitled') + '.penciltest.json'
+        fileName = (@scene.name || 'untitled') + '.penciltest.json'
         Utils.downloadFromUrl url, fileName
         # reader = new FileReader()
         # reader.addEventListener 'load', ->
         #   console.log reader.result.length # XXX
         #   return # XXX
         # reader.readAsDataURL(blob)
-    importFilm:
+    importScene:
       label: "Import"
       hotkey: ['Ctrl+O']
       cancelComplementKeyEvent: true
       listener: ->
         self = @
-        Utils.promptForFile 'Load a film JSON file', (filmJSON) ->
-          self.setFilm JSON.parse filmJSON
+        Utils.promptForFile 'Load a scene JSON file', (sceneJSON) ->
+          self.setScene JSON.parse sceneJSON
         , '.json,application/json'
     linkAudio:
       label: "Link Audio"
       hotkey: ['Alt+A']
       listener: ->
         self = @
-        Utils.prompt 'Audio file URL: ', (if @film.audio then @film.audio.url else ''), (audioURL) ->
+        Utils.prompt 'Audio file URL: ', (if @scene.audio then @scene.audio.url else ''), (audioURL) ->
           self.loadAudio audioURL if audioURL?
     unloadAudio:
       label: "Unload Audio"
@@ -406,14 +412,14 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['[']
       listener: ->
         Utils.log "Shift Audio Earlier"
-        @film.audio.offset-- if @film.audio
+        @scene.audio.offset-- if @scene.audio
         @ui.updateStatus()
     shiftAudioLater:
       label: "Shift Audio Later"
       hotkey: [']']
       listener: ->
         Utils.log "Shift Audio Later"
-        @film.audio.offset++ if @film.audio
+        @scene.audio.offset++ if @scene.audio
         @ui.updateStatus()
     toggleInterfaceHelp:
       label: "Help"
@@ -452,6 +458,7 @@ class PenciltestUI extends PenciltestUIComponent
       'insertFrameAfter'
       'insertFrameBefore'
       'insertSeconds'
+      'clearFrame'
       'dropFrame'
     ]
     Playback: [
@@ -462,19 +469,19 @@ class PenciltestUI extends PenciltestUIComponent
       'onionSkin'
       'smoothing'
       'smoothFrame'
-      'smoothFilm'
+      'smoothScene'
       'linkAudio'
     ]
-    Film: [
+    Scene: [
       'frameRate'
-      'resizeFilm'
-      'panFilm'
+      'resizeScene'
+      'panScene'
       'renderGif'
-      'saveFilm'
-      'loadFilm'
-      'newFilm'
-      'importFilm'
-      'exportFilm'
+      'saveScene'
+      'loadScene'
+      'newScene'
+      'importScene'
+      'exportScene'
     ]
     Settings: [
       'frameHold'
@@ -655,8 +662,11 @@ class PenciltestUI extends PenciltestUIComponent
     @menuItems = @components.menu.getElement().querySelectorAll 'LI'
 
     menuOptionListener = (event) ->
-      if /\bgroup\b/.test @className
+      if this.classList.contains 'group'
         Utils.toggleClass this, 'collapsed'
+        for item in self.menuItems
+          if item != this && item.classList.contains('group') && not item.classList.contains('collapsed')
+            item.classList.add 'collapsed'
       else if @attributes.rel
         event.preventDefault()
         optionName = @attributes.rel.value
@@ -710,6 +720,8 @@ class PenciltestUI extends PenciltestUIComponent
   addOtherListeners: ->
     self = @
     document.body.addEventListener 'wheel', (event) ->
+      if self.menuIsVisible
+        return
       if event.deltaY > 0
         self.doAppAction 'nextFrame'
       else
@@ -770,16 +782,16 @@ class PenciltestUI extends PenciltestUIComponent
 
       @components.appStatus.setHTML appStatusMarkup
 
-      filmStatusMarkup = "<div class=\"frame\">"
-      filmStatusMarkup += "#{@controller.options.frameRate} FPS"
-      filmStatusMarkup += " | (hold #{@controller.getCurrentFrame().hold})"
-      filmStatusMarkup += " | #{@controller.current.frameNumber + 1}/#{@controller.film.frames.length}"
-      filmStatusMarkup += " | #{Utils.getDecimal @controller.current.frameIndex[@controller.current.frameNumber].time, 1, String}"
-      if @controller.film.audio?.offset
-        filmStatusMarkup += " #{if @controller.film.audio.offset >= 0 then '+' else ''}#{@controller.film.audio.offset}"
-      filmStatusMarkup += "</div>"
+      sceneStatusMarkup = "<div class=\"frame\">"
+      sceneStatusMarkup += "#{@controller.options.frameRate} FPS"
+      sceneStatusMarkup += " | (hold #{@controller.getCurrentFrame().hold})"
+      sceneStatusMarkup += " | #{@controller.current.frameNumber + 1}/#{@controller.scene.frames.length}"
+      sceneStatusMarkup += " | #{Utils.getDecimal @controller.current.frameIndex[@controller.current.frameNumber].time, 1, String}"
+      if @controller.scene.audio?.offset
+        sceneStatusMarkup += " #{if @controller.scene.audio.offset >= 0 then '+' else ''}#{@controller.scene.audio.offset}"
+      sceneStatusMarkup += "</div>"
 
-      @components.filmStatus.setHTML filmStatusMarkup
+      @components.sceneStatus.setHTML sceneStatusMarkup
       @components.toggleTool.getElement().className = "toggle-tool fa fa-#{@controller.state.toolStack[0]}"# FIXME: use a helper to do this
 
   showMenu: (coords) ->

@@ -29,11 +29,11 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.2.9'
+    version: '0.2.10'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
-  # metadata generated while interpreting the film data
+  # metadata generated while interpreting the scene data
   current:
     frameIndex: []
     exposureIndex: []
@@ -63,7 +63,7 @@ class Penciltest
 
     @setOptions @options # do all the option actions
 
-    @newFilm()
+    @newScene()
 
     if @state.version isnt Penciltest.prototype.state.version
       @state.version = PenciltestLegacy.update @, @state.version, Penciltest.prototype.state.version
@@ -98,14 +98,14 @@ class Penciltest
       strokes: []
 
     if index is null
-      index = @film.frames.length
+      index = @scene.frames.length
 
     @lift()
-    @film.frames.splice index, 0, frame
-    @buildFilmMeta()
+    @scene.frames.splice index, 0, frame
+    @buildSceneMeta()
 
   getCurrentFrame: ->
-    @film.frames[@current.frameNumber]
+    @scene.frames[@current.frameNumber]
 
   getCurrentStroke: ->
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
@@ -173,25 +173,25 @@ class Penciltest
     @drawCurrentFrame()
 
   goToFrame: (newIndex) ->
-    newIndex = Math.max 0, Math.min @film.frames.length - 1, newIndex
+    newIndex = Math.max 0, Math.min @scene.frames.length - 1, newIndex
 
     @current.frameNumber = newIndex
-    @current.frame = @film.frames[@current.frameNumber]
+    @current.frame = @scene.frames[@current.frameNumber]
 
     if @state.mode isnt Penciltest.prototype.modes.PLAYING
       @seekAudioToFrame newIndex
     @drawCurrentFrame()
 
   seekAudioToFrame: (frameNumber) ->
-    if @film.audio
+    if @scene.audio
       Utils.log(@current.frameIndex[frameNumber])
-      seekTime = @current.frameIndex[frameNumber].time - @film.audio.offset
+      seekTime = @current.frameIndex[frameNumber].time - @scene.audio.offset
       @seekAudio seekTime
 
   play: ->
     self = @
     @playDirection ?= 1
-    if @current.frameNumber < @film.frames.length # i.e. it is a frame in the film (in case @current.frameNumber was
+    if @current.frameNumber < @scene.frames.length # i.e. it is a frame in the scene (in case @current.frameNumber was
       @framesHeld = 0
       @goToFrame @current.frameNumber # reset the audio position to the _beginning_ of the current frame
     else
@@ -202,11 +202,11 @@ class Penciltest
       self.framesHeld++
       currentFrame = self.getCurrentFrame()
       newIndex = self.current.frameNumber + self.playDirection
-      if self.framesHeld >= currentFrame.hold || ( firstStep && newIndex == self.film.frames.length )
+      if self.framesHeld >= currentFrame.hold || ( firstStep && newIndex == self.scene.frames.length )
         self.framesHeld = 0
-        if newIndex >= self.film.frames.length or newIndex < 0
+        if newIndex >= self.scene.frames.length or newIndex < 0
           if self.options.loop || firstStep
-            newIndex = (newIndex + self.film.frames.length) % self.film.frames.length
+            newIndex = (newIndex + self.scene.frames.length) % self.scene.frames.length
             self.goToFrame newIndex
             self.seekAudioToFrame 0
           else
@@ -232,7 +232,7 @@ class Penciltest
       if @state.mode is Penciltest.prototype.modes.PLAYING then @stop() else @play()
 
   drawCurrentFrame: ->
-    return if not @film.frames.length
+    return if not @scene.frames.length
 
     @renderer.clear()
 
@@ -249,7 +249,7 @@ class Penciltest
               opacity: Math.pow @options.onionSkinOpacity, i
             }
           )
-        if @current.frameNumber < @film.frames.length - i
+        if @current.frameNumber < @scene.frames.length - i
           @drawFrame(
             @current.frameNumber + i
             {
@@ -265,7 +265,7 @@ class Penciltest
 
     @renderer.setLineOverrides overrides if overrides
 
-    for stroke in @film.frames[frameIndex].strokes
+    for stroke in @scene.frames[frameIndex].strokes
       @renderer.path @scaleStroke stroke, @zoomFactor
 
     @renderer.clearLineOverrides()
@@ -306,14 +306,18 @@ class Penciltest
   pasteFrame: ->
     if @copyBuffer
       newFrameIndex = @current.frameNumber + 1
-      @film.frames.splice newFrameIndex, 0, Utils.clone(@copyBuffer)
-      @buildFilmMeta()
+      @scene.frames.splice newFrameIndex, 0, Utils.clone(@copyBuffer)
+      @buildSceneMeta()
       @goToFrame(newFrameIndex)
 
   pasteStrokes: ->
     if @copyBuffer
-      @film.frames[@current.frameNumber].strokes = @film.frames[@current.frameNumber].strokes.concat(Utils.clone(@copyBuffer.strokes))
+      @scene.frames[@current.frameNumber].strokes = @scene.frames[@current.frameNumber].strokes.concat(Utils.clone(@copyBuffer.strokes))
       @drawCurrentFrame()
+
+  clearStrokes: ->
+    @scene.frames[@current.frameNumber].strokes = []
+    @drawCurrentFrame()
 
   cutFrame: ->
     droppedFrame = @dropFrame()
@@ -321,12 +325,12 @@ class Penciltest
 
   dropFrame: ->
     droppedFrame = @getCurrentFrame()
-    @film.frames.splice @current.frameNumber, 1
-    @current.frameNumber-- if @current.frameNumber >= @film.frames.length and @current.frameNumber > 0
-    if @film.frames.length is 0
+    @scene.frames.splice @current.frameNumber, 1
+    @current.frameNumber-- if @current.frameNumber >= @scene.frames.length and @current.frameNumber > 0
+    if @scene.frames.length is 0
       @newFrame()
 
-    @buildFilmMeta()
+    @buildSceneMeta()
     @drawCurrentFrame()
 
     droppedFrame
@@ -337,7 +341,7 @@ class Penciltest
       amount = Number amount
       smoothingBackup = self.options.smoothing
       self.options.smoothing = amount
-      frame = self.film.frames[index]
+      frame = self.scene.frames[index]
       oldStrokes = JSON.parse JSON.stringify frame.strokes
       self.lift()
       frame.strokes = []
@@ -354,14 +358,14 @@ class Penciltest
     else
       smooth amount
 
-  smoothFilm: (amount) ->
+  smoothScene: (amount) ->
     self = @
     if @state.mode is Penciltest.prototype.modes.DRAWING
-      Utils.confirm 'Would you like to smooth every frame of this film?', ->
+      Utils.confirm 'Would you like to smooth every frame of this scene?', ->
         doTheThing = (amount) ->
           amount = Number amount
           self.state.mode = Penciltest.prototype.modes.BUSY
-          lastIndex = self.film.frames.length - 1
+          lastIndex = self.scene.frames.length - 1
           for frame in [0..lastIndex]
             self.smoothFrame frame, amount
           self.state.mode = Penciltest.prototype.modes.DRAWING
@@ -370,7 +374,7 @@ class Penciltest
         else
           doTheThing amount
     else
-      Utils.log 'Unable to alter film while playing'
+      Utils.log 'Unable to alter scene while playing'
 
   undo: ->
     if @getCurrentFrame().strokes and @getCurrentFrame().strokes.length
@@ -390,11 +394,11 @@ class Penciltest
 
   setCurrentFrameHold: (newHold) ->
     @getCurrentFrame().hold = Math.max 1, newHold
-    @buildFilmMeta()
+    @buildSceneMeta()
     @ui.updateStatus()
 
-  newFilm: ->
-    @film =
+  newScene: ->
+    @scene =
       name: ''
       version: Penciltest.prototype.state.version
       aspect: '1:1'
@@ -406,20 +410,20 @@ class Penciltest
     @newFrame()
     @goToFrame 0
 
-  getFilmNames: ->
-    filmNamePattern = /^film:/
-    filmNames = []
+  getSceneNames: ->
+    sceneNamePattern = /^scene:/
+    sceneNames = []
     for storageName of window.localStorage
       reference = @decodeStorageReference storageName
-      if reference and reference.namespace is 'film'
-        filmNames.push reference.name
-    filmNames
+      if reference and reference.namespace is 'scene'
+        sceneNames.push reference.name
+    sceneNames
 
   encodeStorageReference: (namespace, name) ->
     "#{namespace}:#{name}"
 
   decodeStorageReference: (encoded) ->
-    if match = encoded.match /^(app|film):(.*)/
+    if match = encoded.match /^(app|scene):(.*)/
       {
         namespace: match[1]
         name: match[2]
@@ -435,12 +439,12 @@ class Penciltest
     storageName = @encodeStorageReference namespace, name
     window.localStorage.setItem storageName, JSON.stringify data
 
-  saveFilm: ->
+  saveScene: ->
     self = @
-    Utils.prompt "what will you name your film?", @film.name, (name) ->
+    Utils.prompt "what will you name your scene?", @scene.name, (name) ->
       if name
-        self.film.name = name
-        self.putStoredData 'film', name, self.film
+        self.scene.name = name
+        self.putStoredData 'scene', name, self.scene
         self.unsavedChanges = false
 
   renderGif: ->
@@ -449,7 +453,7 @@ class Penciltest
       gifConfiguration = (gifConfigurationString || '512 2').split ' '
       # configure for rendering
       # dimensions = [64, 64]
-      dimensions = self.getFilmDimensions()
+      dimensions = self.getSceneDimensions()
       # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
       maxGifDimension = parseInt gifConfiguration[0], 10
       gifLineWidth = parseInt gifConfiguration[1], 10
@@ -485,7 +489,7 @@ class Penciltest
       gifEncoder.setDelay baseFrameDelay
       gifEncoder.start()
 
-      for frameIndex in [0...self.film.frames.length]
+      for frameIndex in [0...self.scene.frames.length]
         self.renderer.setLineOverrides renderLineOverrides
         self.goToFrame frameIndex
         gifEncoder.setDelay baseFrameDelay * self.getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
@@ -556,25 +560,25 @@ class Penciltest
 
     Utils.prompt 'GIF size & lineWidth', '512 2', doTheThing
 
-  selectFilmName: (message, callback) ->
-    filmNames = @getFilmNames()
-    if filmNames.length
-      message ?= 'Choose a film'
-      Utils.select message, filmNames, @film.name, (selectedFilmName) ->
-        if selectedFilmName
-          callback selectedFilmName
+  selectSceneName: (message, callback) ->
+    sceneNames = @getSceneNames()
+    if sceneNames.length
+      message ?= 'Choose a scene'
+      Utils.select message, sceneNames, @scene.name, (selectedSceneName) ->
+        if selectedSceneName
+          callback selectedSceneName
         else
-          Utils.alert "No film by that name."
+          Utils.alert "No scene by that name."
     else
-      Utils.alert "You don't have any saved films yet."
+      Utils.alert "You don't have any saved scenes yet."
 
     false
 
-  setFilm: (film) ->
-    @film = film
-    @buildFilmMeta()
-    if @film.audio and @film.audio.url
-      @loadAudio @film.audio.url
+  setScene: (scene) ->
+    @scene = scene
+    @buildSceneMeta()
+    if @scene.audio and @scene.audio.url
+      @loadAudio @scene.audio.url
     else
       @destroyAudio()
     @goToFrame 0
@@ -582,23 +586,23 @@ class Penciltest
     @unsavedChanges = false
     @resize() # FIXME
 
-  loadFilm: ->
+  loadScene: ->
     self = @
-    @selectFilmName 'Choose a film to load', (name) ->
-      self.setFilm self.getStoredData 'film', name
+    @selectSceneName 'Choose a scene to load', (name) ->
+      self.setScene self.getStoredData 'scene', name
 
-  deleteFilm: ->
+  deleteScene: ->
     self = @
-    @selectFilmName 'Choose a film to DELETE...FOREVER', (filmName) ->
-      window.localStorage.removeItem self.encodeStorageReference 'film', filmName
+    @selectSceneName 'Choose a scene to DELETE...FOREVER', (sceneName) ->
+      window.localStorage.removeItem self.encodeStorageReference 'scene', sceneName
 
-  buildFilmMeta: ->
+  buildSceneMeta: ->
     @current.frameIndex = []
     @current.exposureIndex = []
     @current.exposures = 0
 
-    for i in [0...@film.frames.length]
-      frame = @film.frames[i]
+    for i in [0...@scene.frames.length]
+      frame = @scene.frames[i]
       frameMeta =
         id: i
         exposure: @current.exposures
@@ -606,18 +610,18 @@ class Penciltest
         time: @current.exposures * @singleFrameDuration
       @current.frameIndex.push frameMeta
       @current.exposureIndex.push frameMeta for [1...frame.hold]
-      @current.exposures += @film.frames[i].hold
+      @current.exposures += @scene.frames[i].hold
 
     @current.duration = @current.exposures * @singleFrameDuration
 
   getFrameDuration: (frameNumber = @current.frameNumber) ->
-    frame = @film.frames[frameNumber]
+    frame = @scene.frames[frameNumber]
     frame.hold / @options.frameRate
 
   loadAudio: (audioURL) ->
-    @film.audio ?= {}
-    @film.audio.url = audioURL
-    @film.audio.offset = 0
+    @scene.audio ?= {}
+    @scene.audio.url = audioURL
+    @scene.audio.offset = 0
     @unsavedChanges = true
     if not @audioElement # TODO: abstract away from browser
       @audioElement = document.createElement 'audio'
@@ -628,8 +632,8 @@ class Penciltest
     @audioElement.src = audioURL
 
   destroyAudio: ->
-    if @film.audio
-      delete @film.audio
+    if @scene.audio
+      delete @scene.audio
     if @audioElement
       @pauseAudio()
       @audioElement.remove()
@@ -656,17 +660,17 @@ class Penciltest
     )
 
   pan: (deltaPoint) ->
-    for frame in @film.frames
+    for frame in @scene.frames
       for stroke in frame.strokes
         for segment in stroke
           segment[0] += deltaPoint[0]
           segment[1] += deltaPoint[1]
 
-  getFilmDimensions: ->
-    aspect = @film.aspect or '1:1'
+  getSceneDimensions: ->
+    aspect = @scene.aspect or '1:1'
     aspectParts = aspect.split ':'
     dimensions = 
-      width: @film.width
+      width: @scene.width
       aspect: aspectParts[0] / aspectParts[1]
     dimensions.height = Math.ceil dimensions.width / dimensions.aspect
     dimensions
@@ -680,19 +684,19 @@ class Penciltest
       containerHeight = @container.offsetHeight
       if @options.showStatus
         containerHeight -= 36
-    filmDimensions = @getFilmDimensions()
+    sceneDimensions = @getSceneDimensions()
     containerAspect = containerWidth / containerHeight
 
-    if containerAspect > filmDimensions.aspect
-      @width = Math.floor containerHeight * filmDimensions.aspect
+    if containerAspect > sceneDimensions.aspect
+      @width = Math.floor containerHeight * sceneDimensions.aspect
       @height = containerHeight
     else
       @width = containerWidth
-      @height = Math.floor containerWidth / filmDimensions.aspect
+      @height = Math.floor containerWidth / sceneDimensions.aspect
 
     @fieldContainer.style.width = "#{@width}px"
     @fieldContainer.style.height = "#{@height}px"
     @renderer.resize @width, @height
-    @zoomFactor = @width / @film.width
+    @zoomFactor = @width / @scene.width
     @renderer.options.lineWeight = @zoomFactor
     @drawCurrentFrame()

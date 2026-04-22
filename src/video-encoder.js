@@ -7,11 +7,11 @@ var PenciltestVideoEncoder;
 module.exports = PenciltestVideoEncoder;
 
 PenciltestVideoEncoder = (function() {
-  function PenciltestVideoEncoder(filmFilePath) {
-    var film;
+  function PenciltestVideoEncoder(sceneFilePath) {
+    var scene;
     this.penciltest = new Penciltest;
-    film = require(filmFilePath);
-    this.penciltest.setFilm(film);
+    scene = require(sceneFilePath);
+    this.penciltest.setScene(scene);
   }
 
   return PenciltestVideoEncoder;

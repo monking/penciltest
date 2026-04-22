@@ -7,7 +7,7 @@ A traditional animation tool in the browser.
 ## features
 
 - onion skin
-- save and load films to [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
+- save and load scenes to [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
 - render to GIF (using [GIFEncoder](https://github.com/antimatter15/jsgif))
 
 ## usage
@@ -22,11 +22,11 @@ For options:
 
 ## caveats
 
-Films are saved to Local Storage, so they will disappear if you clear your
+Scenes are saved to Local Storage, so they will disappear if you clear your
 browser's cache (or are in incognito/private browsing).
 
 The "undo" option simply removes the last stroke on a drawing. It cannot be
-recovered, except to load a saved film.
+recovered, except to load a saved scene.
 
 This version has only been tested in Google Chrome (Linux, Mac, Android -- way back in 2016).
 

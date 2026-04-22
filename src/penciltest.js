@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.9',
+    version: '0.2.10',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -55,7 +55,7 @@ Penciltest = (function() {
     this.ui = new PenciltestUI(this);
     this.options.background = Penciltest.prototype.options.background;
     this.setOptions(this.options);
-    this.newFilm();
+    this.newScene();
     if (this.state.version !== Penciltest.prototype.state.version) {
       this.state.version = PenciltestLegacy.update(this, this.state.version, Penciltest.prototype.state.version);
     }
@@ -96,15 +96,15 @@ Penciltest = (function() {
       strokes: []
     };
     if (index === null) {
-      index = this.film.frames.length;
+      index = this.scene.frames.length;
     }
     this.lift();
-    this.film.frames.splice(index, 0, frame);
-    return this.buildFilmMeta();
+    this.scene.frames.splice(index, 0, frame);
+    return this.buildSceneMeta();
   };
 
   Penciltest.prototype.getCurrentFrame = function() {
-    return this.film.frames[this.current.frameNumber];
+    return this.scene.frames[this.current.frameNumber];
   };
 
   Penciltest.prototype.getCurrentStroke = function() {
@@ -186,9 +186,9 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.goToFrame = function(newIndex) {
-    newIndex = Math.max(0, Math.min(this.film.frames.length - 1, newIndex));
+    newIndex = Math.max(0, Math.min(this.scene.frames.length - 1, newIndex));
     this.current.frameNumber = newIndex;
-    this.current.frame = this.film.frames[this.current.frameNumber];
+    this.current.frame = this.scene.frames[this.current.frameNumber];
     if (this.state.mode !== Penciltest.prototype.modes.PLAYING) {
       this.seekAudioToFrame(newIndex);
     }
@@ -197,9 +197,9 @@ Penciltest = (function() {
 
   Penciltest.prototype.seekAudioToFrame = function(frameNumber) {
     var seekTime;
-    if (this.film.audio) {
+    if (this.scene.audio) {
       Utils.log(this.current.frameIndex[frameNumber]);
-      seekTime = this.current.frameIndex[frameNumber].time - this.film.audio.offset;
+      seekTime = this.current.frameIndex[frameNumber].time - this.scene.audio.offset;
       return this.seekAudio(seekTime);
     }
   };
@@ -210,7 +210,7 @@ Penciltest = (function() {
     if (this.playDirection == null) {
       this.playDirection = 1;
     }
-    if (this.current.frameNumber < this.film.frames.length) {
+    if (this.current.frameNumber < this.scene.frames.length) {
       this.framesHeld = 0;
       this.goToFrame(this.current.frameNumber);
     } else {
@@ -222,11 +222,11 @@ Penciltest = (function() {
       self.framesHeld++;
       currentFrame = self.getCurrentFrame();
       newIndex = self.current.frameNumber + self.playDirection;
-      if (self.framesHeld >= currentFrame.hold || (firstStep && newIndex === self.film.frames.length)) {
+      if (self.framesHeld >= currentFrame.hold || (firstStep && newIndex === self.scene.frames.length)) {
         self.framesHeld = 0;
-        if (newIndex >= self.film.frames.length || newIndex < 0) {
+        if (newIndex >= self.scene.frames.length || newIndex < 0) {
           if (self.options.loop || firstStep) {
-            newIndex = (newIndex + self.film.frames.length) % self.film.frames.length;
+            newIndex = (newIndex + self.scene.frames.length) % self.scene.frames.length;
             self.goToFrame(newIndex);
             return self.seekAudioToFrame(0);
           } else {
@@ -267,7 +267,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.drawCurrentFrame = function() {
     var i, _i, _ref;
-    if (!this.film.frames.length) {
+    if (!this.scene.frames.length) {
       return;
     }
     this.renderer.clear();
@@ -282,7 +282,7 @@ Penciltest = (function() {
             opacity: Math.pow(this.options.onionSkinOpacity, i)
           });
         }
-        if (this.current.frameNumber < this.film.frames.length - i) {
+        if (this.current.frameNumber < this.scene.frames.length - i) {
           this.drawFrame(this.current.frameNumber + i, {
             color: [0, 255, 255],
             opacity: Math.pow(this.options.onionSkinOpacity, i)
@@ -302,7 +302,7 @@ Penciltest = (function() {
     if (overrides) {
       this.renderer.setLineOverrides(overrides);
     }
-    _ref = this.film.frames[frameIndex].strokes;
+    _ref = this.scene.frames[frameIndex].strokes;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
       this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
@@ -366,17 +366,22 @@ Penciltest = (function() {
     var newFrameIndex;
     if (this.copyBuffer) {
       newFrameIndex = this.current.frameNumber + 1;
-      this.film.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
-      this.buildFilmMeta();
+      this.scene.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      this.buildSceneMeta();
       return this.goToFrame(newFrameIndex);
     }
   };
 
   Penciltest.prototype.pasteStrokes = function() {
     if (this.copyBuffer) {
-      this.film.frames[this.current.frameNumber].strokes = this.film.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+      this.scene.frames[this.current.frameNumber].strokes = this.scene.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
       return this.drawCurrentFrame();
     }
+  };
+
+  Penciltest.prototype.clearStrokes = function() {
+    this.scene.frames[this.current.frameNumber].strokes = [];
+    return this.drawCurrentFrame();
   };
 
   Penciltest.prototype.cutFrame = function() {
@@ -390,14 +395,14 @@ Penciltest = (function() {
   Penciltest.prototype.dropFrame = function() {
     var droppedFrame;
     droppedFrame = this.getCurrentFrame();
-    this.film.frames.splice(this.current.frameNumber, 1);
-    if (this.current.frameNumber >= this.film.frames.length && this.current.frameNumber > 0) {
+    this.scene.frames.splice(this.current.frameNumber, 1);
+    if (this.current.frameNumber >= this.scene.frames.length && this.current.frameNumber > 0) {
       this.current.frameNumber--;
     }
-    if (this.film.frames.length === 0) {
+    if (this.scene.frames.length === 0) {
       this.newFrame();
     }
-    this.buildFilmMeta();
+    this.buildSceneMeta();
     this.drawCurrentFrame();
     return droppedFrame;
   };
@@ -410,7 +415,7 @@ Penciltest = (function() {
       amount = Number(amount);
       smoothingBackup = self.options.smoothing;
       self.options.smoothing = amount;
-      frame = self.film.frames[index];
+      frame = self.scene.frames[index];
       oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
       self.lift();
       frame.strokes = [];
@@ -435,17 +440,17 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.smoothFilm = function(amount) {
+  Penciltest.prototype.smoothScene = function(amount) {
     var self;
     self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
-      return Utils.confirm('Would you like to smooth every frame of this film?', function() {
+      return Utils.confirm('Would you like to smooth every frame of this scene?', function() {
         var doTheThing;
         doTheThing = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);
           self.state.mode = Penciltest.prototype.modes.BUSY;
-          lastIndex = self.film.frames.length - 1;
+          lastIndex = self.scene.frames.length - 1;
           for (frame = _i = 0; 0 <= lastIndex ? _i <= lastIndex : _i >= lastIndex; frame = 0 <= lastIndex ? ++_i : --_i) {
             self.smoothFrame(frame, amount);
           }
@@ -458,7 +463,7 @@ Penciltest = (function() {
         }
       });
     } else {
-      return Utils.log('Unable to alter film while playing');
+      return Utils.log('Unable to alter scene while playing');
     }
   };
 
@@ -487,12 +492,12 @@ Penciltest = (function() {
 
   Penciltest.prototype.setCurrentFrameHold = function(newHold) {
     this.getCurrentFrame().hold = Math.max(1, newHold);
-    this.buildFilmMeta();
+    this.buildSceneMeta();
     return this.ui.updateStatus();
   };
 
-  Penciltest.prototype.newFilm = function() {
-    this.film = {
+  Penciltest.prototype.newScene = function() {
+    this.scene = {
       name: '',
       version: Penciltest.prototype.state.version,
       aspect: '1:1',
@@ -504,17 +509,17 @@ Penciltest = (function() {
     return this.goToFrame(0);
   };
 
-  Penciltest.prototype.getFilmNames = function() {
-    var filmNamePattern, filmNames, reference, storageName;
-    filmNamePattern = /^film:/;
-    filmNames = [];
+  Penciltest.prototype.getSceneNames = function() {
+    var reference, sceneNamePattern, sceneNames, storageName;
+    sceneNamePattern = /^scene:/;
+    sceneNames = [];
     for (storageName in window.localStorage) {
       reference = this.decodeStorageReference(storageName);
-      if (reference && reference.namespace === 'film') {
-        filmNames.push(reference.name);
+      if (reference && reference.namespace === 'scene') {
+        sceneNames.push(reference.name);
       }
     }
-    return filmNames;
+    return sceneNames;
   };
 
   Penciltest.prototype.encodeStorageReference = function(namespace, name) {
@@ -523,7 +528,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.decodeStorageReference = function(encoded) {
     var match;
-    if (match = encoded.match(/^(app|film):(.*)/)) {
+    if (match = encoded.match(/^(app|scene):(.*)/)) {
       return {
         namespace: match[1],
         name: match[2]
@@ -545,13 +550,13 @@ Penciltest = (function() {
     return window.localStorage.setItem(storageName, JSON.stringify(data));
   };
 
-  Penciltest.prototype.saveFilm = function() {
+  Penciltest.prototype.saveScene = function() {
     var self;
     self = this;
-    return Utils.prompt("what will you name your film?", this.film.name, function(name) {
+    return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
       if (name) {
-        self.film.name = name;
-        self.putStoredData('film', name, self.film);
+        self.scene.name = name;
+        self.putStoredData('scene', name, self.scene);
         return self.unsavedChanges = false;
       }
     });
@@ -563,7 +568,7 @@ Penciltest = (function() {
     doTheThing = function(gifConfigurationString) {
       var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-      dimensions = self.getFilmDimensions();
+      dimensions = self.getSceneDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
       gifLineWidth = parseInt(gifConfiguration[1], 10);
       if (dimensions.width > maxGifDimension) {
@@ -594,7 +599,7 @@ Penciltest = (function() {
       gifEncoder.setRepeat(0);
       gifEncoder.setDelay(baseFrameDelay);
       gifEncoder.start();
-      for (frameIndex = _i = 0, _ref = self.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
+      for (frameIndex = _i = 0, _ref = self.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
         self.renderer.setLineOverrides(renderLineOverrides);
         self.goToFrame(frameIndex);
         gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
@@ -669,31 +674,31 @@ Penciltest = (function() {
     return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
   };
 
-  Penciltest.prototype.selectFilmName = function(message, callback) {
-    var filmNames;
-    filmNames = this.getFilmNames();
-    if (filmNames.length) {
+  Penciltest.prototype.selectSceneName = function(message, callback) {
+    var sceneNames;
+    sceneNames = this.getSceneNames();
+    if (sceneNames.length) {
       if (message == null) {
-        message = 'Choose a film';
+        message = 'Choose a scene';
       }
-      Utils.select(message, filmNames, this.film.name, function(selectedFilmName) {
-        if (selectedFilmName) {
-          return callback(selectedFilmName);
+      Utils.select(message, sceneNames, this.scene.name, function(selectedSceneName) {
+        if (selectedSceneName) {
+          return callback(selectedSceneName);
         } else {
-          return Utils.alert("No film by that name.");
+          return Utils.alert("No scene by that name.");
         }
       });
     } else {
-      Utils.alert("You don't have any saved films yet.");
+      Utils.alert("You don't have any saved scenes yet.");
     }
     return false;
   };
 
-  Penciltest.prototype.setFilm = function(film) {
-    this.film = film;
-    this.buildFilmMeta();
-    if (this.film.audio && this.film.audio.url) {
-      this.loadAudio(this.film.audio.url);
+  Penciltest.prototype.setScene = function(scene) {
+    this.scene = scene;
+    this.buildSceneMeta();
+    if (this.scene.audio && this.scene.audio.url) {
+      this.loadAudio(this.scene.audio.url);
     } else {
       this.destroyAudio();
     }
@@ -703,29 +708,29 @@ Penciltest = (function() {
     return this.resize();
   };
 
-  Penciltest.prototype.loadFilm = function() {
+  Penciltest.prototype.loadScene = function() {
     var self;
     self = this;
-    return this.selectFilmName('Choose a film to load', function(name) {
-      return self.setFilm(self.getStoredData('film', name));
+    return this.selectSceneName('Choose a scene to load', function(name) {
+      return self.setScene(self.getStoredData('scene', name));
     });
   };
 
-  Penciltest.prototype.deleteFilm = function() {
+  Penciltest.prototype.deleteScene = function() {
     var self;
     self = this;
-    return this.selectFilmName('Choose a film to DELETE...FOREVER', function(filmName) {
-      return window.localStorage.removeItem(self.encodeStorageReference('film', filmName));
+    return this.selectSceneName('Choose a scene to DELETE...FOREVER', function(sceneName) {
+      return window.localStorage.removeItem(self.encodeStorageReference('scene', sceneName));
     });
   };
 
-  Penciltest.prototype.buildFilmMeta = function() {
+  Penciltest.prototype.buildSceneMeta = function() {
     var frame, frameMeta, i, _i, _j, _ref, _ref1;
     this.current.frameIndex = [];
     this.current.exposureIndex = [];
     this.current.exposures = 0;
-    for (i = _i = 0, _ref = this.film.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-      frame = this.film.frames[i];
+    for (i = _i = 0, _ref = this.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+      frame = this.scene.frames[i];
       frameMeta = {
         id: i,
         exposure: this.current.exposures,
@@ -736,7 +741,7 @@ Penciltest = (function() {
       for (_j = 1, _ref1 = frame.hold; 1 <= _ref1 ? _j < _ref1 : _j > _ref1; 1 <= _ref1 ? _j++ : _j--) {
         this.current.exposureIndex.push(frameMeta);
       }
-      this.current.exposures += this.film.frames[i].hold;
+      this.current.exposures += this.scene.frames[i].hold;
     }
     return this.current.duration = this.current.exposures * this.singleFrameDuration;
   };
@@ -746,17 +751,17 @@ Penciltest = (function() {
     if (frameNumber == null) {
       frameNumber = this.current.frameNumber;
     }
-    frame = this.film.frames[frameNumber];
+    frame = this.scene.frames[frameNumber];
     return frame.hold / this.options.frameRate;
   };
 
   Penciltest.prototype.loadAudio = function(audioURL) {
     var _base;
-    if ((_base = this.film).audio == null) {
+    if ((_base = this.scene).audio == null) {
       _base.audio = {};
     }
-    this.film.audio.url = audioURL;
-    this.film.audio.offset = 0;
+    this.scene.audio.url = audioURL;
+    this.scene.audio.offset = 0;
     this.unsavedChanges = true;
     if (!this.audioElement) {
       this.audioElement = document.createElement('audio');
@@ -769,8 +774,8 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.destroyAudio = function() {
-    if (this.film.audio) {
-      delete this.film.audio;
+    if (this.scene.audio) {
+      delete this.scene.audio;
     }
     if (this.audioElement) {
       this.pauseAudio();
@@ -811,7 +816,7 @@ Penciltest = (function() {
 
   Penciltest.prototype.pan = function(deltaPoint) {
     var frame, segment, stroke, _i, _len, _ref, _results;
-    _ref = this.film.frames;
+    _ref = this.scene.frames;
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       frame = _ref[_i];
@@ -838,12 +843,12 @@ Penciltest = (function() {
     return _results;
   };
 
-  Penciltest.prototype.getFilmDimensions = function() {
+  Penciltest.prototype.getSceneDimensions = function() {
     var aspect, aspectParts, dimensions;
-    aspect = this.film.aspect || '1:1';
+    aspect = this.scene.aspect || '1:1';
     aspectParts = aspect.split(':');
     dimensions = {
-      width: this.film.width,
+      width: this.scene.width,
       aspect: aspectParts[0] / aspectParts[1]
     };
     dimensions.height = Math.ceil(dimensions.width / dimensions.aspect);
@@ -851,7 +856,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.resize = function() {
-    var containerAspect, containerHeight, containerWidth, filmDimensions;
+    var containerAspect, containerHeight, containerWidth, sceneDimensions;
     if (this.forceDimensions) {
       containerWidth = this.forceDimensions.width;
       containerHeight = this.forceDimensions.height;
@@ -862,19 +867,19 @@ Penciltest = (function() {
         containerHeight -= 36;
       }
     }
-    filmDimensions = this.getFilmDimensions();
+    sceneDimensions = this.getSceneDimensions();
     containerAspect = containerWidth / containerHeight;
-    if (containerAspect > filmDimensions.aspect) {
-      this.width = Math.floor(containerHeight * filmDimensions.aspect);
+    if (containerAspect > sceneDimensions.aspect) {
+      this.width = Math.floor(containerHeight * sceneDimensions.aspect);
       this.height = containerHeight;
     } else {
       this.width = containerWidth;
-      this.height = Math.floor(containerWidth / filmDimensions.aspect);
+      this.height = Math.floor(containerWidth / sceneDimensions.aspect);
     }
     this.fieldContainer.style.width = "" + this.width + "px";
     this.fieldContainer.style.height = "" + this.height + "px";
     this.renderer.resize(this.width, this.height);
-    this.zoomFactor = this.width / this.film.width;
+    this.zoomFactor = this.width / this.scene.width;
     this.renderer.options.lineWeight = this.zoomFactor;
     return this.drawCurrentFrame();
   };
