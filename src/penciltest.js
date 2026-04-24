@@ -22,26 +22,27 @@ Penciltest = (function() {
     hideCursor: false,
     loop: true,
     showStatus: true,
-    frameRate: 12,
     frameHold: 2,
     onionSkin: true,
     smoothing: 1,
-    onionSkinRange: 4,
+    onionSkinFrameRadius: 4,
+    lineColor: 'black',
+    lineWeight: 1,
+    background: 'white',
     renderer: 'canvas',
-    onionSkinOpacity: 0.5,
-    background: 'white'
+    onionSkinOpacity: 0.5
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.12',
+    version: '0.2.13',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
 
   Penciltest.prototype.current = {
-    frameIndex: [],
-    exposureIndex: [],
-    exposures: 0,
+    frames: [],
+    exposures: [],
+    exposureCount: 0,
     exposureNumber: 0,
     frameNumber: 0
   };
@@ -53,9 +54,8 @@ Penciltest = (function() {
     this.container.className = 'penciltest-app';
     this.buildContainer();
     this.ui = new PenciltestUI(this);
-    this.options.background = Penciltest.prototype.options.background;
-    this.setOptions(this.options);
     this.newScene();
+    this.setOptions(this.options);
     if (this.state.version !== Penciltest.prototype.state.version) {
       this.state.version = PenciltestLegacy.update(this, this.state.version, Penciltest.prototype.state.version);
     }
@@ -112,6 +112,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.mark = function(x, y) {
+    debugger;
     var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
@@ -185,25 +186,35 @@ Penciltest = (function() {
     return this.drawCurrentFrame();
   };
 
-  Penciltest.prototype.goToFrame = function(newIndex) {
+  Penciltest.prototype.resolveFrameNumber = function(inputIndex) {
+    var realIndex;
+    realIndex = inputIndex;
     if (this.options.loop) {
-      newIndex = (newIndex + this.scene.frames.length) % this.scene.frames.length;
+      while (realIndex < 0 || realIndex >= this.scene.frames.length) {
+        realIndex = (realIndex + this.scene.frames.length) % this.scene.frames.length;
+      }
     } else {
-      newIndex = Math.max(0, Math.min(this.scene.frames.length - 1, newIndex));
+      realIndex = Math.max(0, Math.min(this.scene.frames.length - 1, realIndex));
     }
-    this.current.frameNumber = newIndex;
+    return realIndex;
+  };
+
+  Penciltest.prototype.goToFrame = function(targetFrameNumber, overrides) {
+    var selectedFrameNumber;
+    selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
+    this.current.frameNumber = selectedFrameNumber;
     this.current.frame = this.scene.frames[this.current.frameNumber];
     if (this.state.mode !== Penciltest.prototype.modes.PLAYING) {
-      this.seekAudioToFrame(newIndex);
+      this.seekAudioToFrame(selectedFrameNumber);
     }
-    return this.drawCurrentFrame();
+    return this.drawCurrentFrame(overrides);
   };
 
   Penciltest.prototype.seekAudioToFrame = function(frameNumber) {
     var seekTime;
     if (this.scene.audio) {
-      Utils.log(this.current.frameIndex[frameNumber]);
-      seekTime = this.current.frameIndex[frameNumber].time - this.scene.audio.offset;
+      Utils.log(this.current.frames[frameNumber]);
+      seekTime = this.current.frames[frameNumber].time - this.scene.audio.offset;
       return this.seekAudio(seekTime);
     }
   };
@@ -243,7 +254,7 @@ Penciltest = (function() {
     };
     this.stop();
     stepListener(true);
-    this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
+    this.playInterval = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
     this.state.mode = Penciltest.prototype.modes.PLAYING;
     return this.playAudio();
@@ -269,49 +280,53 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.drawCurrentFrame = function() {
-    var i, _i, _ref;
-    if (!this.scene.frames.length) {
+  Penciltest.prototype.drawCurrentFrame = function(overrides) {
+    var i, nextFrameNumber, previousFrameNumber, _i, _ref;
+    if (!this.renderer || !this.scene.frames.length) {
       return;
     }
     this.renderer.clear();
-    if (this.options.background) {
-      this.renderer.rect(0, 0, this.width, this.height, this.options.background);
+    if (this.scene.background) {
+      this.renderer.rect(0, 0, this.width, this.height, this.scene.background);
     }
     if (this.options.onionSkin) {
-      for (i = _i = 1, _ref = this.options.onionSkinRange; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
-        if (this.current.frameNumber >= i) {
-          this.drawFrame(this.current.frameNumber - i, {
-            color: [255, 0, 0],
-            opacity: Math.pow(this.options.onionSkinOpacity, i)
-          });
+      for (i = _i = 1, _ref = this.options.onionSkinFrameRadius; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
+        previousFrameNumber = this.resolveFrameNumber(this.current.frameNumber - i);
+        if (previousFrameNumber !== this.current.frameNumber) {
+          this.drawFrame(previousFrameNumber, Object.assign({}, overrides, {
+            lineColor: [255, 0, 0],
+            lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+          }));
         }
-        if (this.current.frameNumber < this.scene.frames.length - i) {
-          this.drawFrame(this.current.frameNumber + i, {
-            color: [0, 255, 255],
-            opacity: Math.pow(this.options.onionSkinOpacity, i)
-          });
+        nextFrameNumber = this.resolveFrameNumber(this.current.frameNumber + i);
+        if (nextFrameNumber !== this.current.frameNumber) {
+          this.drawFrame(nextFrameNumber, Object.assign({}, overrides, {
+            lineColor: [0, 255, 255],
+            lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+          }));
         }
       }
     }
-    this.drawFrame(this.current.frameNumber);
+    this.renderer.composeOptions();
+    this.drawFrame(this.current.frameNumber, overrides);
     return this.ui.updateStatus();
   };
 
-  Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
-    var stroke, _i, _len, _ref;
+  Penciltest.prototype.drawFrame = function(frameNumber, overrides) {
+    var stroke, _i, _len, _ref, _results;
     if (!this.width || !this.height) {
       return;
     }
     if (overrides) {
-      this.renderer.setLineOverrides(overrides);
+      this.renderer.composeOptions(overrides);
     }
-    _ref = this.scene.frames[frameIndex].strokes;
+    _ref = this.scene.frames[frameNumber].strokes;
+    _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
+      _results.push(this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
     }
-    return this.renderer.clearLineOverrides();
+    return _results;
   };
 
   Penciltest.prototype.scaleStroke = function(stroke, factor) {
@@ -367,12 +382,12 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.pasteFrame = function() {
-    var newFrameIndex;
+    var newFrameNumber;
     if (this.copyBuffer) {
-      newFrameIndex = this.current.frameNumber + 1;
-      this.scene.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      newFrameNumber = this.current.frameNumber + 1;
+      this.scene.frames.splice(newFrameNumber, 0, Utils.clone(this.copyBuffer));
       this.buildSceneMeta();
-      return this.goToFrame(newFrameIndex);
+      return this.goToFrame(newFrameNumber);
     }
   };
 
@@ -449,8 +464,8 @@ Penciltest = (function() {
     self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       return Utils.confirm('Would you like to smooth every frame of this scene?', function() {
-        var doTheThing;
-        doTheThing = function(amount) {
+        var beginSmoothingScene;
+        beginSmoothingScene = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);
           self.state.mode = Penciltest.prototype.modes.BUSY;
@@ -461,9 +476,9 @@ Penciltest = (function() {
           return self.state.mode = Penciltest.prototype.modes.DRAWING;
         };
         if (!amount) {
-          return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
+          return Utils.prompt('How much to smooth? 1-5', 2, beginSmoothingScene);
         } else {
-          return doTheThing(amount);
+          return beginSmoothingScene(amount);
         }
       });
     } else {
@@ -500,23 +515,45 @@ Penciltest = (function() {
     return this.ui.updateStatus();
   };
 
-  Penciltest.prototype.newScene = function() {
-    var now, nowString;
+  Penciltest.prototype.defaultScene = function(sceneData) {
+    var now, nowString, scene;
+    if (sceneData == null) {
+      sceneData = null;
+    }
     now = new Date();
     nowString = now.toISOString();
-    this.scene = {
+    scene = {
       name: '',
       dateModified: nowString,
       dateCreated: nowString,
+      uuid: null,
       instrument: {
         name: 'io.lovejoy.penciltest',
         version: Penciltest.prototype.state.version
       },
       aspect: '1:1',
       width: 1024,
+      framerate: 12,
+      background: this.options.background,
+      lineColor: this.options.lineColor,
+      lineWeight: this.options.lineWeight,
       frames: []
     };
-    this.scene.dateModified = this.scene.dateCreated;
+    if (sceneData) {
+      Object.assign(scene, sceneData);
+    }
+    if (scene.uuid === null) {
+      if (typeof crypto !== "undefined" && crypto !== null) {
+        crypto.randomUUID();
+      }
+    } else if (scene === false) {
+      delete scene.uuid;
+    }
+    return scene;
+  };
+
+  Penciltest.prototype.newScene = function() {
+    this.scene = this.defaultScene();
     this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
@@ -566,6 +603,7 @@ Penciltest = (function() {
   Penciltest.prototype.saveScene = function() {
     var self;
     self = this;
+    this.scene.dateModified = (new Date()).toISOString();
     return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
       if (name) {
         self.scene.name = name;
@@ -577,14 +615,14 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var doTheThing, gifSize, lineWeight, self;
+    var beginRenderingGif, gifSize, lineWeight, self;
     self = this;
-    doTheThing = function(gifConfigurationString) {
-      var baseFrameDelay, blobUrl, containerCss, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, gifLink, gifLinkId, maxGifDimension, oldLineOverrides, oldRendererType, renderLineOverrides, _i, _ref;
+    beginRenderingGif = function(gifConfigurationString) {
+      var baseFrameDelay, blobUrl, containerCss, dimensions, frameNumber, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWeight, gifLink, gifLinkId, gifRenderOverrides, maxGifDimension, oldRendererType, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
       dimensions = self.getSceneDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
-      gifLineWidth = parseInt(gifConfiguration[1], 10);
+      gifLineWeight = parseInt(gifConfiguration[1], 10);
       if (dimensions.width > maxGifDimension) {
         dimensions.width = maxGifDimension;
         dimensions.height = maxGifDimension / dimensions.aspect;
@@ -603,19 +641,17 @@ Penciltest = (function() {
         renderer: 'canvas'
       });
       self.ui.appActions.renderer.action();
-      oldLineOverrides = self.renderer.overrides;
-      renderLineOverrides = {
-        weight: gifLineWidth
+      gifRenderOverrides = {
+        lineWeight: gifLineWeight
       };
-      baseFrameDelay = 1000 / self.options.frameRate;
-      frameIndex = 0;
+      baseFrameDelay = 1000 / self.scene.framerate;
+      frameNumber = 0;
       gifEncoder = new GIFEncoder();
       gifEncoder.setRepeat(0);
       gifEncoder.setDelay(baseFrameDelay);
       gifEncoder.start();
-      for (frameIndex = _i = 0, _ref = self.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-        self.renderer.setLineOverrides(renderLineOverrides);
-        self.goToFrame(frameIndex);
+      for (frameNumber = _i = 0, _ref = self.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameNumber = 0 <= _ref ? ++_i : --_i) {
+        self.goToFrame(frameNumber, gifRenderOverrides);
         gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
         gifEncoder.addFrame(self.renderer.context);
       }
@@ -681,13 +717,12 @@ Penciltest = (function() {
       self.setOptions({
         renderer: oldRendererType
       });
-      self.renderer.setLineOverrides(oldLineOverrides);
       self.forceDimensions = null;
       return self.resize();
     };
     gifSize = Math.min(512, self.scene.width);
     lineWeight = 1;
-    return Utils.prompt('GIF size & line weight (px)', gifSize + ' ' + lineWeight, doTheThing);
+    return Utils.prompt('GIF size & line weight (px)', gifSize + ' ' + lineWeight, beginRenderingGif);
   };
 
   Penciltest.prototype.selectSceneName = function(message, callback) {
@@ -711,12 +746,25 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setScene = function(scene) {
-    this.scene = scene;
+    this.scene = Object.assign(this.defaultScene({
+      uuid: false
+    }), scene);
     this.buildSceneMeta();
     if (this.scene.audio && this.scene.audio.url) {
       this.loadAudio(this.scene.audio.url);
     } else {
       this.destroyAudio();
+    }
+    if (this.renderer) {
+      if (this.scene.background) {
+        this.renderer.options.background = this.scene.background;
+      }
+      if (this.scene.lineColor) {
+        this.renderer.options.lineColor = this.scene.lineColor;
+      }
+      if (this.scene.lineWeight) {
+        this.renderer.options.lineWeight = this.scene.lineWeight;
+      }
     }
     this.goToFrame(0);
     this.ui.updateStatus();
@@ -742,24 +790,25 @@ Penciltest = (function() {
 
   Penciltest.prototype.buildSceneMeta = function() {
     var frame, frameMeta, i, _i, _j, _ref, _ref1;
-    this.current.frameIndex = [];
-    this.current.exposureIndex = [];
-    this.current.exposures = 0;
+    this.current.frames = [];
+    this.current.exposures = [];
+    this.current.exposureCount = 0;
+    this.current.singleFrameDuration = 1 / this.scene.framerate;
     for (i = _i = 0, _ref = this.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
       frame = this.scene.frames[i];
       frameMeta = {
         id: i,
-        exposure: this.current.exposures,
-        duration: frame.hold * this.singleFrameDuration,
-        time: this.current.exposures * this.singleFrameDuration
+        exposure: this.current.exposureCount,
+        duration: frame.hold * this.current.singleFrameDuration,
+        time: this.current.exposureCount * this.current.singleFrameDuration
       };
-      this.current.frameIndex.push(frameMeta);
+      this.current.frames.push(frameMeta);
       for (_j = 1, _ref1 = frame.hold; 1 <= _ref1 ? _j < _ref1 : _j > _ref1; 1 <= _ref1 ? _j++ : _j--) {
-        this.current.exposureIndex.push(frameMeta);
+        this.current.exposures.push(frameMeta);
       }
-      this.current.exposures += this.scene.frames[i].hold;
+      this.current.exposureCount += this.scene.frames[i].hold;
     }
-    return this.current.duration = this.current.exposures * this.singleFrameDuration;
+    return this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
   };
 
   Penciltest.prototype.getFrameDuration = function(frameNumber) {
@@ -768,7 +817,7 @@ Penciltest = (function() {
       frameNumber = this.current.frameNumber;
     }
     frame = this.scene.frames[frameNumber];
-    return frame.hold / this.options.frameRate;
+    return frame.hold / this.scene.framerate;
   };
 
   Penciltest.prototype.loadAudio = function(audioURL) {
@@ -896,7 +945,7 @@ Penciltest = (function() {
     this.fieldContainer.style.height = "" + this.height + "px";
     this.renderer.resize(this.width, this.height);
     this.zoomFactor = this.width / this.scene.width;
-    this.renderer.options.lineWeight = this.zoomFactor;
+    this.renderer.options.lineWeight = this.zoomFactor * this.scene.lineWeight;
     return this.drawCurrentFrame();
   };
 

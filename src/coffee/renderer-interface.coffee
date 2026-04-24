@@ -6,7 +6,7 @@ class RendererInterface
 
   options:
     container: 'body'
-    lineColor: [0, 0, 0]
+    lineColor: 'black'
     lineWeight: 1
     lineOpacity: 1
     lineCorner: 'round'
@@ -24,7 +24,7 @@ class RendererInterface
     else
       @container = @options.container
 
-    @clearLineOverrides()
+    @composeOptions()
 
     @resize @options.width, @options.height
 
@@ -41,22 +41,20 @@ class RendererInterface
   rect: (x, y, width, height, backgroundColor, strokeColor) ->
     null
 
-  setLineOverrides: ( options ) ->
-    @overrides = options
-    @currentLineOptions = Utils.inherit(
-      @overrides
-      @defaultLineOptions()
-    )
+  composeOptions: (overrides, persist = null) ->
+    composedOptions = Object.assign {}, @options
 
-  defaultLineOptions: ->
-    color: @options.lineColor
-    weight: @options.lineWeight
-    corner: @options.lineCorner
-    opacity: @options.lineOpacity
+    Object.assign @overrides, overrides if persist == true
 
-  clearLineOverrides: ->
-    @overrides = {}
-    @currentLineOptions = @defaultLineOptions()
+    Object.assign composedOptions, @overrides if persist != false
+
+    Object.assign composedOptions, overrides if persist != true
+
+    @currentLineOptions =
+      color: composedOptions.lineColor
+      weight: composedOptions.lineWeight
+      corner: composedOptions.lineCorner
+      opacity: composedOptions.lineOpacity
 
   path: (path) ->
     for segment, i in path

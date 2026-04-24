@@ -121,6 +121,8 @@ PenciltestUI = (function(_super) {
             _ref.destroy();
           }
           return this.renderer = new this.availableRenderers[this.options.renderer]({
+            lineColor: this.scene.lineColor,
+            lineWeight: this.scene.lineWeight,
             container: this.fieldElement,
             width: this.forceDimensions ? this.forceDimensions.width : this.width,
             height: this.forceDimensions ? this.forceDimensions.height : this.height
@@ -258,7 +260,7 @@ PenciltestUI = (function(_super) {
         return Utils.prompt('# of seconds to insert: ', 1, function(seconds) {
           var first, last, newIndex, _i;
           first = self.current.frameNumber + 1;
-          last = self.current.frameNumber + Math.floor(self.options.frameRate * Number(seconds));
+          last = self.current.frameNumber + Math.floor(self.scene.framerate * Number(seconds));
           for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
             self.newFrame(newIndex);
           }
@@ -286,21 +288,68 @@ PenciltestUI = (function(_super) {
         return this.redo();
       }
     },
-    frameRate: {
+    lineColor: {
+      label: "Line Color",
+      listener: function() {
+        var self;
+        self = this;
+        return Utils.prompt('line color: ', this.scene.lineColor, function(lineColor) {
+          if (!lineColor) {
+            lineColor = 'black';
+          }
+          return self.setOptions({
+            lineColor: lineColor
+          });
+        }, 'color');
+      },
+      action: function() {
+        var _ref;
+        this.scene.lineColor = this.options.lineColor;
+        if ((_ref = this.renderer) != null) {
+          _ref.lineColor = this.options.lineColor;
+        }
+        return this.drawCurrentFrame();
+      }
+    },
+    background: {
+      label: "Background Color",
+      listener: function() {
+        var self;
+        self = this;
+        return Utils.prompt('background color: ', this.scene.background, function(bg) {
+          if (!bg) {
+            bg = 'white';
+          }
+          return self.setOptions({
+            background: bg
+          });
+        }, 'color');
+      },
+      action: function() {
+        var _ref;
+        this.scene.background = this.options.background;
+        if ((_ref = this.renderer) != null) {
+          _ref.background = this.options.background;
+        }
+        return this.drawCurrentFrame();
+      }
+    },
+    framerate: {
       label: "Frame Rate",
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
+        return Utils.prompt('frames per second: ', this.scene.framerate, function(rate) {
           if (rate) {
             return self.setOptions({
-              frameRate: Number(rate)
+              framerate: Number(rate)
             });
           }
         });
       },
       action: function() {
-        return this.singleFrameDuration = 1 / this.options.frameRate;
+        this.scene.framerate = this.options.framerate;
+        return this.current.singleFrameDuration = 1 / this.scene.framerate;
       }
     },
     frameHold: {
@@ -481,12 +530,12 @@ PenciltestUI = (function(_super) {
     },
     newScene: {
       label: "New",
-      hotkey: ['N'],
+      hotkey: ['Alt+N'],
       listener: function() {
         var self;
         self = this;
         if (this.unsavedChanges) {
-          return Utils.confirm("Unsaved changes will be lost.", function() {
+          return Utils.confirm("Make a new scene? Unsaved changes will be lost.", function() {
             return self.newScene();
           });
         } else {
@@ -563,6 +612,7 @@ PenciltestUI = (function(_super) {
       cancelComplementKeyEvent: true,
       listener: function() {
         var blob, fileName, url;
+        this.scene.dateModified = (new Date()).toISOString();
         blob = new Blob([JSON.stringify(this.scene)], {
           type: 'application/json'
         });
@@ -655,7 +705,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'clearFrame', 'dropFrame'],
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothScene', 'linkAudio'],
-      Scene: ['frameRate', 'resizeScene', 'panScene', 'renderGif', 'saveScene', 'loadScene', 'newScene', 'importScene', 'exportScene'],
+      Scene: ['renderGif', 'saveScene', 'loadScene', 'importScene', 'exportScene', 'framerate', 'resizeScene', 'panScene', 'background', 'lineColor', 'newScene'],
       Settings: ['frameHold', 'renderer', 'toggleInterfaceHelp', 'reset', 'toggleDebug']
     }
   ];
@@ -712,6 +762,7 @@ PenciltestUI = (function(_super) {
       return self.pointer.coords = pageCoords;
     };
     mouseDownListener = function(event) {
+      debugger;
       var pageCoords;
       this.previousEvent = event;
       if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -752,6 +803,7 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      debugger;
       var pageCoords;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
@@ -1002,10 +1054,10 @@ PenciltestUI = (function(_super) {
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
       this.components.appStatus.setHTML(appStatusMarkup);
       sceneStatusMarkup = "<div class=\"frame\">";
-      sceneStatusMarkup += "" + this.controller.options.frameRate + " FPS";
+      sceneStatusMarkup += "" + this.controller.scene.framerate + " FPS";
       sceneStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
       sceneStatusMarkup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.scene.frames.length;
-      sceneStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
+      sceneStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, String));
       if ((_ref = this.controller.scene.audio) != null ? _ref.offset : void 0) {
         sceneStatusMarkup += " " + (this.controller.scene.audio.offset >= 0 ? '+' : '') + this.controller.scene.audio.offset;
       }

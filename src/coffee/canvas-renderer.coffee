@@ -15,7 +15,7 @@ class CanvasRenderer extends RendererInterface
 
     @container.appendChild @field
 
-    @updateStrokeStyle()
+    @applyStrokeStyle()
 
   lineTo: (x, y) ->
     super x, y
@@ -32,26 +32,25 @@ class CanvasRenderer extends RendererInterface
       @context.strokeStyle = strokeColor
       @context.stroke()
 
-    @updateStrokeStyle()
+    @applyStrokeStyle()
 
-  updateStrokeStyle: ->
+  applyStrokeStyle: ->
     if @context
-      @context.fillStyle = null # FIXME: rename this function, or move this elsewhere?
+      @context.fillStyle = null
       @context.lineWidth = @currentLineOptions.weight
       @context.lineJoin = @currentLineOptions.corner
-      @context.strokeStyle = 'rgba(' +
-        @currentLineOptions.color[0] + ',' +
-        @currentLineOptions.color[1] + ',' +
-        @currentLineOptions.color[2] + ',' +
-        @currentLineOptions.opacity + ')'
+      if Array.isArray @currentLineOptions.color
+        @context.strokeStyle = 'rgba(' +
+          @currentLineOptions.color[0] + ',' +
+          @currentLineOptions.color[1] + ',' +
+          @currentLineOptions.color[2] + ',' +
+          @currentLineOptions.opacity + ')'
+      else
+        @context.strokeStyle = @currentLineOptions.color
 
-  setLineOverrides: (options) ->
+  composeOptions: (options) ->
     super options
-    @updateStrokeStyle()
-
-  clearLineOverrides: ->
-    super()
-    @updateStrokeStyle()
+    @applyStrokeStyle()
 
   moveTo: (x, y) ->
     super x, y

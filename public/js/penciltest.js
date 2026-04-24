@@ -8174,7 +8174,7 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, property, submitPromptModal, utils, value;
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
     utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
@@ -8205,8 +8205,12 @@ Utils = {
     }
     promptForm.innerHTML = message;
     promptModal.appendChild(promptForm);
-    if (!promptInput) {
+    promptType = typeof promptInput === 'string' ? promptInput : null;
+    if (typeof promptInput !== 'object') {
       promptInput = document.createElement('input');
+    }
+    if (promptType !== null) {
+      promptInput.type = promptType;
     }
     if (defaultValue !== null) {
       promptInput.value = defaultValue;
@@ -8610,7 +8614,7 @@ var RendererInterface;
 RendererInterface = (function() {
   RendererInterface.prototype.options = {
     container: 'body',
-    lineColor: [0, 0, 0],
+    lineColor: 'black',
     lineWeight: 1,
     lineOpacity: 1,
     lineCorner: 'round',
@@ -8625,7 +8629,7 @@ RendererInterface = (function() {
     } else {
       this.container = this.options.container;
     }
-    this.clearLineOverrides();
+    this.composeOptions();
     this.resize(this.options.width, this.options.height);
   }
 
@@ -8646,23 +8650,27 @@ RendererInterface = (function() {
     return null;
   };
 
-  RendererInterface.prototype.setLineOverrides = function(options) {
-    this.overrides = options;
-    return this.currentLineOptions = Utils.inherit(this.overrides, this.defaultLineOptions());
-  };
-
-  RendererInterface.prototype.defaultLineOptions = function() {
-    return {
-      color: this.options.lineColor,
-      weight: this.options.lineWeight,
-      corner: this.options.lineCorner,
-      opacity: this.options.lineOpacity
+  RendererInterface.prototype.composeOptions = function(overrides, persist) {
+    var composedOptions;
+    if (persist == null) {
+      persist = null;
+    }
+    composedOptions = Object.assign({}, this.options);
+    if (persist === true) {
+      Object.assign(this.overrides, overrides);
+    }
+    if (persist !== false) {
+      Object.assign(composedOptions, this.overrides);
+    }
+    if (persist !== true) {
+      Object.assign(composedOptions, overrides);
+    }
+    return this.currentLineOptions = {
+      color: composedOptions.lineColor,
+      weight: composedOptions.lineWeight,
+      corner: composedOptions.lineCorner,
+      opacity: composedOptions.lineOpacity
     };
-  };
-
-  RendererInterface.prototype.clearLineOverrides = function() {
-    this.overrides = {};
-    return this.currentLineOptions = this.defaultLineOptions();
   };
 
   RendererInterface.prototype.path = function(path) {
@@ -8712,7 +8720,7 @@ CanvasRenderer = (function(_super) {
     });
     CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
-    this.updateStrokeStyle();
+    this.applyStrokeStyle();
   }
 
   CanvasRenderer.prototype.lineTo = function(x, y) {
@@ -8732,26 +8740,25 @@ CanvasRenderer = (function(_super) {
       this.context.strokeStyle = strokeColor;
       this.context.stroke();
     }
-    return this.updateStrokeStyle();
+    return this.applyStrokeStyle();
   };
 
-  CanvasRenderer.prototype.updateStrokeStyle = function() {
+  CanvasRenderer.prototype.applyStrokeStyle = function() {
     if (this.context) {
       this.context.fillStyle = null;
       this.context.lineWidth = this.currentLineOptions.weight;
       this.context.lineJoin = this.currentLineOptions.corner;
-      return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
+      if (Array.isArray(this.currentLineOptions.color)) {
+        return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
+      } else {
+        return this.context.strokeStyle = this.currentLineOptions.color;
+      }
     }
   };
 
-  CanvasRenderer.prototype.setLineOverrides = function(options) {
-    CanvasRenderer.__super__.setLineOverrides.call(this, options);
-    return this.updateStrokeStyle();
-  };
-
-  CanvasRenderer.prototype.clearLineOverrides = function() {
-    CanvasRenderer.__super__.clearLineOverrides.call(this);
-    return this.updateStrokeStyle();
+  CanvasRenderer.prototype.composeOptions = function(options) {
+    CanvasRenderer.__super__.composeOptions.call(this, options);
+    return this.applyStrokeStyle();
   };
 
   CanvasRenderer.prototype.moveTo = function(x, y) {
@@ -8967,6 +8974,8 @@ PenciltestUI = (function(_super) {
             _ref.destroy();
           }
           return this.renderer = new this.availableRenderers[this.options.renderer]({
+            lineColor: this.scene.lineColor,
+            lineWeight: this.scene.lineWeight,
             container: this.fieldElement,
             width: this.forceDimensions ? this.forceDimensions.width : this.width,
             height: this.forceDimensions ? this.forceDimensions.height : this.height
@@ -9104,7 +9113,7 @@ PenciltestUI = (function(_super) {
         return Utils.prompt('# of seconds to insert: ', 1, function(seconds) {
           var first, last, newIndex, _i;
           first = self.current.frameNumber + 1;
-          last = self.current.frameNumber + Math.floor(self.options.frameRate * Number(seconds));
+          last = self.current.frameNumber + Math.floor(self.scene.framerate * Number(seconds));
           for (newIndex = _i = first; first <= last ? _i <= last : _i >= last; newIndex = first <= last ? ++_i : --_i) {
             self.newFrame(newIndex);
           }
@@ -9132,21 +9141,68 @@ PenciltestUI = (function(_super) {
         return this.redo();
       }
     },
-    frameRate: {
+    lineColor: {
+      label: "Line Color",
+      listener: function() {
+        var self;
+        self = this;
+        return Utils.prompt('line color: ', this.scene.lineColor, function(lineColor) {
+          if (!lineColor) {
+            lineColor = 'black';
+          }
+          return self.setOptions({
+            lineColor: lineColor
+          });
+        }, 'color');
+      },
+      action: function() {
+        var _ref;
+        this.scene.lineColor = this.options.lineColor;
+        if ((_ref = this.renderer) != null) {
+          _ref.lineColor = this.options.lineColor;
+        }
+        return this.drawCurrentFrame();
+      }
+    },
+    background: {
+      label: "Background Color",
+      listener: function() {
+        var self;
+        self = this;
+        return Utils.prompt('background color: ', this.scene.background, function(bg) {
+          if (!bg) {
+            bg = 'white';
+          }
+          return self.setOptions({
+            background: bg
+          });
+        }, 'color');
+      },
+      action: function() {
+        var _ref;
+        this.scene.background = this.options.background;
+        if ((_ref = this.renderer) != null) {
+          _ref.background = this.options.background;
+        }
+        return this.drawCurrentFrame();
+      }
+    },
+    framerate: {
       label: "Frame Rate",
       listener: function() {
         var self;
         self = this;
-        return Utils.prompt('frames per second: ', this.options.frameRate, function(rate) {
+        return Utils.prompt('frames per second: ', this.scene.framerate, function(rate) {
           if (rate) {
             return self.setOptions({
-              frameRate: Number(rate)
+              framerate: Number(rate)
             });
           }
         });
       },
       action: function() {
-        return this.singleFrameDuration = 1 / this.options.frameRate;
+        this.scene.framerate = this.options.framerate;
+        return this.current.singleFrameDuration = 1 / this.scene.framerate;
       }
     },
     frameHold: {
@@ -9327,12 +9383,12 @@ PenciltestUI = (function(_super) {
     },
     newScene: {
       label: "New",
-      hotkey: ['N'],
+      hotkey: ['Alt+N'],
       listener: function() {
         var self;
         self = this;
         if (this.unsavedChanges) {
-          return Utils.confirm("Unsaved changes will be lost.", function() {
+          return Utils.confirm("Make a new scene? Unsaved changes will be lost.", function() {
             return self.newScene();
           });
         } else {
@@ -9409,6 +9465,7 @@ PenciltestUI = (function(_super) {
       cancelComplementKeyEvent: true,
       listener: function() {
         var blob, fileName, url;
+        this.scene.dateModified = (new Date()).toISOString();
         blob = new Blob([JSON.stringify(this.scene)], {
           type: 'application/json'
         });
@@ -9501,7 +9558,7 @@ PenciltestUI = (function(_super) {
       Edit: ['undo', 'redo', 'moreHold', 'lessHold', 'copyFrame', 'cutFrame', 'pasteFrame', 'pasteStrokes', 'insertFrameAfter', 'insertFrameBefore', 'insertSeconds', 'clearFrame', 'dropFrame'],
       Playback: ['loop'],
       Tools: ['hideCursor', 'onionSkin', 'smoothing', 'smoothFrame', 'smoothScene', 'linkAudio'],
-      Scene: ['frameRate', 'resizeScene', 'panScene', 'renderGif', 'saveScene', 'loadScene', 'newScene', 'importScene', 'exportScene'],
+      Scene: ['renderGif', 'saveScene', 'loadScene', 'importScene', 'exportScene', 'framerate', 'resizeScene', 'panScene', 'background', 'lineColor', 'newScene'],
       Settings: ['frameHold', 'renderer', 'toggleInterfaceHelp', 'reset', 'toggleDebug']
     }
   ];
@@ -9558,6 +9615,7 @@ PenciltestUI = (function(_super) {
       return self.pointer.coords = pageCoords;
     };
     mouseDownListener = function(event) {
+      debugger;
       var pageCoords;
       this.previousEvent = event;
       if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -9598,6 +9656,7 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
+      debugger;
       var pageCoords;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
@@ -9848,10 +9907,10 @@ PenciltestUI = (function(_super) {
       appStatusMarkup += " Smoothing: " + this.controller.options.smoothing;
       this.components.appStatus.setHTML(appStatusMarkup);
       sceneStatusMarkup = "<div class=\"frame\">";
-      sceneStatusMarkup += "" + this.controller.options.frameRate + " FPS";
+      sceneStatusMarkup += "" + this.controller.scene.framerate + " FPS";
       sceneStatusMarkup += " | (hold " + (this.controller.getCurrentFrame().hold) + ")";
       sceneStatusMarkup += " | " + (this.controller.current.frameNumber + 1) + "/" + this.controller.scene.frames.length;
-      sceneStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frameIndex[this.controller.current.frameNumber].time, 1, String));
+      sceneStatusMarkup += " | " + (Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, String));
       if ((_ref = this.controller.scene.audio) != null ? _ref.offset : void 0) {
         sceneStatusMarkup += " " + (this.controller.scene.audio.offset >= 0 ? '+' : '') + this.controller.scene.audio.offset;
       }
@@ -9967,26 +10026,27 @@ Penciltest = (function() {
     hideCursor: false,
     loop: true,
     showStatus: true,
-    frameRate: 12,
     frameHold: 2,
     onionSkin: true,
     smoothing: 1,
-    onionSkinRange: 4,
+    onionSkinFrameRadius: 4,
+    lineColor: 'black',
+    lineWeight: 1,
+    background: 'white',
     renderer: 'canvas',
-    onionSkinOpacity: 0.5,
-    background: 'white'
+    onionSkinOpacity: 0.5
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.12',
+    version: '0.2.13',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
 
   Penciltest.prototype.current = {
-    frameIndex: [],
-    exposureIndex: [],
-    exposures: 0,
+    frames: [],
+    exposures: [],
+    exposureCount: 0,
     exposureNumber: 0,
     frameNumber: 0
   };
@@ -9998,9 +10058,8 @@ Penciltest = (function() {
     this.container.className = 'penciltest-app';
     this.buildContainer();
     this.ui = new PenciltestUI(this);
-    this.options.background = Penciltest.prototype.options.background;
-    this.setOptions(this.options);
     this.newScene();
+    this.setOptions(this.options);
     if (this.state.version !== Penciltest.prototype.state.version) {
       this.state.version = PenciltestLegacy.update(this, this.state.version, Penciltest.prototype.state.version);
     }
@@ -10057,6 +10116,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.mark = function(x, y) {
+    debugger;
     var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
@@ -10130,25 +10190,35 @@ Penciltest = (function() {
     return this.drawCurrentFrame();
   };
 
-  Penciltest.prototype.goToFrame = function(newIndex) {
+  Penciltest.prototype.resolveFrameNumber = function(inputIndex) {
+    var realIndex;
+    realIndex = inputIndex;
     if (this.options.loop) {
-      newIndex = (newIndex + this.scene.frames.length) % this.scene.frames.length;
+      while (realIndex < 0 || realIndex >= this.scene.frames.length) {
+        realIndex = (realIndex + this.scene.frames.length) % this.scene.frames.length;
+      }
     } else {
-      newIndex = Math.max(0, Math.min(this.scene.frames.length - 1, newIndex));
+      realIndex = Math.max(0, Math.min(this.scene.frames.length - 1, realIndex));
     }
-    this.current.frameNumber = newIndex;
+    return realIndex;
+  };
+
+  Penciltest.prototype.goToFrame = function(targetFrameNumber, overrides) {
+    var selectedFrameNumber;
+    selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
+    this.current.frameNumber = selectedFrameNumber;
     this.current.frame = this.scene.frames[this.current.frameNumber];
     if (this.state.mode !== Penciltest.prototype.modes.PLAYING) {
-      this.seekAudioToFrame(newIndex);
+      this.seekAudioToFrame(selectedFrameNumber);
     }
-    return this.drawCurrentFrame();
+    return this.drawCurrentFrame(overrides);
   };
 
   Penciltest.prototype.seekAudioToFrame = function(frameNumber) {
     var seekTime;
     if (this.scene.audio) {
-      Utils.log(this.current.frameIndex[frameNumber]);
-      seekTime = this.current.frameIndex[frameNumber].time - this.scene.audio.offset;
+      Utils.log(this.current.frames[frameNumber]);
+      seekTime = this.current.frames[frameNumber].time - this.scene.audio.offset;
       return this.seekAudio(seekTime);
     }
   };
@@ -10188,7 +10258,7 @@ Penciltest = (function() {
     };
     this.stop();
     stepListener(true);
-    this.playInterval = setInterval(stepListener, 1000 / this.options.frameRate);
+    this.playInterval = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
     this.state.mode = Penciltest.prototype.modes.PLAYING;
     return this.playAudio();
@@ -10214,49 +10284,53 @@ Penciltest = (function() {
     }
   };
 
-  Penciltest.prototype.drawCurrentFrame = function() {
-    var i, _i, _ref;
-    if (!this.scene.frames.length) {
+  Penciltest.prototype.drawCurrentFrame = function(overrides) {
+    var i, nextFrameNumber, previousFrameNumber, _i, _ref;
+    if (!this.renderer || !this.scene.frames.length) {
       return;
     }
     this.renderer.clear();
-    if (this.options.background) {
-      this.renderer.rect(0, 0, this.width, this.height, this.options.background);
+    if (this.scene.background) {
+      this.renderer.rect(0, 0, this.width, this.height, this.scene.background);
     }
     if (this.options.onionSkin) {
-      for (i = _i = 1, _ref = this.options.onionSkinRange; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
-        if (this.current.frameNumber >= i) {
-          this.drawFrame(this.current.frameNumber - i, {
-            color: [255, 0, 0],
-            opacity: Math.pow(this.options.onionSkinOpacity, i)
-          });
+      for (i = _i = 1, _ref = this.options.onionSkinFrameRadius; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
+        previousFrameNumber = this.resolveFrameNumber(this.current.frameNumber - i);
+        if (previousFrameNumber !== this.current.frameNumber) {
+          this.drawFrame(previousFrameNumber, Object.assign({}, overrides, {
+            lineColor: [255, 0, 0],
+            lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+          }));
         }
-        if (this.current.frameNumber < this.scene.frames.length - i) {
-          this.drawFrame(this.current.frameNumber + i, {
-            color: [0, 255, 255],
-            opacity: Math.pow(this.options.onionSkinOpacity, i)
-          });
+        nextFrameNumber = this.resolveFrameNumber(this.current.frameNumber + i);
+        if (nextFrameNumber !== this.current.frameNumber) {
+          this.drawFrame(nextFrameNumber, Object.assign({}, overrides, {
+            lineColor: [0, 255, 255],
+            lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+          }));
         }
       }
     }
-    this.drawFrame(this.current.frameNumber);
+    this.renderer.composeOptions();
+    this.drawFrame(this.current.frameNumber, overrides);
     return this.ui.updateStatus();
   };
 
-  Penciltest.prototype.drawFrame = function(frameIndex, overrides) {
-    var stroke, _i, _len, _ref;
+  Penciltest.prototype.drawFrame = function(frameNumber, overrides) {
+    var stroke, _i, _len, _ref, _results;
     if (!this.width || !this.height) {
       return;
     }
     if (overrides) {
-      this.renderer.setLineOverrides(overrides);
+      this.renderer.composeOptions(overrides);
     }
-    _ref = this.scene.frames[frameIndex].strokes;
+    _ref = this.scene.frames[frameNumber].strokes;
+    _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       stroke = _ref[_i];
-      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor));
+      _results.push(this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
     }
-    return this.renderer.clearLineOverrides();
+    return _results;
   };
 
   Penciltest.prototype.scaleStroke = function(stroke, factor) {
@@ -10312,12 +10386,12 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.pasteFrame = function() {
-    var newFrameIndex;
+    var newFrameNumber;
     if (this.copyBuffer) {
-      newFrameIndex = this.current.frameNumber + 1;
-      this.scene.frames.splice(newFrameIndex, 0, Utils.clone(this.copyBuffer));
+      newFrameNumber = this.current.frameNumber + 1;
+      this.scene.frames.splice(newFrameNumber, 0, Utils.clone(this.copyBuffer));
       this.buildSceneMeta();
-      return this.goToFrame(newFrameIndex);
+      return this.goToFrame(newFrameNumber);
     }
   };
 
@@ -10394,8 +10468,8 @@ Penciltest = (function() {
     self = this;
     if (this.state.mode === Penciltest.prototype.modes.DRAWING) {
       return Utils.confirm('Would you like to smooth every frame of this scene?', function() {
-        var doTheThing;
-        doTheThing = function(amount) {
+        var beginSmoothingScene;
+        beginSmoothingScene = function(amount) {
           var frame, lastIndex, _i;
           amount = Number(amount);
           self.state.mode = Penciltest.prototype.modes.BUSY;
@@ -10406,9 +10480,9 @@ Penciltest = (function() {
           return self.state.mode = Penciltest.prototype.modes.DRAWING;
         };
         if (!amount) {
-          return Utils.prompt('How much to smooth? 1-5', 2, doTheThing);
+          return Utils.prompt('How much to smooth? 1-5', 2, beginSmoothingScene);
         } else {
-          return doTheThing(amount);
+          return beginSmoothingScene(amount);
         }
       });
     } else {
@@ -10445,23 +10519,45 @@ Penciltest = (function() {
     return this.ui.updateStatus();
   };
 
-  Penciltest.prototype.newScene = function() {
-    var now, nowString;
+  Penciltest.prototype.defaultScene = function(sceneData) {
+    var now, nowString, scene;
+    if (sceneData == null) {
+      sceneData = null;
+    }
     now = new Date();
     nowString = now.toISOString();
-    this.scene = {
+    scene = {
       name: '',
       dateModified: nowString,
       dateCreated: nowString,
+      uuid: null,
       instrument: {
         name: 'io.lovejoy.penciltest',
         version: Penciltest.prototype.state.version
       },
       aspect: '1:1',
       width: 1024,
+      framerate: 12,
+      background: this.options.background,
+      lineColor: this.options.lineColor,
+      lineWeight: this.options.lineWeight,
       frames: []
     };
-    this.scene.dateModified = this.scene.dateCreated;
+    if (sceneData) {
+      Object.assign(scene, sceneData);
+    }
+    if (scene.uuid === null) {
+      if (typeof crypto !== "undefined" && crypto !== null) {
+        crypto.randomUUID();
+      }
+    } else if (scene === false) {
+      delete scene.uuid;
+    }
+    return scene;
+  };
+
+  Penciltest.prototype.newScene = function() {
+    this.scene = this.defaultScene();
     this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
@@ -10511,6 +10607,7 @@ Penciltest = (function() {
   Penciltest.prototype.saveScene = function() {
     var self;
     self = this;
+    this.scene.dateModified = (new Date()).toISOString();
     return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
       if (name) {
         self.scene.name = name;
@@ -10522,14 +10619,14 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var doTheThing, gifSize, lineWeight, self;
+    var beginRenderingGif, gifSize, lineWeight, self;
     self = this;
-    doTheThing = function(gifConfigurationString) {
-      var baseFrameDelay, blobUrl, containerCss, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, gifLink, gifLinkId, maxGifDimension, oldLineOverrides, oldRendererType, renderLineOverrides, _i, _ref;
+    beginRenderingGif = function(gifConfigurationString) {
+      var baseFrameDelay, blobUrl, containerCss, dimensions, frameNumber, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWeight, gifLink, gifLinkId, gifRenderOverrides, maxGifDimension, oldRendererType, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
       dimensions = self.getSceneDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
-      gifLineWidth = parseInt(gifConfiguration[1], 10);
+      gifLineWeight = parseInt(gifConfiguration[1], 10);
       if (dimensions.width > maxGifDimension) {
         dimensions.width = maxGifDimension;
         dimensions.height = maxGifDimension / dimensions.aspect;
@@ -10548,19 +10645,17 @@ Penciltest = (function() {
         renderer: 'canvas'
       });
       self.ui.appActions.renderer.action();
-      oldLineOverrides = self.renderer.overrides;
-      renderLineOverrides = {
-        weight: gifLineWidth
+      gifRenderOverrides = {
+        lineWeight: gifLineWeight
       };
-      baseFrameDelay = 1000 / self.options.frameRate;
-      frameIndex = 0;
+      baseFrameDelay = 1000 / self.scene.framerate;
+      frameNumber = 0;
       gifEncoder = new GIFEncoder();
       gifEncoder.setRepeat(0);
       gifEncoder.setDelay(baseFrameDelay);
       gifEncoder.start();
-      for (frameIndex = _i = 0, _ref = self.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameIndex = 0 <= _ref ? ++_i : --_i) {
-        self.renderer.setLineOverrides(renderLineOverrides);
-        self.goToFrame(frameIndex);
+      for (frameNumber = _i = 0, _ref = self.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; frameNumber = 0 <= _ref ? ++_i : --_i) {
+        self.goToFrame(frameNumber, gifRenderOverrides);
         gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold);
         gifEncoder.addFrame(self.renderer.context);
       }
@@ -10626,13 +10721,12 @@ Penciltest = (function() {
       self.setOptions({
         renderer: oldRendererType
       });
-      self.renderer.setLineOverrides(oldLineOverrides);
       self.forceDimensions = null;
       return self.resize();
     };
     gifSize = Math.min(512, self.scene.width);
     lineWeight = 1;
-    return Utils.prompt('GIF size & line weight (px)', gifSize + ' ' + lineWeight, doTheThing);
+    return Utils.prompt('GIF size & line weight (px)', gifSize + ' ' + lineWeight, beginRenderingGif);
   };
 
   Penciltest.prototype.selectSceneName = function(message, callback) {
@@ -10656,12 +10750,25 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setScene = function(scene) {
-    this.scene = scene;
+    this.scene = Object.assign(this.defaultScene({
+      uuid: false
+    }), scene);
     this.buildSceneMeta();
     if (this.scene.audio && this.scene.audio.url) {
       this.loadAudio(this.scene.audio.url);
     } else {
       this.destroyAudio();
+    }
+    if (this.renderer) {
+      if (this.scene.background) {
+        this.renderer.options.background = this.scene.background;
+      }
+      if (this.scene.lineColor) {
+        this.renderer.options.lineColor = this.scene.lineColor;
+      }
+      if (this.scene.lineWeight) {
+        this.renderer.options.lineWeight = this.scene.lineWeight;
+      }
     }
     this.goToFrame(0);
     this.ui.updateStatus();
@@ -10687,24 +10794,25 @@ Penciltest = (function() {
 
   Penciltest.prototype.buildSceneMeta = function() {
     var frame, frameMeta, i, _i, _j, _ref, _ref1;
-    this.current.frameIndex = [];
-    this.current.exposureIndex = [];
-    this.current.exposures = 0;
+    this.current.frames = [];
+    this.current.exposures = [];
+    this.current.exposureCount = 0;
+    this.current.singleFrameDuration = 1 / this.scene.framerate;
     for (i = _i = 0, _ref = this.scene.frames.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
       frame = this.scene.frames[i];
       frameMeta = {
         id: i,
-        exposure: this.current.exposures,
-        duration: frame.hold * this.singleFrameDuration,
-        time: this.current.exposures * this.singleFrameDuration
+        exposure: this.current.exposureCount,
+        duration: frame.hold * this.current.singleFrameDuration,
+        time: this.current.exposureCount * this.current.singleFrameDuration
       };
-      this.current.frameIndex.push(frameMeta);
+      this.current.frames.push(frameMeta);
       for (_j = 1, _ref1 = frame.hold; 1 <= _ref1 ? _j < _ref1 : _j > _ref1; 1 <= _ref1 ? _j++ : _j--) {
-        this.current.exposureIndex.push(frameMeta);
+        this.current.exposures.push(frameMeta);
       }
-      this.current.exposures += this.scene.frames[i].hold;
+      this.current.exposureCount += this.scene.frames[i].hold;
     }
-    return this.current.duration = this.current.exposures * this.singleFrameDuration;
+    return this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
   };
 
   Penciltest.prototype.getFrameDuration = function(frameNumber) {
@@ -10713,7 +10821,7 @@ Penciltest = (function() {
       frameNumber = this.current.frameNumber;
     }
     frame = this.scene.frames[frameNumber];
-    return frame.hold / this.options.frameRate;
+    return frame.hold / this.scene.framerate;
   };
 
   Penciltest.prototype.loadAudio = function(audioURL) {
@@ -10841,7 +10949,7 @@ Penciltest = (function() {
     this.fieldContainer.style.height = "" + this.height + "px";
     this.renderer.resize(this.width, this.height);
     this.zoomFactor = this.width / this.scene.width;
-    this.renderer.options.lineWeight = this.zoomFactor;
+    this.renderer.options.lineWeight = this.zoomFactor * this.scene.lineWeight;
     return this.drawCurrentFrame();
   };
 

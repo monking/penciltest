@@ -60,7 +60,10 @@ Utils =
     promptForm.innerHTML = message
     promptModal.appendChild promptForm
 
-    promptInput = document.createElement 'input' if !promptInput
+    promptType = if typeof promptInput == 'string' then promptInput else null
+    promptInput = document.createElement 'input' if typeof promptInput isnt 'object' 
+    if promptType != null
+      promptInput.type = promptType
     promptInput.value = defaultValue if defaultValue isnt null
     promptInput.style.display = 'block'
     promptForm.appendChild promptInput

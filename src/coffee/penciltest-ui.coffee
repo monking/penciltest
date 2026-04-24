@@ -84,6 +84,8 @@ class PenciltestUI extends PenciltestUIComponent
         if @fieldElement
           @renderer?.destroy()
           @renderer = new @availableRenderers[ @options.renderer ](
+            lineColor: @scene.lineColor
+            lineWeight: @scene.lineWeight
             container: @fieldElement
             width: if @forceDimensions then @forceDimensions.width else @width
             height: if @forceDimensions then @forceDimensions.height else @height
@@ -187,7 +189,7 @@ class PenciltestUI extends PenciltestUIComponent
         self = @
         Utils.prompt '# of seconds to insert: ', 1, (seconds) ->
           first = self.current.frameNumber + 1
-          last = self.current.frameNumber + Math.floor self.options.frameRate * Number(seconds)
+          last = self.current.frameNumber + Math.floor self.scene.framerate * Number(seconds)
           self.newFrame newIndex for newIndex in [first..last]
           self.goToFrame newIndex
     undo:
@@ -204,13 +206,49 @@ class PenciltestUI extends PenciltestUIComponent
       gesture: /3 still from right/
       repeat: true
       listener: -> @redo()
-    frameRate:
+    lineColor:
+      label: "Line Color"
+      listener: ->
+        self = @
+        Utils.prompt(
+          'line color: ',
+          @scene.lineColor,
+          (lineColor) ->
+            if not lineColor then lineColor = 'black'
+            self.setOptions lineColor: lineColor
+          , 
+          'color'
+        )
+      action: ->
+        @scene.lineColor = @options.lineColor
+        @renderer?.lineColor = @options.lineColor
+        @drawCurrentFrame()
+    background:
+      label: "Background Color"
+      listener: ->
+        self = @
+        Utils.prompt(
+          'background color: ',
+          @scene.background,
+          (bg) ->
+            if not bg then bg = 'white'
+            self.setOptions background: bg
+          , 
+          'color'
+        )
+      action: ->
+        @scene.background = @options.background
+        @renderer?.background = @options.background
+        @drawCurrentFrame()
+    framerate:
       label: "Frame Rate"
       listener: ->
         self = @
-        Utils.prompt 'frames per second: ', @options.frameRate, (rate) ->
-          if rate then self.setOptions frameRate: Number rate
-      action: -> @singleFrameDuration = 1 / @options.frameRate
+        Utils.prompt 'frames per second: ', @scene.framerate, (rate) ->
+          if rate then self.setOptions framerate: Number rate
+      action: ->
+        @scene.framerate = @options.framerate
+        @current.singleFrameDuration = 1 / @scene.framerate
     frameHold:
       label: "Default Frame Hold"
       listener: ->
@@ -314,11 +352,11 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @loadScene()
     newScene:
       label: "New"
-      hotkey: ['N']
+      hotkey: ['Alt+N']
       listener: ->
         self = @
         if @unsavedChanges
-          Utils.confirm "Unsaved changes will be lost.", -> self.newScene()
+          Utils.confirm "Make a new scene? Unsaved changes will be lost.", -> self.newScene()
         else
           @newScene()
     renderGif:
@@ -378,15 +416,11 @@ class PenciltestUI extends PenciltestUIComponent
       cancelComplementKeyEvent: true
       listener: ->
         # self = @
+        @scene.dateModified = (new Date()).toISOString()
         blob = new Blob([JSON.stringify @scene], {type:'application/json'})
         url = window.URL.createObjectURL blob
         fileName = (@scene.name || 'untitled') + '.penciltest.json'
         Utils.downloadFromUrl url, fileName
-        # reader = new FileReader()
-        # reader.addEventListener 'load', ->
-        #   console.log reader.result.length # XXX
-        #   return # XXX
-        # reader.readAsDataURL(blob)
     importScene:
       label: "Import"
       hotkey: ['Ctrl+O']
@@ -473,15 +507,17 @@ class PenciltestUI extends PenciltestUIComponent
       'linkAudio'
     ]
     Scene: [
-      'frameRate'
-      'resizeScene'
-      'panScene'
       'renderGif'
       'saveScene'
       'loadScene'
-      'newScene'
       'importScene'
       'exportScene'
+      'framerate'
+      'resizeScene'
+      'panScene'
+      'background'
+      'lineColor'
+      'newScene'
     ]
     Settings: [
       'frameHold'
@@ -534,6 +570,7 @@ class PenciltestUI extends PenciltestUIComponent
       self.pointer.coords = pageCoords;
 
     mouseDownListener = (event) ->
+      debugger
       @previousEvent = event
       return if @controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
@@ -571,6 +608,7 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', @uiListeners.up
 
     mouseMoveListener = (event) ->
+      debugger
       # @previousEvent = event
       event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
@@ -783,10 +821,10 @@ class PenciltestUI extends PenciltestUIComponent
       @components.appStatus.setHTML appStatusMarkup
 
       sceneStatusMarkup = "<div class=\"frame\">"
-      sceneStatusMarkup += "#{@controller.options.frameRate} FPS"
+      sceneStatusMarkup += "#{@controller.scene.framerate} FPS"
       sceneStatusMarkup += " | (hold #{@controller.getCurrentFrame().hold})"
       sceneStatusMarkup += " | #{@controller.current.frameNumber + 1}/#{@controller.scene.frames.length}"
-      sceneStatusMarkup += " | #{Utils.getDecimal @controller.current.frameIndex[@controller.current.frameNumber].time, 1, String}"
+      sceneStatusMarkup += " | #{Utils.getDecimal @controller.current.frames[@controller.current.frameNumber].time, 1, String}"
       if @controller.scene.audio?.offset
         sceneStatusMarkup += " #{if @controller.scene.audio.offset >= 0 then '+' else ''}#{@controller.scene.audio.offset}"
       sceneStatusMarkup += "</div>"

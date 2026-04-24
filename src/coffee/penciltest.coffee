@@ -19,25 +19,26 @@ class Penciltest
     hideCursor: false
     loop: true
     showStatus: true
-    frameRate: 12
     frameHold: 2
     onionSkin: true
     smoothing: 1
-    onionSkinRange: 4
+    onionSkinFrameRadius: 4
+    lineColor: 'black'
+    lineWeight: 1
+    background: 'white'
     renderer: 'canvas'
     onionSkinOpacity: 0.5
-    background: 'white'
 
   state:
-    version: '0.2.12'
+    version: '0.2.13'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
   # metadata generated while interpreting the scene data
   current:
-    frameIndex: []
-    exposureIndex: []
-    exposures: 0
+    frames: []
+    exposures: []
+    exposureCount: 0
     exposureNumber: 0
     frameNumber: 0
 
@@ -59,11 +60,10 @@ class Penciltest
     @buildContainer()
 
     @ui = new PenciltestUI( this )
-    @options.background = Penciltest.prototype.options.background # until there's a UI to change it
-
-    @setOptions @options # do all the option actions
 
     @newScene()
+
+    @setOptions @options # do all the option actions
 
     if @state.version isnt Penciltest.prototype.state.version
       @state.version = PenciltestLegacy.update @, @state.version, Penciltest.prototype.state.version
@@ -111,6 +111,7 @@ class Penciltest
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
 
   mark: (x,y) ->
+    debugger
     x = Utils.getDecimal x, 1
     y = Utils.getDecimal y, 1
 
@@ -172,23 +173,28 @@ class Penciltest
   updateCurrentFrame: (segment) ->
     @drawCurrentFrame()
 
-  goToFrame: (newIndex) ->
+  resolveFrameNumber: (inputIndex) ->
+    realIndex = inputIndex
     if @options.loop
-      newIndex = (newIndex + @scene.frames.length) % @scene.frames.length
+      realIndex = (realIndex + @scene.frames.length) % @scene.frames.length while realIndex < 0 || realIndex >= @scene.frames.length
     else
-      newIndex = Math.max 0, Math.min @scene.frames.length - 1, newIndex
+      realIndex = Math.max 0, Math.min @scene.frames.length - 1, realIndex
+    realIndex
 
-    @current.frameNumber = newIndex
+  goToFrame: (targetFrameNumber, overrides) ->
+    selectedFrameNumber = @resolveFrameNumber targetFrameNumber
+
+    @current.frameNumber = selectedFrameNumber
     @current.frame = @scene.frames[@current.frameNumber]
 
     if @state.mode isnt Penciltest.prototype.modes.PLAYING
-      @seekAudioToFrame newIndex
-    @drawCurrentFrame()
+      @seekAudioToFrame selectedFrameNumber
+    @drawCurrentFrame(overrides)
 
   seekAudioToFrame: (frameNumber) ->
     if @scene.audio
-      Utils.log(@current.frameIndex[frameNumber])
-      seekTime = @current.frameIndex[frameNumber].time - @scene.audio.offset
+      Utils.log(@current.frames[frameNumber])
+      seekTime = @current.frames[frameNumber].time - @scene.audio.offset
       @seekAudio seekTime
 
   play: ->
@@ -219,7 +225,7 @@ class Penciltest
 
     @stop()
     stepListener(true)
-    @playInterval = setInterval stepListener, 1000 / @options.frameRate
+    @playInterval = setInterval stepListener, 1000 / @scene.framerate
     @lift()
     @state.mode = Penciltest.prototype.modes.PLAYING
     @playAudio()
@@ -234,44 +240,54 @@ class Penciltest
     if @state.mode isnt Penciltest.prototype.modes.BUSY
       if @state.mode is Penciltest.prototype.modes.PLAYING then @stop() else @play()
 
-  drawCurrentFrame: ->
-    return if not @scene.frames.length
+  drawCurrentFrame: (overrides) ->
+    # NOTE: This draws the background, while drawFrame() does not.
+    return if not @renderer or not @scene.frames.length
 
     @renderer.clear()
 
-    if @options.background
-      @renderer.rect 0, 0, @width, @height, @options.background
+    if @scene.background
+      @renderer.rect 0, 0, @width, @height, @scene.background
 
     if @options.onionSkin
-      for i in [1..@options.onionSkinRange]
-        if @current.frameNumber >= i
+      for i in [1..@options.onionSkinFrameRadius]
+        previousFrameNumber = @resolveFrameNumber(@current.frameNumber - i)
+        if previousFrameNumber != @current.frameNumber
           @drawFrame(
-            @current.frameNumber - i
-            {
-              color: [255, 0, 0],
-              opacity: Math.pow @options.onionSkinOpacity, i
-            }
+            previousFrameNumber
+            Object.assign(
+              {},
+              overrides,
+              {
+                lineColor: [255, 0, 0],
+                lineOpacity: Math.pow @options.onionSkinOpacity, i
+              }
+            )
           )
-        if @current.frameNumber < @scene.frames.length - i
+        nextFrameNumber = @resolveFrameNumber(@current.frameNumber + i)
+        if nextFrameNumber != @current.frameNumber
           @drawFrame(
-            @current.frameNumber + i
-            {
-              color: [0, 255, 255],
-              opacity: Math.pow @options.onionSkinOpacity, i
-            }
+            nextFrameNumber
+            Object.assign(
+              {},
+              overrides,
+              {
+                lineColor: [0, 255, 255],
+                lineOpacity: Math.pow @options.onionSkinOpacity, i
+              }
+            )
           )
-    @drawFrame @current.frameNumber
+    @renderer.composeOptions()
+    @drawFrame @current.frameNumber, overrides
     @ui.updateStatus()
 
-  drawFrame: (frameIndex, overrides) ->
+  drawFrame: (frameNumber, overrides) ->
     return if !@width or !@height
 
-    @renderer.setLineOverrides overrides if overrides
+    @renderer.composeOptions overrides if overrides
 
-    for stroke in @scene.frames[frameIndex].strokes
+    for stroke in @scene.frames[frameNumber].strokes
       @renderer.path @scaleStroke stroke, @zoomFactor
-
-    @renderer.clearLineOverrides()
 
   scaleStroke: (stroke, factor) ->
     @scaleCoordinates coords, factor for coords in stroke
@@ -308,10 +324,10 @@ class Penciltest
 
   pasteFrame: ->
     if @copyBuffer
-      newFrameIndex = @current.frameNumber + 1
-      @scene.frames.splice newFrameIndex, 0, Utils.clone(@copyBuffer)
+      newFrameNumber = @current.frameNumber + 1
+      @scene.frames.splice newFrameNumber, 0, Utils.clone(@copyBuffer)
       @buildSceneMeta()
-      @goToFrame(newFrameIndex)
+      @goToFrame(newFrameNumber)
 
   pasteStrokes: ->
     if @copyBuffer
@@ -365,7 +381,7 @@ class Penciltest
     self = @
     if @state.mode is Penciltest.prototype.modes.DRAWING
       Utils.confirm 'Would you like to smooth every frame of this scene?', ->
-        doTheThing = (amount) ->
+        beginSmoothingScene = (amount) ->
           amount = Number amount
           self.state.mode = Penciltest.prototype.modes.BUSY
           lastIndex = self.scene.frames.length - 1
@@ -373,9 +389,9 @@ class Penciltest
             self.smoothFrame frame, amount
           self.state.mode = Penciltest.prototype.modes.DRAWING
         if not amount
-          Utils.prompt 'How much to smooth? 1-5', 2, doTheThing
+          Utils.prompt 'How much to smooth? 1-5', 2, beginSmoothingScene
         else
-          doTheThing amount
+          beginSmoothingScene amount
     else
       Utils.log 'Unable to alter scene while playing'
 
@@ -400,21 +416,37 @@ class Penciltest
     @buildSceneMeta()
     @ui.updateStatus()
 
-  newScene: ->
+  defaultScene: (sceneData = null) ->
     now = new Date()
     nowString = now.toISOString()
-    @scene =
+    scene = 
       name: ''
       dateModified: nowString
       dateCreated: nowString
+      uuid: null
       instrument:
         name: 'io.lovejoy.penciltest'
         version: Penciltest.prototype.state.version
       aspect: '1:1'
       width: 1024
+      framerate: 12
+      background: @options.background
+      lineColor: @options.lineColor
+      lineWeight: @options.lineWeight
       frames: []
 
-    @scene.dateModified = @scene.dateCreated
+    if sceneData
+      Object.assign scene, sceneData
+
+    if scene.uuid == null
+      crypto?.randomUUID()
+    else if scene == false
+      delete scene.uuid
+
+    scene
+
+  newScene: ->
+    @scene = @defaultScene()
 
     @unsavedChanges = false
 
@@ -452,6 +484,7 @@ class Penciltest
 
   saveScene: ->
     self = @
+    @scene.dateModified = (new Date()).toISOString()
     Utils.prompt "what will you name your scene?", @scene.name, (name) ->
       if name
         self.scene.name = name
@@ -461,14 +494,14 @@ class Penciltest
 
   renderGif: ->
     self = @
-    doTheThing = (gifConfigurationString) ->
+    beginRenderingGif = (gifConfigurationString) ->
       gifConfiguration = (gifConfigurationString || '512 2').split ' '
       # configure for rendering
       # dimensions = [64, 64]
       dimensions = self.getSceneDimensions()
       # while rendering is only useful at one size, save the step # dimensions = ().split 'x'
       maxGifDimension = parseInt gifConfiguration[0], 10
-      gifLineWidth = parseInt gifConfiguration[1], 10
+      gifLineWeight = parseInt gifConfiguration[1], 10
       if dimensions.width > maxGifDimension
         dimensions.width = maxGifDimension
         dimensions.height = maxGifDimension / dimensions.aspect
@@ -487,12 +520,11 @@ class Penciltest
       self.setOptions renderer: 'canvas'
       self.ui.appActions.renderer.action()
 
-      oldLineOverrides = self.renderer.overrides
-      renderLineOverrides = 
-        weight: gifLineWidth
+      gifRenderOverrides = 
+        lineWeight: gifLineWeight
 
-      baseFrameDelay = 1000 / self.options.frameRate
-      frameIndex = 0
+      baseFrameDelay = 1000 / self.scene.framerate
+      frameNumber = 0
 
       # prepare encoder
       gifEncoder = new GIFEncoder()
@@ -501,12 +533,10 @@ class Penciltest
       gifEncoder.setDelay baseFrameDelay
       gifEncoder.start()
 
-      for frameIndex in [0...self.scene.frames.length]
-        self.renderer.setLineOverrides renderLineOverrides
-        self.goToFrame frameIndex
+      for frameNumber in [0...self.scene.frames.length]
+        self.goToFrame frameNumber, gifRenderOverrides
         gifEncoder.setDelay baseFrameDelay * self.getCurrentFrame().hold # FIXME no good; how to set individual delays for each fram in gifEncoder?
         gifEncoder.addFrame self.renderer.context
-
 
       gifEncoder.finish()
       blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }))
@@ -570,13 +600,12 @@ class Penciltest
 
       # reset to user's configuration
       self.setOptions renderer: oldRendererType
-      self.renderer.setLineOverrides oldLineOverrides
       self.forceDimensions = null
       self.resize()
 
     gifSize = Math.min 512, self.scene.width
     lineWeight = 1
-    Utils.prompt 'GIF size & line weight (px)', gifSize+' '+lineWeight, doTheThing
+    Utils.prompt 'GIF size & line weight (px)', gifSize+' '+lineWeight, beginRenderingGif
 
   selectSceneName: (message, callback) ->
     sceneNames = @getSceneNames()
@@ -593,12 +622,16 @@ class Penciltest
     false
 
   setScene: (scene) ->
-    @scene = scene
+    @scene = Object.assign @defaultScene({uuid:false}), scene
     @buildSceneMeta()
     if @scene.audio and @scene.audio.url
       @loadAudio @scene.audio.url
     else
       @destroyAudio()
+    if @renderer
+      @renderer.options.background = @scene.background if @scene.background
+      @renderer.options.lineColor = @scene.lineColor if @scene.lineColor
+      @renderer.options.lineWeight = @scene.lineWeight if @scene.lineWeight
     @goToFrame 0
     @ui.updateStatus()
     @unsavedChanges = false
@@ -615,26 +648,27 @@ class Penciltest
       window.localStorage.removeItem self.encodeStorageReference 'scene', sceneName
 
   buildSceneMeta: ->
-    @current.frameIndex = []
-    @current.exposureIndex = []
-    @current.exposures = 0
+    @current.frames = []
+    @current.exposures = []
+    @current.exposureCount = 0
+    @current.singleFrameDuration = 1 / @scene.framerate
 
     for i in [0...@scene.frames.length]
       frame = @scene.frames[i]
       frameMeta =
         id: i
-        exposure: @current.exposures
-        duration: frame.hold * @singleFrameDuration
-        time: @current.exposures * @singleFrameDuration
-      @current.frameIndex.push frameMeta
-      @current.exposureIndex.push frameMeta for [1...frame.hold]
-      @current.exposures += @scene.frames[i].hold
+        exposure: @current.exposureCount
+        duration: frame.hold * @current.singleFrameDuration
+        time: @current.exposureCount * @current.singleFrameDuration
+      @current.frames.push frameMeta
+      @current.exposures.push frameMeta for [1...frame.hold]
+      @current.exposureCount += @scene.frames[i].hold
 
-    @current.duration = @current.exposures * @singleFrameDuration
+    @current.duration = @current.exposureCount * @current.singleFrameDuration
 
   getFrameDuration: (frameNumber = @current.frameNumber) ->
     frame = @scene.frames[frameNumber]
-    frame.hold / @options.frameRate
+    frame.hold / @scene.framerate
 
   loadAudio: (audioURL) ->
     @scene.audio ?= {}
@@ -716,5 +750,5 @@ class Penciltest
     @fieldContainer.style.height = "#{@height}px"
     @renderer.resize @width, @height
     @zoomFactor = @width / @scene.width
-    @renderer.options.lineWeight = @zoomFactor
+    @renderer.options.lineWeight = @zoomFactor * @scene.lineWeight
     @drawCurrentFrame()

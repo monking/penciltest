@@ -56,7 +56,7 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, property, submitPromptModal, utils, value;
+    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
     utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
@@ -87,8 +87,12 @@ Utils = {
     }
     promptForm.innerHTML = message;
     promptModal.appendChild(promptForm);
-    if (!promptInput) {
+    promptType = typeof promptInput === 'string' ? promptInput : null;
+    if (typeof promptInput !== 'object') {
       promptInput = document.createElement('input');
+    }
+    if (promptType !== null) {
+      promptInput.type = promptType;
     }
     if (defaultValue !== null) {
       promptInput.value = defaultValue;

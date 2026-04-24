@@ -16,7 +16,7 @@ CanvasRenderer = (function(_super) {
     });
     CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
-    this.updateStrokeStyle();
+    this.applyStrokeStyle();
   }
 
   CanvasRenderer.prototype.lineTo = function(x, y) {
@@ -36,26 +36,25 @@ CanvasRenderer = (function(_super) {
       this.context.strokeStyle = strokeColor;
       this.context.stroke();
     }
-    return this.updateStrokeStyle();
+    return this.applyStrokeStyle();
   };
 
-  CanvasRenderer.prototype.updateStrokeStyle = function() {
+  CanvasRenderer.prototype.applyStrokeStyle = function() {
     if (this.context) {
       this.context.fillStyle = null;
       this.context.lineWidth = this.currentLineOptions.weight;
       this.context.lineJoin = this.currentLineOptions.corner;
-      return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
+      if (Array.isArray(this.currentLineOptions.color)) {
+        return this.context.strokeStyle = 'rgba(' + this.currentLineOptions.color[0] + ',' + this.currentLineOptions.color[1] + ',' + this.currentLineOptions.color[2] + ',' + this.currentLineOptions.opacity + ')';
+      } else {
+        return this.context.strokeStyle = this.currentLineOptions.color;
+      }
     }
   };
 
-  CanvasRenderer.prototype.setLineOverrides = function(options) {
-    CanvasRenderer.__super__.setLineOverrides.call(this, options);
-    return this.updateStrokeStyle();
-  };
-
-  CanvasRenderer.prototype.clearLineOverrides = function() {
-    CanvasRenderer.__super__.clearLineOverrides.call(this);
-    return this.updateStrokeStyle();
+  CanvasRenderer.prototype.composeOptions = function(options) {
+    CanvasRenderer.__super__.composeOptions.call(this, options);
+    return this.applyStrokeStyle();
   };
 
   CanvasRenderer.prototype.moveTo = function(x, y) {

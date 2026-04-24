@@ -7,7 +7,7 @@ var RendererInterface;
 RendererInterface = (function() {
   RendererInterface.prototype.options = {
     container: 'body',
-    lineColor: [0, 0, 0],
+    lineColor: 'black',
     lineWeight: 1,
     lineOpacity: 1,
     lineCorner: 'round',
@@ -22,7 +22,7 @@ RendererInterface = (function() {
     } else {
       this.container = this.options.container;
     }
-    this.clearLineOverrides();
+    this.composeOptions();
     this.resize(this.options.width, this.options.height);
   }
 
@@ -43,23 +43,27 @@ RendererInterface = (function() {
     return null;
   };
 
-  RendererInterface.prototype.setLineOverrides = function(options) {
-    this.overrides = options;
-    return this.currentLineOptions = Utils.inherit(this.overrides, this.defaultLineOptions());
-  };
-
-  RendererInterface.prototype.defaultLineOptions = function() {
-    return {
-      color: this.options.lineColor,
-      weight: this.options.lineWeight,
-      corner: this.options.lineCorner,
-      opacity: this.options.lineOpacity
+  RendererInterface.prototype.composeOptions = function(overrides, persist) {
+    var composedOptions;
+    if (persist == null) {
+      persist = null;
+    }
+    composedOptions = Object.assign({}, this.options);
+    if (persist === true) {
+      Object.assign(this.overrides, overrides);
+    }
+    if (persist !== false) {
+      Object.assign(composedOptions, this.overrides);
+    }
+    if (persist !== true) {
+      Object.assign(composedOptions, overrides);
+    }
+    return this.currentLineOptions = {
+      color: composedOptions.lineColor,
+      weight: composedOptions.lineWeight,
+      corner: composedOptions.lineCorner,
+      opacity: composedOptions.lineOpacity
     };
-  };
-
-  RendererInterface.prototype.clearLineOverrides = function() {
-    this.overrides = {};
-    return this.currentLineOptions = this.defaultLineOptions();
   };
 
   RendererInterface.prototype.path = function(path) {
