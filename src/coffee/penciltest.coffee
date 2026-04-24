@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.2.10'
+    version: '0.2.11'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -398,12 +398,20 @@ class Penciltest
     @ui.updateStatus()
 
   newScene: ->
+    now = new Date()
+    nowString = now.toISOString()
     @scene =
       name: ''
-      version: Penciltest.prototype.state.version
+      dateModified: nowString
+      dateCreated: nowString
+      instrument:
+        name: 'io.lovejoy.penciltest'
+        version: Penciltest.prototype.state.version
       aspect: '1:1'
-      width: 1920
+      width: 1024
       frames: []
+
+    @scene.dateModified = @scene.dateCreated
 
     @unsavedChanges = false
 
@@ -444,6 +452,7 @@ class Penciltest
     Utils.prompt "what will you name your scene?", @scene.name, (name) ->
       if name
         self.scene.name = name
+        self.scene.dateModified = (new Date()).toISOString()
         self.putStoredData 'scene', name, self.scene
         self.unsavedChanges = false
 

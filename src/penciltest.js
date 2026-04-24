@@ -33,7 +33,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.10',
+    version: '0.2.11',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -497,13 +497,22 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.newScene = function() {
+    var now, nowString;
+    now = new Date();
+    nowString = now.toISOString();
     this.scene = {
       name: '',
-      version: Penciltest.prototype.state.version,
+      dateModified: nowString,
+      dateCreated: nowString,
+      instrument: {
+        name: 'io.lovejoy.penciltest',
+        version: Penciltest.prototype.state.version
+      },
       aspect: '1:1',
-      width: 1920,
+      width: 1024,
       frames: []
     };
+    this.scene.dateModified = this.scene.dateCreated;
     this.unsavedChanges = false;
     this.newFrame();
     return this.goToFrame(0);
@@ -556,6 +565,7 @@ Penciltest = (function() {
     return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
       if (name) {
         self.scene.name = name;
+        self.scene.dateModified = (new Date()).toISOString();
         self.putStoredData('scene', name, self.scene);
         return self.unsavedChanges = false;
       }
