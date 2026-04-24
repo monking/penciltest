@@ -29,7 +29,7 @@ class Penciltest
     background: 'white'
 
   state:
-    version: '0.2.11'
+    version: '0.2.12'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -173,7 +173,10 @@ class Penciltest
     @drawCurrentFrame()
 
   goToFrame: (newIndex) ->
-    newIndex = Math.max 0, Math.min @scene.frames.length - 1, newIndex
+    if @options.loop
+      newIndex = (newIndex + @scene.frames.length) % @scene.frames.length
+    else
+      newIndex = Math.max 0, Math.min @scene.frames.length - 1, newIndex
 
     @current.frameNumber = newIndex
     @current.frame = @scene.frames[@current.frameNumber]
@@ -506,11 +509,12 @@ class Penciltest
 
 
       gifEncoder.finish()
-      binaryGif = gifEncoder.stream().getData()
-      dataUrl = 'data:image/gif;base64,' + encode64 binaryGif
+      blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }))
 
       gifElementId = 'rendered_gif'
       gifElement = document.getElementById gifElementId
+      gifLinkId = 'rendered_gif_link'
+      gifLink = document.getElementById gifLinkId
       if not gifElement
         gifElement = document.createElement 'img'
         gifElement.id = gifElementId
@@ -521,8 +525,7 @@ class Penciltest
           transform: 'translateX(-50%) translateY(-50%)'
           maxWidth: '80%'
           maxHeight: '80%'
-        for property, value of gifCss
-          gifElement.style[property] = value
+        Object.assign gifElement.style, gifCss
         gifContainer = document.createElement 'div'
         containerCss =
           position: 'absolute'
@@ -531,31 +534,35 @@ class Penciltest
           bottom: '0px'
           right: '0px'
           backgroundColor: 'rgba(0,0,0,0.5)'
-        for property, value of containerCss
-          gifContainer.style[property] = value
+        Object.assign gifContainer.style, containerCss
         gifInstructions = document.createElement 'div'
         containerCss =
           position: 'relative'
           color: 'white'
           textAlign: 'center'
           backgroundColor: 'rgba(0,0,0,0.5)'
-        for property, value of containerCss
-          gifInstructions.style[property] = value
-        gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close."
-        gifContainer.appendChild gifElement
+        Object.assign gifInstructions.style, containerCss
+        gifLink = document.createElement 'a'
+        gifInstructions.innerHTML = "Click/touch image to download.<br>Click/touch outside GIF to close."
+        gifLink.appendChild gifElement
+        gifContainer.appendChild gifLink
         gifContainer.appendChild gifInstructions
         document.body.appendChild gifContainer
 
         gifCloseHandler = (event) ->
-          if event.target isnt gifElement
+          if event.target isnt gifElement || ( event.type = 'keydown' && event.key == 'escape' )
             gifContainer.removeEventListener 'click', gifCloseHandler
             gifContainer.removeEventListener 'touchend', gifCloseHandler
+            document.body.removeEventListener 'keydown', gifCloseHandler
             gifContainer.remove()
 
         gifContainer.addEventListener 'click', gifCloseHandler
         gifContainer.addEventListener 'touchend', gifCloseHandler
+        document.body.addEventListener 'keydown', gifCloseHandler
 
-      gifElement.src = dataUrl
+      gifElement.src = blobUrl
+      gifLink.href = blobUrl
+      gifLink.download = (self.scene.name || 'untitled')+'.penciltest.gif'
 
       # TODO 1) render each frame small in canvas
       # TODO 2) append with the corect duration to a GIF in memory
@@ -567,7 +574,9 @@ class Penciltest
       self.forceDimensions = null
       self.resize()
 
-    Utils.prompt 'GIF size & lineWidth', '512 2', doTheThing
+    gifSize = Math.min 512, self.scene.width
+    lineWeight = 1
+    Utils.prompt 'GIF size & line weight (px)', gifSize+' '+lineWeight, doTheThing
 
   selectSceneName: (message, callback) ->
     sceneNames = @getSceneNames()

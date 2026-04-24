@@ -11,7 +11,9 @@ CanvasRenderer = (function(_super) {
 
   function CanvasRenderer(options) {
     this.field = document.createElement('canvas');
-    this.context = this.field.getContext('2d');
+    this.context = this.field.getContext('2d', {
+      alpha: false
+    });
     CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
     this.updateStrokeStyle();
@@ -24,6 +26,7 @@ CanvasRenderer = (function(_super) {
 
   CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
     CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
+    this.context.beginPath();
     this.context.rect(x, y, width, height);
     if (backgroundColor) {
       this.context.fillStyle = backgroundColor;
@@ -58,7 +61,7 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.moveTo = function(x, y) {
     CanvasRenderer.__super__.moveTo.call(this, x, y);
     this.context.moveTo(x, y);
-    return this.drawingPath != null ? this.drawingPath : this.drawingPath = this.context.beginPath();
+    return this.drawingPath = this.context.beginPath();
   };
 
   CanvasRenderer.prototype.render = function() {

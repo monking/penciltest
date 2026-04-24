@@ -8707,7 +8707,9 @@ CanvasRenderer = (function(_super) {
 
   function CanvasRenderer(options) {
     this.field = document.createElement('canvas');
-    this.context = this.field.getContext('2d');
+    this.context = this.field.getContext('2d', {
+      alpha: false
+    });
     CanvasRenderer.__super__.constructor.call(this, options);
     this.container.appendChild(this.field);
     this.updateStrokeStyle();
@@ -8720,6 +8722,7 @@ CanvasRenderer = (function(_super) {
 
   CanvasRenderer.prototype.rect = function(x, y, width, height, backgroundColor, strokeColor) {
     CanvasRenderer.__super__.rect.call(this, x, y, width, height, backgroundColor);
+    this.context.beginPath();
     this.context.rect(x, y, width, height);
     if (backgroundColor) {
       this.context.fillStyle = backgroundColor;
@@ -8754,7 +8757,7 @@ CanvasRenderer = (function(_super) {
   CanvasRenderer.prototype.moveTo = function(x, y) {
     CanvasRenderer.__super__.moveTo.call(this, x, y);
     this.context.moveTo(x, y);
-    return this.drawingPath != null ? this.drawingPath : this.drawingPath = this.context.beginPath();
+    return this.drawingPath = this.context.beginPath();
   };
 
   CanvasRenderer.prototype.render = function() {
@@ -9975,7 +9978,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.11',
+    version: '0.2.12',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -10128,7 +10131,11 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.goToFrame = function(newIndex) {
-    newIndex = Math.max(0, Math.min(this.scene.frames.length - 1, newIndex));
+    if (this.options.loop) {
+      newIndex = (newIndex + this.scene.frames.length) % this.scene.frames.length;
+    } else {
+      newIndex = Math.max(0, Math.min(this.scene.frames.length - 1, newIndex));
+    }
     this.current.frameNumber = newIndex;
     this.current.frame = this.scene.frames[this.current.frameNumber];
     if (this.state.mode !== Penciltest.prototype.modes.PLAYING) {
@@ -10515,10 +10522,10 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.renderGif = function() {
-    var doTheThing, self;
+    var doTheThing, gifSize, lineWeight, self;
     self = this;
     doTheThing = function(gifConfigurationString) {
-      var baseFrameDelay, binaryGif, containerCss, dataUrl, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, maxGifDimension, oldLineOverrides, oldRendererType, property, renderLineOverrides, value, _i, _ref;
+      var baseFrameDelay, blobUrl, containerCss, dimensions, frameIndex, gifCloseHandler, gifConfiguration, gifContainer, gifCss, gifElement, gifElementId, gifEncoder, gifInstructions, gifLineWidth, gifLink, gifLinkId, maxGifDimension, oldLineOverrides, oldRendererType, renderLineOverrides, _i, _ref;
       gifConfiguration = (gifConfigurationString || '512 2').split(' ');
       dimensions = self.getSceneDimensions();
       maxGifDimension = parseInt(gifConfiguration[0], 10);
@@ -10558,10 +10565,13 @@ Penciltest = (function() {
         gifEncoder.addFrame(self.renderer.context);
       }
       gifEncoder.finish();
-      binaryGif = gifEncoder.stream().getData();
-      dataUrl = 'data:image/gif;base64,' + encode64(binaryGif);
+      blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], {
+        type: "image/gif"
+      }));
       gifElementId = 'rendered_gif';
       gifElement = document.getElementById(gifElementId);
+      gifLinkId = 'rendered_gif_link';
+      gifLink = document.getElementById(gifLinkId);
       if (!gifElement) {
         gifElement = document.createElement('img');
         gifElement.id = gifElementId;
@@ -10573,10 +10583,7 @@ Penciltest = (function() {
           maxWidth: '80%',
           maxHeight: '80%'
         };
-        for (property in gifCss) {
-          value = gifCss[property];
-          gifElement.style[property] = value;
-        }
+        Object.assign(gifElement.style, gifCss);
         gifContainer = document.createElement('div');
         containerCss = {
           position: 'absolute',
@@ -10586,10 +10593,7 @@ Penciltest = (function() {
           right: '0px',
           backgroundColor: 'rgba(0,0,0,0.5)'
         };
-        for (property in containerCss) {
-          value = containerCss[property];
-          gifContainer.style[property] = value;
-        }
+        Object.assign(gifContainer.style, containerCss);
         gifInstructions = document.createElement('div');
         containerCss = {
           position: 'relative',
@@ -10597,25 +10601,28 @@ Penciltest = (function() {
           textAlign: 'center',
           backgroundColor: 'rgba(0,0,0,0.5)'
         };
-        for (property in containerCss) {
-          value = containerCss[property];
-          gifInstructions.style[property] = value;
-        }
-        gifInstructions.innerHTML = "Right click (or touch & hold on mobile) to save.<br>Click/touch outside GIF to close.";
-        gifContainer.appendChild(gifElement);
+        Object.assign(gifInstructions.style, containerCss);
+        gifLink = document.createElement('a');
+        gifInstructions.innerHTML = "Click/touch image to download.<br>Click/touch outside GIF to close.";
+        gifLink.appendChild(gifElement);
+        gifContainer.appendChild(gifLink);
         gifContainer.appendChild(gifInstructions);
         document.body.appendChild(gifContainer);
         gifCloseHandler = function(event) {
-          if (event.target !== gifElement) {
+          if (event.target !== gifElement || (event.type = 'keydown' && event.key === 'escape')) {
             gifContainer.removeEventListener('click', gifCloseHandler);
             gifContainer.removeEventListener('touchend', gifCloseHandler);
+            document.body.removeEventListener('keydown', gifCloseHandler);
             return gifContainer.remove();
           }
         };
         gifContainer.addEventListener('click', gifCloseHandler);
         gifContainer.addEventListener('touchend', gifCloseHandler);
+        document.body.addEventListener('keydown', gifCloseHandler);
       }
-      gifElement.src = dataUrl;
+      gifElement.src = blobUrl;
+      gifLink.href = blobUrl;
+      gifLink.download = (self.scene.name || 'untitled') + '.penciltest.gif';
       self.setOptions({
         renderer: oldRendererType
       });
@@ -10623,7 +10630,9 @@ Penciltest = (function() {
       self.forceDimensions = null;
       return self.resize();
     };
-    return Utils.prompt('GIF size & lineWidth', '512 2', doTheThing);
+    gifSize = Math.min(512, self.scene.width);
+    lineWeight = 1;
+    return Utils.prompt('GIF size & line weight (px)', gifSize + ' ' + lineWeight, doTheThing);
   };
 
   Penciltest.prototype.selectSceneName = function(message, callback) {

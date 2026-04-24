@@ -8,7 +8,8 @@ class CanvasRenderer extends RendererInterface
 
   constructor: (options) ->
     @field = document.createElement 'canvas'
-    @context = @field.getContext '2d'
+    @context = @field.getContext '2d',
+      alpha: false
 
     super options
 
@@ -22,6 +23,7 @@ class CanvasRenderer extends RendererInterface
 
   rect: (x, y, width, height, backgroundColor, strokeColor) ->
     super x, y, width, height, backgroundColor
+    @context.beginPath()
     @context.rect x, y, width, height
     if backgroundColor
       @context.fillStyle = backgroundColor
@@ -54,7 +56,7 @@ class CanvasRenderer extends RendererInterface
   moveTo: (x, y) ->
     super x, y
     @context.moveTo x, y
-    @drawingPath ?= @context.beginPath()
+    @drawingPath = @context.beginPath()
 
   render: ->
     super()
