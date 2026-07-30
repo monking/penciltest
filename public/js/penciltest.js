@@ -8197,7 +8197,7 @@ Utils = {
       left: '50%',
       padding: '1em',
       transform: 'translateX(-50%) translateY(-50%)',
-      backgroundColor: 'white'
+      backgroundColor: 'lightgray'
     };
     for (property in promptFormCss) {
       value = promptFormCss[property];
@@ -9446,8 +9446,8 @@ PenciltestUI = (function(_super) {
       }
     },
     panScene: {
-      label: "Pan Canvas",
-      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center.",
+      label: "Pan Scene",
+      title: "Drag to reposition all frames in this scene. Useful after resizing.",
       hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
@@ -10078,13 +10078,13 @@ Penciltest = (function() {
     onionSkinFrameRadius: 4,
     lineColor: 'black',
     lineWeight: 1,
-    background: 'white',
+    background: 'gray',
     renderer: 'canvas',
     onionSkinOpacity: 0.5
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.14',
+    version: '0.2.15',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };

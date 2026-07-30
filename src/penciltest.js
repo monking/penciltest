@@ -28,13 +28,13 @@ Penciltest = (function() {
     onionSkinFrameRadius: 4,
     lineColor: 'black',
     lineWeight: 1,
-    background: 'white',
+    background: 'gray',
     renderer: 'canvas',
     onionSkinOpacity: 0.5
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.14',
+    version: '0.2.15',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };

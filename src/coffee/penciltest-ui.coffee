@@ -377,8 +377,8 @@ class PenciltestUI extends PenciltestUIComponent
           self.scene.aspect = dimensions[1]
           self.resize()
     panScene:
-      label: "Pan Canvas"
-      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center."
+      label: "Pan Scene"
+      title: "Drag to reposition all frames in this scene. Useful after resizing."
       hotkey: ['P']
       listener: ->
         self = @

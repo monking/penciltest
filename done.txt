@@ -1,3 +1,4 @@
 x 2026-04-22 2026-04-22 Collapse other menu groups when expanding any other.  uuid:7b0e3eb3-1a4b-48b6-b59b-074110e86d4e
 x 2026-04-22 2026-04-22 Do not let mousewheel control frames while menu is open.  uuid:ec4cb486-929c-41b9-abd0-7008e38a454f
 x 2026-04-24 2026-04-22 (canvas) Fix render filling areas inappropriately. Currently no appropriate fill, yes?  uuid:d5a66d06-b0e3-42b8-a3de-fe6f8db91799 pri:A
+x 2026-07-30 2026-07-30 Gray default background.  uuid:9c5f5f42-99bb-438e-a115-e4972b6b16b4 pri:B

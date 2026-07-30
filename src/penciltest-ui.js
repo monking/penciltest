@@ -568,8 +568,8 @@ PenciltestUI = (function(_super) {
       }
     },
     panScene: {
-      label: "Pan Canvas",
-      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center.",
+      label: "Pan Scene",
+      title: "Drag to reposition all frames in this scene. Useful after resizing.",
       hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;

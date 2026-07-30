@@ -54,7 +54,7 @@ Utils =
       left: '50%'
       padding: '1em'
       transform: 'translateX(-50%) translateY(-50%)'
-      backgroundColor: 'white'
+      backgroundColor: 'lightgray'
     for property, value of promptFormCss
       promptForm.style[property] = value
     promptForm.innerHTML = message

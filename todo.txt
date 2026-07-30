@@ -1,8 +1,8 @@
 (A) 2026-04-22 Port from CoffeeScript to TypeScript  uuid:265aea6e-2e7e-4946-960f-00f733691231
-(A) 2026-04-24 +FIXME First time toggling onion skin will reset line & bg color.  uuid:4daf3ff3-7c68-459f-909a-8fd9be6db111
-(A) 2026-07-30 +FIXME State can become stuck in BUSY. WORKAROUND:Settings>Reset  uuid:8db91e0b-f80a-4482-84c3-a3fa53c1adea
+(A) 2026-04-24 +FIXME +NEEDS_REPLICATION_STEPS First time toggling onion skin will reset line & bg color.  uuid:4daf3ff3-7c68-459f-909a-8fd9be6db111
 (A) 2026-07-30 Pick audio file, and create blob.  uuid:1ecb31f3-898d-483e-8ac8-87dabfb13797 branch:feature/load-audio-file
 (B) 2026-04-22 (canvas) Render line uniform darkness first and always. Fixes faint line appearing darker on subsequent renders.  uuid:610aa833-5351-4014-8fd2-edd12ddb6118
 (B) 2026-04-22 Save unnamed draft automatically, and load automatically if it exists at app start.  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1
+(C) 2026-07-30 +FIXME +NEEDS_REPLICATION_STEPS `state.mode` can become stuck in BUSY. WORKAROUND:Settings>Reset  uuid:8db91e0b-f80a-4482-84c3-a3fa53c1adea  | Confusing. Seems only `smoothScene` and `panScene` set `state.mode`.
 (C) 2026-07-30 More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb
 (D) 2026-07-30 LAYERS.  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
