@@ -514,9 +514,10 @@ PenciltestUI = (function(_super) {
     },
     saveScene: {
       label: "Save",
-      hotkey: ['Alt+S'],
+      hotkey: ['Ctrl+Alt+S'],
       gesture: /3 still from center (bottom|middle)/,
       listener: function() {
+        this.updateScene();
         return this.saveScene();
       }
     },
@@ -551,7 +552,8 @@ PenciltestUI = (function(_super) {
       }
     },
     resizeScene: {
-      label: "Resize Scene",
+      label: "Resize Canvas",
+      title: "Set the width and height of the canvas in this scene",
       hotkey: ['Alt+R'],
       listener: function() {
         var self;
@@ -566,7 +568,8 @@ PenciltestUI = (function(_super) {
       }
     },
     panScene: {
-      label: "Pan Scene",
+      label: "Pan Canvas",
+      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center.",
       hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
@@ -611,14 +614,17 @@ PenciltestUI = (function(_super) {
       hotkey: ['Ctrl+S', 'Alt+E'],
       cancelComplementKeyEvent: true,
       listener: function() {
-        var blob, fileName, url;
-        this.scene.dateModified = (new Date()).toISOString();
-        blob = new Blob([JSON.stringify(this.scene)], {
-          type: 'application/json'
-        });
-        url = window.URL.createObjectURL(blob);
-        fileName = (this.scene.name || 'untitled') + '.penciltest.json';
-        return Utils.downloadFromUrl(url, fileName);
+        return this.updateScene((function(_this) {
+          return function(scene) {
+            var blob, fileName, url;
+            blob = new Blob([JSON.stringify(scene)], {
+              type: 'application/json'
+            });
+            url = window.URL.createObjectURL(blob);
+            fileName = (scene.name || 'untitled') + '.penciltest.json';
+            return Utils.downloadFromUrl(url, fileName);
+          };
+        })(this));
       }
     },
     importScene: {
@@ -629,21 +635,27 @@ PenciltestUI = (function(_super) {
         var self;
         self = this;
         return Utils.promptForFile('Load a scene JSON file', function(sceneJSON) {
-          return self.setScene(JSON.parse(sceneJSON));
-        }, '.json,application/json');
+          self.setScene(JSON.parse(sceneJSON));
+          return self.saveScene(false);
+        }, '.json,application/json', 'text');
       }
     },
     linkAudio: {
       label: "Link Audio",
       hotkey: ['Alt+A'],
-      listener: function() {
-        var self;
+      listener: function(controller, notice) {
+        var promptMessage, self;
         self = this;
-        return Utils.prompt('Audio file URL: ', (this.scene.audio ? this.scene.audio.url : ''), function(audioURL) {
-          if (audioURL != null) {
-            return self.loadAudio(audioURL);
+        promptMessage = 'Audio file';
+        if (notice) {
+          promptMessage += ' (' + notice + ')';
+        }
+        promptMessage += ': ';
+        return Utils.promptForFile(promptMessage, function(uri, filePath) {
+          if (uri) {
+            return self.loadAudio(uri, filePath);
           }
-        });
+        }, 'audio/*', 'uri');
       }
     },
     unloadAudio: {
@@ -655,6 +667,7 @@ PenciltestUI = (function(_super) {
     shiftAudioEarlier: {
       label: "Shift Audio Earlier",
       hotkey: ['['],
+      title: "Decrease the offset of the audio playback",
       listener: function() {
         Utils.log("Shift Audio Earlier");
         if (this.scene.audio) {
@@ -665,6 +678,7 @@ PenciltestUI = (function(_super) {
     },
     shiftAudioLater: {
       label: "Shift Audio Later",
+      title: "Increase the offset of the audio playback",
       hotkey: [']'],
       listener: function() {
         Utils.log("Shift Audio Later");
@@ -683,7 +697,7 @@ PenciltestUI = (function(_super) {
     },
     reset: {
       label: "Reset",
-      title: "Clear settings; helpful if the app has stopped working.",
+      title: "Reset the app's state and settings. Helpful if the app has stopped working.",
       action: function() {
         this.state = Utils.inherit({}, Penciltest.prototype.state);
         return this.setOptions(Utils.inherit({}, Penciltest.prototype.options));
@@ -710,9 +724,16 @@ PenciltestUI = (function(_super) {
     }
   ];
 
-  PenciltestUI.prototype.doAppAction = function(optionName) {
-    var _ref;
-    return (_ref = this.appActions[optionName].listener) != null ? _ref.call(this.controller) : void 0;
+  PenciltestUI.prototype.doAppAction = function(optionName, args) {
+    var _ref, _ref1, _ref2;
+    if (args == null) {
+      args = [];
+    }
+    if ((_ref = this.appActions[optionName]) != null ? _ref.listener : void 0) {
+      return (_ref1 = this.appActions[optionName].listener) != null ? _ref1.call(this.controller, args) : void 0;
+    } else if ((_ref2 = this.appActions[optionName]) != null ? _ref2.action : void 0) {
+      return this.appActions[optionName].action.call(this.controller, args);
+    }
   };
 
   PenciltestUI.prototype.menuWalker = function(level) {
@@ -722,7 +743,9 @@ PenciltestUI = (function(_super) {
       key = level[_i];
       if (typeof key === 'string') {
         label = this.appActions[key].label;
-        title = this.appActions[key].title;
+        if (this.appActions[key].title) {
+          title = this.appActions[key].title;
+        }
         text = this.appActions[key].text || '';
         markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + text + "<label>" + label + "</label></li>";
       } else {
@@ -762,7 +785,6 @@ PenciltestUI = (function(_super) {
       return self.pointer.coords = pageCoords;
     };
     mouseDownListener = function(event) {
-      debugger;
       var pageCoords;
       this.previousEvent = event;
       if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -803,7 +825,6 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
-      debugger;
       var pageCoords;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
@@ -995,7 +1016,7 @@ PenciltestUI = (function(_super) {
       self.controller.putStoredData('app', 'options', self.controller.options);
       self.controller.putStoredData('app', 'state', self.controller.state);
       if (self.controller.unsavedChanges) {
-        return event.returnValue = "You have unsaved changes. Alt+S to save.";
+        return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save.";
       }
     });
   };

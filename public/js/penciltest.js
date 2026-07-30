@@ -8174,7 +8174,7 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
+    var closePromptModal, e, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
     utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
@@ -8212,8 +8212,13 @@ Utils = {
     if (promptType !== null) {
       promptInput.type = promptType;
     }
-    if (defaultValue !== null) {
-      promptInput.value = defaultValue;
+    try {
+      if (defaultValue !== null) {
+        promptInput.value = defaultValue;
+      }
+    } catch (_error) {
+      e = _error;
+      console.error(e);
     }
     promptInput.style.display = 'block';
     promptForm.appendChild(promptInput);
@@ -8291,26 +8296,46 @@ Utils = {
     };
     return this.prompt(message, null, promptCallback, selectInput);
   },
-  promptForFile: function(message, callback, acceptTypes) {
+  promptForFile: function(message, callback, acceptTypes, loadAs) {
     var fileInput, loadFile;
+    if (loadAs == null) {
+      loadAs = 'files';
+    }
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     if (acceptTypes) {
       fileInput.accept = String(acceptTypes);
     }
-    loadFile = function() {
-      var file, fileReader, _i, _len, _ref, _results;
-      _ref = fileInput.files;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        file = _ref[_i];
-        fileReader = new FileReader();
-        fileReader.addEventListener('load', function(event) {
-          return callback(event.target.result);
-        });
-        _results.push(fileReader.readAsText(file));
+    loadFile = function(filePath) {
+      var file, fileReader, _i, _j, _len, _len1, _ref, _ref1, _results, _results1;
+      if (loadAs === 'text') {
+        _ref = fileInput.files;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          file = _ref[_i];
+          fileReader = new FileReader();
+          fileReader.addEventListener('load', function(event) {
+            return callback(event.target.result, filePath);
+          });
+          _results.push(fileReader.readAsText(file));
+        }
+        return _results;
+      } else if (loadAs === 'uri') {
+        _ref1 = fileInput.files;
+        _results1 = [];
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          file = _ref1[_j];
+          if (file) {
+            callback(URL.createObjectURL(file), filePath);
+            break;
+          } else {
+            _results1.push(void 0);
+          }
+        }
+        return _results1;
+      } else {
+        return callback(fileInput.files, filePath);
       }
-      return _results;
     };
     this.prompt(message, null, loadFile, fileInput, true);
     return fileInput.click();
@@ -9367,9 +9392,10 @@ PenciltestUI = (function(_super) {
     },
     saveScene: {
       label: "Save",
-      hotkey: ['Alt+S'],
+      hotkey: ['Ctrl+Alt+S'],
       gesture: /3 still from center (bottom|middle)/,
       listener: function() {
+        this.updateScene();
         return this.saveScene();
       }
     },
@@ -9404,7 +9430,8 @@ PenciltestUI = (function(_super) {
       }
     },
     resizeScene: {
-      label: "Resize Scene",
+      label: "Resize Canvas",
+      title: "Set the width and height of the canvas in this scene",
       hotkey: ['Alt+R'],
       listener: function() {
         var self;
@@ -9419,7 +9446,8 @@ PenciltestUI = (function(_super) {
       }
     },
     panScene: {
-      label: "Pan Scene",
+      label: "Pan Canvas",
+      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center.",
       hotkey: ['P'],
       listener: function() {
         var deltaPoint, dragEnd, dragStart, dragStep, endPoint, frameScale, oldMode, self, startPoint;
@@ -9464,14 +9492,17 @@ PenciltestUI = (function(_super) {
       hotkey: ['Ctrl+S', 'Alt+E'],
       cancelComplementKeyEvent: true,
       listener: function() {
-        var blob, fileName, url;
-        this.scene.dateModified = (new Date()).toISOString();
-        blob = new Blob([JSON.stringify(this.scene)], {
-          type: 'application/json'
-        });
-        url = window.URL.createObjectURL(blob);
-        fileName = (this.scene.name || 'untitled') + '.penciltest.json';
-        return Utils.downloadFromUrl(url, fileName);
+        return this.updateScene((function(_this) {
+          return function(scene) {
+            var blob, fileName, url;
+            blob = new Blob([JSON.stringify(scene)], {
+              type: 'application/json'
+            });
+            url = window.URL.createObjectURL(blob);
+            fileName = (scene.name || 'untitled') + '.penciltest.json';
+            return Utils.downloadFromUrl(url, fileName);
+          };
+        })(this));
       }
     },
     importScene: {
@@ -9482,21 +9513,27 @@ PenciltestUI = (function(_super) {
         var self;
         self = this;
         return Utils.promptForFile('Load a scene JSON file', function(sceneJSON) {
-          return self.setScene(JSON.parse(sceneJSON));
-        }, '.json,application/json');
+          self.setScene(JSON.parse(sceneJSON));
+          return self.saveScene(false);
+        }, '.json,application/json', 'text');
       }
     },
     linkAudio: {
       label: "Link Audio",
       hotkey: ['Alt+A'],
-      listener: function() {
-        var self;
+      listener: function(controller, notice) {
+        var promptMessage, self;
         self = this;
-        return Utils.prompt('Audio file URL: ', (this.scene.audio ? this.scene.audio.url : ''), function(audioURL) {
-          if (audioURL != null) {
-            return self.loadAudio(audioURL);
+        promptMessage = 'Audio file';
+        if (notice) {
+          promptMessage += ' (' + notice + ')';
+        }
+        promptMessage += ': ';
+        return Utils.promptForFile(promptMessage, function(uri, filePath) {
+          if (uri) {
+            return self.loadAudio(uri, filePath);
           }
-        });
+        }, 'audio/*', 'uri');
       }
     },
     unloadAudio: {
@@ -9508,6 +9545,7 @@ PenciltestUI = (function(_super) {
     shiftAudioEarlier: {
       label: "Shift Audio Earlier",
       hotkey: ['['],
+      title: "Decrease the offset of the audio playback",
       listener: function() {
         Utils.log("Shift Audio Earlier");
         if (this.scene.audio) {
@@ -9518,6 +9556,7 @@ PenciltestUI = (function(_super) {
     },
     shiftAudioLater: {
       label: "Shift Audio Later",
+      title: "Increase the offset of the audio playback",
       hotkey: [']'],
       listener: function() {
         Utils.log("Shift Audio Later");
@@ -9536,7 +9575,7 @@ PenciltestUI = (function(_super) {
     },
     reset: {
       label: "Reset",
-      title: "Clear settings; helpful if the app has stopped working.",
+      title: "Reset the app's state and settings. Helpful if the app has stopped working.",
       action: function() {
         this.state = Utils.inherit({}, Penciltest.prototype.state);
         return this.setOptions(Utils.inherit({}, Penciltest.prototype.options));
@@ -9563,9 +9602,16 @@ PenciltestUI = (function(_super) {
     }
   ];
 
-  PenciltestUI.prototype.doAppAction = function(optionName) {
-    var _ref;
-    return (_ref = this.appActions[optionName].listener) != null ? _ref.call(this.controller) : void 0;
+  PenciltestUI.prototype.doAppAction = function(optionName, args) {
+    var _ref, _ref1, _ref2;
+    if (args == null) {
+      args = [];
+    }
+    if ((_ref = this.appActions[optionName]) != null ? _ref.listener : void 0) {
+      return (_ref1 = this.appActions[optionName].listener) != null ? _ref1.call(this.controller, args) : void 0;
+    } else if ((_ref2 = this.appActions[optionName]) != null ? _ref2.action : void 0) {
+      return this.appActions[optionName].action.call(this.controller, args);
+    }
   };
 
   PenciltestUI.prototype.menuWalker = function(level) {
@@ -9575,7 +9621,9 @@ PenciltestUI = (function(_super) {
       key = level[_i];
       if (typeof key === 'string') {
         label = this.appActions[key].label;
-        title = this.appActions[key].title;
+        if (this.appActions[key].title) {
+          title = this.appActions[key].title;
+        }
         text = this.appActions[key].text || '';
         markup += "<li rel=\"" + key + "\" title=\"" + title + "\">" + text + "<label>" + label + "</label></li>";
       } else {
@@ -9615,7 +9663,6 @@ PenciltestUI = (function(_super) {
       return self.pointer.coords = pageCoords;
     };
     mouseDownListener = function(event) {
-      debugger;
       var pageCoords;
       this.previousEvent = event;
       if (this.controller.state.mode !== Penciltest.prototype.modes.DRAWING) {
@@ -9656,7 +9703,6 @@ PenciltestUI = (function(_super) {
       }
     };
     mouseMoveListener = function(event) {
-      debugger;
       var pageCoords;
       event.preventDefault();
       if (event.type === 'touchmove' && event.touches.length > 1) {
@@ -9848,7 +9894,7 @@ PenciltestUI = (function(_super) {
       self.controller.putStoredData('app', 'options', self.controller.options);
       self.controller.putStoredData('app', 'state', self.controller.state);
       if (self.controller.unsavedChanges) {
-        return event.returnValue = "You have unsaved changes. Alt+S to save.";
+        return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save.";
       }
     });
   };
@@ -10038,7 +10084,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.13',
+    version: '0.2.14',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -10108,7 +10154,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.getCurrentFrame = function() {
-    return this.scene.frames[this.current.frameNumber];
+    return this.scene.frames[this.current.frameNumber || 0];
   };
 
   Penciltest.prototype.getCurrentStroke = function() {
@@ -10116,7 +10162,6 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.mark = function(x, y) {
-    debugger;
     var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
@@ -10604,18 +10649,39 @@ Penciltest = (function() {
     return window.localStorage.setItem(storageName, JSON.stringify(data));
   };
 
-  Penciltest.prototype.saveScene = function() {
+  Penciltest.prototype.updateScene = function(callback) {
     var self;
     self = this;
     this.scene.dateModified = (new Date()).toISOString();
-    return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
-      if (name) {
-        self.scene.name = name;
-        self.scene.dateModified = (new Date()).toISOString();
-        self.putStoredData('scene', name, self.scene);
-        return self.unsavedChanges = false;
+    this.scene.current = {
+      frameNumber: this.current.frameNumber
+    };
+    if (!this.scene.name) {
+      return Utils.prompt("What's the name of your scene?", this.scene.name, function(name) {
+        if (name) {
+          self.scene.name = name;
+        }
+        if (callback) {
+          return callback(self.scene);
+        }
+      });
+    } else {
+      if (callback) {
+        return callback(self.scene);
       }
-    });
+    }
+  };
+
+  Penciltest.prototype.saveScene = function(update) {
+    var name;
+    if (update == null) {
+      update = true;
+    }
+    name = (this.scene.name != null) || 'Untitled';
+    this.putStoredData('scene', name, this.scene);
+    if (update) {
+      return this.unsavedChanges = false;
+    }
   };
 
   Penciltest.prototype.renderGif = function() {
@@ -10750,12 +10816,17 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setScene = function(scene) {
+    var _ref, _ref1;
     this.scene = Object.assign(this.defaultScene({
       uuid: false
     }), scene);
+    if ((_ref = this.scene) != null ? _ref.current : void 0) {
+      this.current = this.scene.current;
+      delete this.scene.current;
+    }
     this.buildSceneMeta();
     if (this.scene.audio && this.scene.audio.url) {
-      this.loadAudio(this.scene.audio.url);
+      this.loadAudio(this.scene.audio.url, this.scene.audio.info != null);
     } else {
       this.destroyAudio();
     }
@@ -10770,7 +10841,7 @@ Penciltest = (function() {
         this.renderer.options.lineWeight = this.scene.lineWeight;
       }
     }
-    this.goToFrame(0);
+    this.goToFrame(((_ref1 = this.current) != null ? _ref1.frameNumber : void 0) || 0);
     this.ui.updateStatus();
     this.unsavedChanges = false;
     return this.resize();
@@ -10824,13 +10895,15 @@ Penciltest = (function() {
     return frame.hold / this.scene.framerate;
   };
 
-  Penciltest.prototype.loadAudio = function(audioURL) {
-    var _base;
+  Penciltest.prototype.loadAudio = function(audioURL, audioInfo) {
+    var self, _base;
+    self = this;
     if ((_base = this.scene).audio == null) {
       _base.audio = {};
     }
     this.scene.audio.url = audioURL;
     this.scene.audio.offset = 0;
+    this.scene.audio.info = audioInfo;
     this.unsavedChanges = true;
     if (!this.audioElement) {
       this.audioElement = document.createElement('audio');
@@ -10839,6 +10912,12 @@ Penciltest = (function() {
     } else {
       this.pauseAudio();
     }
+    this.audioElement.addEventListener('error', (function(_this) {
+      return function(e) {
+        console.log('audio file error', e);
+        return self.ui.appActions.linkAudio.listener.apply(self, ["The audio URL is no longer available. Please load the file again: " + _this.scene.audio.info]);
+      };
+    })(this));
     return this.audioElement.src = audioURL;
   };
 

@@ -342,9 +342,11 @@ class PenciltestUI extends PenciltestUIComponent
         @resize() # FIXME: should either not redraw, or redraw fine without this
     saveScene:
       label: "Save"
-      hotkey: ['Alt+S']
+      hotkey: ['Ctrl+Alt+S']
       gesture: /3 still from center (bottom|middle)/
-      listener: -> @saveScene()
+      listener: ->
+        @updateScene()
+        @saveScene()
     loadScene:
       label: "Load"
       hotkey: ['Alt+O']
@@ -364,7 +366,8 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['G']
       listener: -> @renderGif()
     resizeScene:
-      label: "Resize Scene"
+      label: "Resize Canvas"
+      title: "Set the width and height of the canvas in this scene"
       hotkey: ['Alt+R']
       listener: ->
         self = @
@@ -374,7 +377,8 @@ class PenciltestUI extends PenciltestUIComponent
           self.scene.aspect = dimensions[1]
           self.resize()
     panScene:
-      label: "Pan Scene"
+      label: "Pan Canvas"
+      title: "Drag to reposition all frames in this scene. Useful if resize leaves things off center."
       hotkey: ['P']
       listener: ->
         self = @
@@ -415,28 +419,40 @@ class PenciltestUI extends PenciltestUIComponent
       hotkey: ['Ctrl+S', 'Alt+E']
       cancelComplementKeyEvent: true
       listener: ->
-        # self = @
-        @scene.dateModified = (new Date()).toISOString()
-        blob = new Blob([JSON.stringify @scene], {type:'application/json'})
-        url = window.URL.createObjectURL blob
-        fileName = (@scene.name || 'untitled') + '.penciltest.json'
-        Utils.downloadFromUrl url, fileName
+        @updateScene (scene) =>
+          blob = new Blob([JSON.stringify scene], {type:'application/json'})
+          url = window.URL.createObjectURL blob
+          fileName = (scene.name || 'untitled') + '.penciltest.json'
+          Utils.downloadFromUrl url, fileName
     importScene:
       label: "Import"
       hotkey: ['Ctrl+O']
       cancelComplementKeyEvent: true
       listener: ->
         self = @
-        Utils.promptForFile 'Load a scene JSON file', (sceneJSON) ->
-          self.setScene JSON.parse sceneJSON
-        , '.json,application/json'
+        Utils.promptForFile(
+          'Load a scene JSON file',
+          (sceneJSON) ->
+            self.setScene JSON.parse sceneJSON
+            self.saveScene(false)
+          ,
+          '.json,application/json',
+          'text')
     linkAudio:
       label: "Link Audio"
       hotkey: ['Alt+A']
-      listener: ->
+      listener: (controller, notice) ->
         self = @
-        Utils.prompt 'Audio file URL: ', (if @scene.audio then @scene.audio.url else ''), (audioURL) ->
-          self.loadAudio audioURL if audioURL?
+        promptMessage = 'Audio file'
+        promptMessage += ' ('+notice+')' if notice
+        promptMessage += ': '
+        Utils.promptForFile(
+          promptMessage,
+          (uri, filePath) ->
+            self.loadAudio(uri, filePath) if uri
+          ,
+          'audio/*',
+          'uri')
     unloadAudio:
       label: "Unload Audio"
       listener: ->
@@ -444,12 +460,14 @@ class PenciltestUI extends PenciltestUIComponent
     shiftAudioEarlier:
       label: "Shift Audio Earlier"
       hotkey: ['[']
+      title: "Decrease the offset of the audio playback"
       listener: ->
         Utils.log "Shift Audio Earlier"
         @scene.audio.offset-- if @scene.audio
         @ui.updateStatus()
     shiftAudioLater:
       label: "Shift Audio Later"
+      title: "Increase the offset of the audio playback"
       hotkey: [']']
       listener: ->
         Utils.log "Shift Audio Later"
@@ -461,7 +479,7 @@ class PenciltestUI extends PenciltestUIComponent
       listener: -> @ui.toggleInterfaceHelp()
     reset:
       label: "Reset"
-      title: "Clear settings; helpful if the app has stopped working."
+      title: "Reset the app's state and settings. Helpful if the app has stopped working."
       action: ->
         @state = Utils.inherit {}, Penciltest.prototype.state
         @setOptions Utils.inherit {}, Penciltest.prototype.options
@@ -528,15 +546,18 @@ class PenciltestUI extends PenciltestUIComponent
     ]
   ]
 
-  doAppAction: (optionName) ->
-    @appActions[optionName].listener?.call @controller
+  doAppAction: (optionName, args = []) ->
+    if @appActions[optionName]?.listener
+      @appActions[optionName].listener?.call @controller, args
+    else if @appActions[optionName]?.action
+      @appActions[optionName].action.call @controller, args
 
   menuWalker: (level) ->
     markup = ''
     for key in level
       if typeof key is 'string'
         label = @appActions[key].label
-        title = @appActions[key].title
+        title = @appActions[key].title if @appActions[key].title
         text = @appActions[key].text or ''
         markup += "<li rel=\"#{key}\" title=\"#{title}\">#{text}<label>#{label}</label></li>"
       else
@@ -570,7 +591,6 @@ class PenciltestUI extends PenciltestUIComponent
       self.pointer.coords = pageCoords;
 
     mouseDownListener = (event) ->
-      debugger
       @previousEvent = event
       return if @controller.state.mode != Penciltest.prototype.modes.DRAWING
       event.preventDefault()
@@ -608,7 +628,6 @@ class PenciltestUI extends PenciltestUIComponent
         document.body.addEventListener 'touchend', @uiListeners.up
 
     mouseMoveListener = (event) ->
-      debugger
       # @previousEvent = event
       event.preventDefault()
       if event.type is 'touchmove' and event.touches.length > 1
@@ -767,7 +786,7 @@ class PenciltestUI extends PenciltestUIComponent
     window.addEventListener 'beforeunload', ->
       self.controller.putStoredData 'app', 'options', self.controller.options
       self.controller.putStoredData 'app', 'state', self.controller.state
-      event.returnValue = "You have unsaved changes. Alt+S to save." if self.controller.unsavedChanges
+      event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save." if self.controller.unsavedChanges
 
   toggleInterfaceHelp: ->
     helpElement = @components.help.getElement()

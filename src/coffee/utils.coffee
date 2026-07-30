@@ -64,7 +64,10 @@ Utils =
     promptInput = document.createElement 'input' if typeof promptInput isnt 'object' 
     if promptType != null
       promptInput.type = promptType
-    promptInput.value = defaultValue if defaultValue isnt null
+    try
+      promptInput.value = defaultValue if defaultValue isnt null
+    catch e
+      console.error e
     promptInput.style.display = 'block'
     promptForm.appendChild promptInput
 
@@ -134,16 +137,24 @@ Utils =
       callback(selected)
     @prompt message, null, promptCallback, selectInput
 
-  promptForFile: (message, callback, acceptTypes) ->
+  promptForFile: (message, callback, acceptTypes, loadAs = 'files') ->
     fileInput = document.createElement 'input'
     fileInput.type = 'file'
     fileInput.accept = String(acceptTypes) if acceptTypes
-    loadFile = ->
+    loadFile = (filePath) ->
+      if loadAs == 'text'
         for file in fileInput.files
           fileReader = new FileReader()
           fileReader.addEventListener 'load', (event) ->
-            callback event.target.result
+            callback event.target.result, filePath
           fileReader.readAsText file
+      else if loadAs == 'uri'
+        for file in fileInput.files
+          if file
+            callback URL.createObjectURL(file), filePath
+            break
+      else
+        callback fileInput.files, filePath
     @prompt message, null, loadFile, fileInput, true
     fileInput.click()
 

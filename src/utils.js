@@ -56,7 +56,7 @@ Utils = {
     }
   },
   prompt: function(message, defaultValue, callback, promptInput, shouldSubmitOnChange) {
-    var closePromptModal, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
+    var closePromptModal, e, promptAcceptButton, promptCancelButton, promptForm, promptFormCss, promptKeyListener, promptModal, promptModalCss, promptType, property, submitPromptModal, utils, value;
     utils = this;
     window.pauseKeyboardListeners = true;
     promptModal = document.createElement('div');
@@ -94,8 +94,13 @@ Utils = {
     if (promptType !== null) {
       promptInput.type = promptType;
     }
-    if (defaultValue !== null) {
-      promptInput.value = defaultValue;
+    try {
+      if (defaultValue !== null) {
+        promptInput.value = defaultValue;
+      }
+    } catch (_error) {
+      e = _error;
+      console.error(e);
     }
     promptInput.style.display = 'block';
     promptForm.appendChild(promptInput);
@@ -173,26 +178,46 @@ Utils = {
     };
     return this.prompt(message, null, promptCallback, selectInput);
   },
-  promptForFile: function(message, callback, acceptTypes) {
+  promptForFile: function(message, callback, acceptTypes, loadAs) {
     var fileInput, loadFile;
+    if (loadAs == null) {
+      loadAs = 'files';
+    }
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     if (acceptTypes) {
       fileInput.accept = String(acceptTypes);
     }
-    loadFile = function() {
-      var file, fileReader, _i, _len, _ref, _results;
-      _ref = fileInput.files;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        file = _ref[_i];
-        fileReader = new FileReader();
-        fileReader.addEventListener('load', function(event) {
-          return callback(event.target.result);
-        });
-        _results.push(fileReader.readAsText(file));
+    loadFile = function(filePath) {
+      var file, fileReader, _i, _j, _len, _len1, _ref, _ref1, _results, _results1;
+      if (loadAs === 'text') {
+        _ref = fileInput.files;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          file = _ref[_i];
+          fileReader = new FileReader();
+          fileReader.addEventListener('load', function(event) {
+            return callback(event.target.result, filePath);
+          });
+          _results.push(fileReader.readAsText(file));
+        }
+        return _results;
+      } else if (loadAs === 'uri') {
+        _ref1 = fileInput.files;
+        _results1 = [];
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          file = _ref1[_j];
+          if (file) {
+            callback(URL.createObjectURL(file), filePath);
+            break;
+          } else {
+            _results1.push(void 0);
+          }
+        }
+        return _results1;
+      } else {
+        return callback(fileInput.files, filePath);
       }
-      return _results;
     };
     this.prompt(message, null, loadFile, fileInput, true);
     return fileInput.click();

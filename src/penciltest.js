@@ -34,7 +34,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.state = {
-    version: '0.2.13',
+    version: '0.2.14',
     mode: Penciltest.prototype.modes.DRAWING,
     toolStack: ['pencil', 'eraser']
   };
@@ -104,7 +104,7 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.getCurrentFrame = function() {
-    return this.scene.frames[this.current.frameNumber];
+    return this.scene.frames[this.current.frameNumber || 0];
   };
 
   Penciltest.prototype.getCurrentStroke = function() {
@@ -112,7 +112,6 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.mark = function(x, y) {
-    debugger;
     var _base;
     x = Utils.getDecimal(x, 1);
     y = Utils.getDecimal(y, 1);
@@ -600,18 +599,39 @@ Penciltest = (function() {
     return window.localStorage.setItem(storageName, JSON.stringify(data));
   };
 
-  Penciltest.prototype.saveScene = function() {
+  Penciltest.prototype.updateScene = function(callback) {
     var self;
     self = this;
     this.scene.dateModified = (new Date()).toISOString();
-    return Utils.prompt("what will you name your scene?", this.scene.name, function(name) {
-      if (name) {
-        self.scene.name = name;
-        self.scene.dateModified = (new Date()).toISOString();
-        self.putStoredData('scene', name, self.scene);
-        return self.unsavedChanges = false;
+    this.scene.current = {
+      frameNumber: this.current.frameNumber
+    };
+    if (!this.scene.name) {
+      return Utils.prompt("What's the name of your scene?", this.scene.name, function(name) {
+        if (name) {
+          self.scene.name = name;
+        }
+        if (callback) {
+          return callback(self.scene);
+        }
+      });
+    } else {
+      if (callback) {
+        return callback(self.scene);
       }
-    });
+    }
+  };
+
+  Penciltest.prototype.saveScene = function(update) {
+    var name;
+    if (update == null) {
+      update = true;
+    }
+    name = (this.scene.name != null) || 'Untitled';
+    this.putStoredData('scene', name, this.scene);
+    if (update) {
+      return this.unsavedChanges = false;
+    }
   };
 
   Penciltest.prototype.renderGif = function() {
@@ -746,12 +766,17 @@ Penciltest = (function() {
   };
 
   Penciltest.prototype.setScene = function(scene) {
+    var _ref, _ref1;
     this.scene = Object.assign(this.defaultScene({
       uuid: false
     }), scene);
+    if ((_ref = this.scene) != null ? _ref.current : void 0) {
+      this.current = this.scene.current;
+      delete this.scene.current;
+    }
     this.buildSceneMeta();
     if (this.scene.audio && this.scene.audio.url) {
-      this.loadAudio(this.scene.audio.url);
+      this.loadAudio(this.scene.audio.url, this.scene.audio.info != null);
     } else {
       this.destroyAudio();
     }
@@ -766,7 +791,7 @@ Penciltest = (function() {
         this.renderer.options.lineWeight = this.scene.lineWeight;
       }
     }
-    this.goToFrame(0);
+    this.goToFrame(((_ref1 = this.current) != null ? _ref1.frameNumber : void 0) || 0);
     this.ui.updateStatus();
     this.unsavedChanges = false;
     return this.resize();
@@ -820,13 +845,15 @@ Penciltest = (function() {
     return frame.hold / this.scene.framerate;
   };
 
-  Penciltest.prototype.loadAudio = function(audioURL) {
-    var _base;
+  Penciltest.prototype.loadAudio = function(audioURL, audioInfo) {
+    var self, _base;
+    self = this;
     if ((_base = this.scene).audio == null) {
       _base.audio = {};
     }
     this.scene.audio.url = audioURL;
     this.scene.audio.offset = 0;
+    this.scene.audio.info = audioInfo;
     this.unsavedChanges = true;
     if (!this.audioElement) {
       this.audioElement = document.createElement('audio');
@@ -835,6 +862,12 @@ Penciltest = (function() {
     } else {
       this.pauseAudio();
     }
+    this.audioElement.addEventListener('error', (function(_this) {
+      return function(e) {
+        console.log('audio file error', e);
+        return self.ui.appActions.linkAudio.listener.apply(self, ["The audio URL is no longer available. Please load the file again: " + _this.scene.audio.info]);
+      };
+    })(this));
     return this.audioElement.src = audioURL;
   };
 

@@ -30,7 +30,7 @@ class Penciltest
     onionSkinOpacity: 0.5
 
   state:
-    version: '0.2.13'
+    version: '0.2.14'
     mode: Penciltest.prototype.modes.DRAWING
     toolStack: ['pencil','eraser']
 
@@ -105,13 +105,12 @@ class Penciltest
     @buildSceneMeta()
 
   getCurrentFrame: ->
-    @scene.frames[@current.frameNumber]
+    @scene.frames[@current.frameNumber || 0]
 
   getCurrentStroke: ->
     @getCurrentFrame().strokes[@currentStrokeIndex or 0]
 
   mark: (x,y) ->
-    debugger
     x = Utils.getDecimal x, 1
     y = Utils.getDecimal y, 1
 
@@ -482,15 +481,23 @@ class Penciltest
     storageName = @encodeStorageReference namespace, name
     window.localStorage.setItem storageName, JSON.stringify data
 
-  saveScene: ->
+  updateScene: (callback) ->
     self = @
     @scene.dateModified = (new Date()).toISOString()
-    Utils.prompt "what will you name your scene?", @scene.name, (name) ->
-      if name
-        self.scene.name = name
-        self.scene.dateModified = (new Date()).toISOString()
-        self.putStoredData 'scene', name, self.scene
-        self.unsavedChanges = false
+    @scene.current = {
+      frameNumber: @current.frameNumber
+    }
+    if not @scene.name
+      Utils.prompt "What's the name of your scene?", @scene.name, (name) ->
+        self.scene.name = name if name
+        callback(self.scene) if callback
+    else
+      callback(self.scene) if callback
+
+  saveScene: (update = true)->
+    name = @scene.name? || 'Untitled'
+    @putStoredData 'scene', name, @scene
+    @unsavedChanges = false    if update
 
   renderGif: ->
     self = @
@@ -623,16 +630,19 @@ class Penciltest
 
   setScene: (scene) ->
     @scene = Object.assign @defaultScene({uuid:false}), scene
+    if @scene?.current
+      @current = @scene.current
+      delete @scene.current
     @buildSceneMeta()
     if @scene.audio and @scene.audio.url
-      @loadAudio @scene.audio.url
+      @loadAudio @scene.audio.url, @scene.audio.info?
     else
       @destroyAudio()
     if @renderer
       @renderer.options.background = @scene.background if @scene.background
       @renderer.options.lineColor = @scene.lineColor if @scene.lineColor
       @renderer.options.lineWeight = @scene.lineWeight if @scene.lineWeight
-    @goToFrame 0
+    @goToFrame @current?.frameNumber || 0
     @ui.updateStatus()
     @unsavedChanges = false
     @resize() # FIXME
@@ -670,10 +680,12 @@ class Penciltest
     frame = @scene.frames[frameNumber]
     frame.hold / @scene.framerate
 
-  loadAudio: (audioURL) ->
+  loadAudio: (audioURL, audioInfo) ->
+    self = @
     @scene.audio ?= {}
     @scene.audio.url = audioURL
     @scene.audio.offset = 0
+    @scene.audio.info = audioInfo
     @unsavedChanges = true
     if not @audioElement # TODO: abstract away from browser
       @audioElement = document.createElement 'audio'
@@ -681,6 +693,9 @@ class Penciltest
       @fieldContainer.appendChild @audioElement
     else
       @pauseAudio()
+    @audioElement.addEventListener 'error', (e) =>
+      console.log 'audio file error', e
+      self.ui.appActions.linkAudio.listener.apply self, ["The audio URL is no longer available. Please load the file again: "+@scene.audio.info]
     @audioElement.src = audioURL
 
   destroyAudio: ->
