@@ -1,4 +1,3 @@
-let keyCode: number, keyCodeName: string | number;
 var Utils = {
 
   clone(object: any) {
@@ -42,7 +41,7 @@ var Utils = {
     if (globalThis.confirm(message)) { return callback(); }
   },
 
-  prompt(message: any, defaultValue: any, callback: (arg0: any) => any, promptInput: { type: string; value: any; style: { display: string; }; addEventListener: (arg0: string, arg1: () => any) => void; focus: () => any; }, shouldSubmitOnChange: any) {
+  prompt(message: string, defaultValue: any, callback: Function | null = null, givenPromptInput: HTMLElement | string = 'text', shouldSubmitOnChange: boolean = false) {
     let property: string | number, value: any;
     const utils = this;
     globalThis.pauseKeyboardListeners = true; // FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
@@ -76,10 +75,11 @@ var Utils = {
     promptForm.innerHTML = message;
     promptModal.appendChild(promptForm);
 
-    const promptType = typeof promptInput === 'string' ? promptInput : null;
-    if (typeof promptInput !== 'object') { promptInput = document.createElement('input'); } 
-    if (promptType !== null) {
-      promptInput.type = promptType;
+    const promptInput = typeof givenPromptInput === 'string'
+      ? document.createElement('input')
+      : givenPromptInput;
+    if (typeof givenPromptInput === 'string') {
+      promptInput.setAttribute('type', givenPromptInput);
     }
     try {
       if (defaultValue !== null) { promptInput.value = defaultValue; }
@@ -95,12 +95,15 @@ var Utils = {
       return globalThis.pauseKeyboardListeners = false;
     };
 
-    const submitPromptModal = function() {
+    const submitPromptModal = ():any => {
       closePromptModal();
-      return callback(promptInput.value);
+      if (typeof callback === 'function') {
+        return (callback as Function)(promptInput.value)
+      }
+      return promptInput.value;
     };
 
-    var promptKeyListener = function(event: any) {
+    var promptKeyListener = function(event: KeyboardEvent):any {
       const keysDescription = utils.describeKeyCombo(event);
       if (keysDescription === 'Esc') {
         return closePromptModal();
@@ -254,7 +257,7 @@ var Utils = {
     191 : '?'
   },
 
-  getKeyCodeName(keyCode: string | number, shiftKey: any) {
+  getKeyCodeName(keyCode: string | number, shiftKey: any):string {
     let keyCodeName: any;
     if (shiftKey && this.shiftKeyCodeNames.hasOwnProperty(keyCode)) {
       keyCodeName = this.shiftKeyCodeNames[keyCode];
@@ -267,7 +270,7 @@ var Utils = {
     return keyCodeName;
   },
 
-  describeKeyCombo(event: { metaey: any; ctrlKey: any; altKey: any; keyCode: any; shiftKey: any; }) {
+  describeKeyCombo(event: { metaey: any; ctrlKey: any; altKey: any; keyCode: any; shiftKey: any; }):string {
     const combo = [];
     if (event.metaey) { combo.push('Super'); }
     if (event.ctrlKey) { combo.push('Ctrl'); }
@@ -282,8 +285,8 @@ var Utils = {
     return combo.join('+');
   },
 
-  averageTouches(event: { targetTouches: { length: number; }; }) {
-    const sumPoints = {x: 0, y: 0};
+  averageTouches(event: { targetTouches: { length: number; }; }):Point {
+    const sumPoints:Point = {x: 0, y: 0};
     for (let point of Array.from(event.targetTouches)) {
       sumPoints.x += point.clientX;
       sumPoints.y += point.clientY;
@@ -295,7 +298,7 @@ var Utils = {
     return sumPoints;
   },
 
-  diffPoints(point1: { x: number; y: number; }, point2: { x: number; y: number; }) {
+  diffPoints(point1: Point, point2: Point):Point {
     return {
       x: point1.x - point2.x,
       y: point1.y - point2.y
@@ -334,6 +337,7 @@ var Utils = {
   }
 };
 
+let keyCode: number, keyCodeName: string;
 Utils.keyCodes = {};
 for (keyCode = 0; keyCode < 256; keyCode++) {
   keyCodeName = Utils.keyCodeNames[keyCode] || String.fromCharCode(keyCode);

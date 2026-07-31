@@ -1,15 +1,15 @@
-class CanvasRenderer extends RendererInterface {
-  field: any;
+class CanvasRenderer extends BaseRenderer {
+  field: HTMLElement;
   context: any;
-  container: any;
-  currentLineOptions: any;
+  container: HTMLElement;
+  currentLineOptions: PenciltestLineOptions;
   drawingPath: any;
 
   constructor(options: PenciltestRendererOptions) {
     super(options);
 
     this.field = document.createElement('canvas');
-    this.context = this.field.getContext('2d',
+    this.context = (this.field as HTMLCanvasElement).getContext('2d',
       {alpha: false});
 
     super(options);
@@ -45,24 +45,16 @@ class CanvasRenderer extends RendererInterface {
       this.context.fillStyle = null;
       this.context.lineWidth = this.currentLineOptions.weight;
       this.context.lineJoin = this.currentLineOptions.corner;
-      if (Array.isArray(this.currentLineOptions.color)) {
-        return this.context.strokeStyle = 'rgba(' +
-          this.currentLineOptions.color[0] + ',' +
-          this.currentLineOptions.color[1] + ',' +
-          this.currentLineOptions.color[2] + ',' +
-          this.currentLineOptions.opacity + ')';
-      } else {
-        return this.context.strokeStyle = this.currentLineOptions.color;
-      }
+      this.context.strokeStyle = super.getColorString(this.currentLineOptions.color);
     }
   }
 
-  composeOptions(options: any) {
-    super.composeOptions(options);
-    return this.applyStrokeStyle();
+  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null = null) {
+    super.composeOptions(overrides);
+    this.applyStrokeStyle();
   }
 
-  moveTo(x: any, y: any) {
+  moveTo(x: number, y: number) {
     super.moveTo(x, y);
     this.context.moveTo(x, y);
     return this.drawingPath = this.context.beginPath();

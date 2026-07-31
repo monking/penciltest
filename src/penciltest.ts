@@ -1,37 +1,7 @@
-enum PenciltestRenderers { CANVAS, SVG }; //"canvas" | "svg";
-
-enum PenciltestModes { DRAWING, ERASING, WORKING, PLAYING }; //"drawing" | "erasing" | "working" | "playing";
-
-enum PenciltestTools { PENCIL, ERASER }; //"pencil" | "eraser";
-
-interface PenciltestRenderer {
-};
-
-interface PenciltestOptions {
-  container?: string;
-  hideCursor?: boolean;
-  loop?: boolean;
-  showStatus?: boolean;
-  frameHold?: number;
-  onionSkin?: boolean;
-  smoothing?: number;
-  onionSkinFrameRadius?: number;
-  lineColor?: string;
-  lineWeight?: number;
-  background?: string;
-  renderer?: PenciltestRenderers;
-  onionSkinOpacity?: number;
-};
-
-interface PenciltestState {
-  version: string;
-  mode: PenciltestModes;
-  toolStack: Array<PenciltestTools>;
-};
-
 class Penciltest {
 
   static version: string = '0.2.15';
+  static instrumentIdentifier: string = 'io.lovejoy.penciltest';
 
   static defaultOptions: PenciltestOptions = {
     container: 'body',
@@ -45,56 +15,43 @@ class Penciltest {
     lineColor: 'black',
     lineWeight: 1,
     background: 'gray',
-    renderer: PenciltestRenderers.CANVAS,
+    renderer: Renderers.CANVAS,
     onionSkinOpacity: 0.5,
   };
 
-  static modes = { // deprecated
-    WORKING: "working",
-    DRAWING: "drawing",
-    ERASING: "erasing",
-    PLAYING: "playing",
-  };
-
-  static availableRenderers = {
-    [PenciltestRenderers.CANVAS]: CanvasRenderer,
-    [PenciltestRenderers.SVG]: SVGRenderer
-  };
-    
-  availableRenderers: { [PenciltestRenderers.CANVAS]: PenciltestRenderer; [PenciltestRenderers.SVG]: PenciltestRenderer; };
   options: PenciltestOptions;
-  state: { version: string; mode: any; toolStack: {}; };
+  state: PenciltestState;
   current: { frames: {}; exposures: {}; exposureCount: number; exposureNumber: number; frameNumber: number; };
-  container: any;
-  ui: any;
-  fieldContainer: any;
-  fieldElement: any;
-  scene: any;
+  container: HTMLElement;
+  ui: PenciltestUI;
+  fieldContainer: HTMLElement;
+  fieldElement: HTMLElement;
+  scene: PenciltestScene;
   currentStrokeIndex: number;
-  renderer: any;
+  renderer: CanvasRenderer | SVGRenderer;
   zoomFactor: number;
-  unsavedChanges: boolean;
-  markPoint: { x: number; y: number; };
-  markBuffer: {};
-  playDirection: any;
+  hasUnsavedChanges: boolean;
+  markPoint: Point;
+  markBuffer: Array<Point>;
+  playDirection: number | null;
   framesHeld: number;
   playInterval: any;
-  audioElement: any;
+  audioElement: HTMLElement;
   copyBuffer: any;
-  redoQueue: any;
-  forceDimensions: { width: any; height: any; };
+  redoQueue: Array<Stroke>;
+  forceDimensions: Bounds | null;
 
   constructor(options: PenciltestOptions) {
     this.options = {
       ...Penciltest.defaultOptions,
-      ...this.getStoredData('app', 'options'),
+      ...this.getStoredData('app', 'options') as PenciltestOptions,
     };
   
     this.state = {
       version: Penciltest.version,
-      mode: "drawing",
-      toolStack: ['pencil','eraser'],
-      ...this.getStoredData('app', 'state'),
+      mode: PenciltestModes.DRAWING,
+      toolStack: [PenciltestTools.PENCIL,PenciltestTools.ERASER],
+      ...this.getStoredData('app', 'state') as PenciltestState,
     };
   
     // metadata generated while interpreting the scene data
@@ -126,18 +83,17 @@ class Penciltest {
     globalThis.pt = this;
   };
 
-  setOptions(newOptions: { [x: string]: any; renderer?: any; }) {
-    this.options = Utils.inherit(
-      newOptions,
-      this.options || {},
-      Penciltest.prototype.state
-    );
+  setOptions(newOptions: PenciltestOptions) {
+    Object.assign(this.options, newOptions);
+    //...Penciltest.state, // FIXME, was this meaningful? @1785486819
 
     return (() => {
       const result = [];
       for (let key in newOptions) {
         const value = newOptions[key];
-        if (key in this.ui.appActions && this.ui.appActions[key].action) { result.push(this.ui.appActions[key].action.call(this)); } else {
+        if (key in PenciltestUI.appActions && PenciltestUI.appActions[key].action) {
+          result.push(PenciltestUI.appActions[key].action.call(this));
+        } else {
           result.push(undefined);
         }
       }
@@ -179,36 +135,36 @@ class Penciltest {
     return this.getCurrentFrame().strokes[this.currentStrokeIndex || 0];
   }
 
-  mark(x: any,y: any) {
-    x = Utils.getDecimal(x, 1);
-    y = Utils.getDecimal(y, 1);
+  mark(point: Point) {
+    //const x = Utils.getDecimal(point.x, 1);
+    //const y = Utils.getDecimal(point.y, 1);
 
     if (!this.currentStrokeIndex) {
       let base: { strokes: {}; };
       if ((base = this.getCurrentFrame()).strokes == null) { base.strokes = []; }
       this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
       this.getCurrentFrame().strokes.push([]);
-      this.renderer.moveTo(x, y);
+      this.renderer.moveTo(point.x, point.y);
     } else {
-      this.renderer.lineTo(x, y);
+      this.renderer.lineTo(point.x, point.y);
     }
 
-    this.getCurrentStroke().push(this.scaleCoordinates([x, y], 1 / this.zoomFactor));
-    if (this.state.mode === "drawing") {
+    this.getCurrentStroke().push(this.scaleCoordinates([point.x, point.y], 1 / this.zoomFactor));
+    if (this.state.mode === PenciltestModes.DRAWING) {
       this.renderer.render();
     }
 
     this.clearRedo();
-    return this.unsavedChanges = true;
+    return this.hasUnsavedChanges = true;
   }
 
   track(x: number,y: number) {
-    const coords = {
+    const point: Point = {
       x,
       y
     };
 
-    if (this.state.toolStack[0] === 'eraser') {
+    if (this.state.toolStack[0] === PenciltestTools.ERASER) {
       const screenPoint = [x, y];
       const point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
       let done = false;
@@ -232,11 +188,11 @@ class Penciltest {
 
     } else {
       if ((this.currentStrokeIndex == null)) {
-        this.markPoint = coords;
+        this.markPoint = point;
         this.markBuffer = [];
       }
 
-      this.markBuffer.push(coords);
+      this.markBuffer.push(point);
 
       // TODO  Mark multiple points per @options.smoothing
       this.markPoint.x = ((this.markPoint.x * this.options.smoothing) + x) / (this.options.smoothing + 1);
@@ -247,7 +203,7 @@ class Penciltest {
         this.markBuffer = [];
       }
 
-      return this.mark(this.markPoint.x, this.markPoint.y);
+      return this.mark(this.markPoint);
     }
   }
 
@@ -265,7 +221,7 @@ class Penciltest {
     return realIndex;
   }
 
-  goToFrame(targetFrameNumber: number, overrides: { lineWeight: any; }) {
+  goToFrame(targetFrameNumber: number, overrides: PenciltestLineOptions = {}) {
     const selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
 
     this.current.frameNumber = selectedFrameNumber;
@@ -328,7 +284,7 @@ class Penciltest {
     if (this.audioElement) { this.pauseAudio(); }
     clearInterval(this.playInterval);
     if (this.state.mode === "playing") {
-      return this.state.mode = "drawing";
+      return this.state.mode = PenciltestModes.DRAWING;
     }
   }
 
@@ -338,7 +294,7 @@ class Penciltest {
     }
   }
 
-  drawCurrentFrame(overrides: undefined) {
+  drawCurrentFrame(overrides: {} = {}) {
     // NOTE: This draws the background, while drawFrame() does not.
     if (!this.renderer || !this.scene.frames.length) { return; }
 
@@ -351,6 +307,7 @@ class Penciltest {
     if (this.options.onionSkin) {
       for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
         const previousFrameNumber = this.resolveFrameNumber(this.current.frameNumber - i);
+        const lineOpacity = Math.pow(this.options.onionSkinOpacity, i)
         if (previousFrameNumber !== this.current.frameNumber) {
           this.drawFrame(
             previousFrameNumber,
@@ -358,8 +315,7 @@ class Penciltest {
               {},
               overrides,
               {
-                lineColor: [255, 0, 0],
-                lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+                lineColor: [255, 0, 0, lineOpacity]
               }
             )
           );
@@ -372,8 +328,7 @@ class Penciltest {
               {},
               overrides,
               {
-                lineColor: [0, 255, 255],
-                lineOpacity: Math.pow(this.options.onionSkinOpacity, i)
+                lineColor: [0, 255, 255, lineOpacity]
               }
             )
           );
@@ -384,12 +339,6 @@ class Penciltest {
     this.drawFrame(this.current.frameNumber, overrides);
     return this.ui.updateStatus();
   }
-    width(arg0: number, arg1: number, width: any, height: any, background: any) {
-        throw new Error("Method not implemented.");
-    }
-    height(arg0: number, arg1: number, width: any, height: any, background: any) {
-        throw new Error("Method not implemented.");
-    }
 
   drawFrame(frameNumber: string | number, overrides: any) {
     if (!this.width || !this.height) { return; }
@@ -404,7 +353,7 @@ class Penciltest {
     return Array.from(stroke).map((coords: any) => this.scaleCoordinates(coords, factor));
   }
 
-  scaleCoordinates(coords: { slice?: any; }, factor: number) {
+  scaleCoordinates(coords: Array<number>, factor: number) {
     const newCoords = [
       coords[0] * factor,
       coords[1] * factor
@@ -432,7 +381,7 @@ class Penciltest {
       this.markBuffer = [];
     }
     this.currentStrokeIndex = null;
-    if (this.state.toolStack[0] === 'eraser') {
+    if (this.state.toolStack[0] === PenciltestTools.ERASER) {
       return this.drawCurrentFrame();
     }
   }
@@ -518,7 +467,7 @@ class Penciltest {
 
   smoothScene(amount: any) {
     const self = this;
-    if (this.state.mode === "drawing") {
+    if (this.state.mode === PenciltestModes.DRAWING) {
       return Utils.confirm('Would you like to smooth every frame of this scene?', function() {
         const beginSmoothingScene = function(amount: any) {
           amount = Number(amount);
@@ -527,7 +476,7 @@ class Penciltest {
           for (let frame = 0, end = lastIndex, asc = 0 <= end; asc ? frame <= end : frame >= end; asc ? frame++ : frame--) {
             self.smoothFrame(frame, amount);
           }
-          return self.state.mode = "drawing";
+          return self.state.mode = PenciltestModes.DRAWING;
         };
         if (!amount) {
           return Utils.prompt('How much to smooth? 1-5', 2, beginSmoothingScene);
@@ -542,9 +491,8 @@ class Penciltest {
 
   undo() {
     if (this.getCurrentFrame().strokes && this.getCurrentFrame().strokes.length) {
-      if (this.redoQueue == null) { this.redoQueue = []; }
       this.redoQueue.push(this.getCurrentFrame().strokes.pop());
-      this.unsavedChanges = true;
+      this.hasUnsavedChanges = true;
       return this.drawCurrentFrame();
     }
   }
@@ -552,7 +500,7 @@ class Penciltest {
   redo() {
     if (this.redoQueue && this.redoQueue.length) {
       this.getCurrentFrame().strokes.push(this.redoQueue.pop());
-      this.unsavedChanges = true;
+      this.hasUnsavedChanges = true;
       return this.drawCurrentFrame();
     }
   }
@@ -567,17 +515,17 @@ class Penciltest {
     return this.ui.updateStatus();
   }
 
-  defaultScene(sceneData = null) {
+  defaultScene(sceneData:PenciltestScene = {}) {
     const now = new Date();
     const nowString = now.toISOString();
-    const scene = { 
+    const scene:PenciltestScene = {
       name: '',
       dateModified: nowString,
       dateCreated: nowString,
-      uuid: null,
+      uuid: '',
       instrument: {
-        name: 'io.lovejoy.penciltest',
-        version: Penciltest.prototype.state.version
+        name: Penciltest.instrumentIdentifier,
+        version: Penciltest.version
       },
       aspect: '1:1',
       width: 1024,
@@ -588,16 +536,14 @@ class Penciltest {
       frames: []
     };
 
-    if (sceneData) {
+    if (Object.keys(sceneData).length > 0) {
       Object.assign(scene, sceneData);
     }
 
-    if (scene.uuid === null) {
+    if (scene.uuid.length === 0) {
       if (typeof crypto !== 'undefined' && crypto !== null) {
         crypto.randomUUID();
       }
-    } else if (scene === false) {
-      delete scene.uuid;
     }
 
     return scene;
@@ -606,7 +552,7 @@ class Penciltest {
   newScene() {
     this.scene = this.defaultScene();
 
-    this.unsavedChanges = false;
+    this.hasUnsavedChanges = false;
 
     this.newFrame();
     return this.goToFrame(0);
@@ -650,19 +596,19 @@ class Penciltest {
     return globalThis.localStorage.setItem(storageName, JSON.stringify(data));
   }
 
-  updateScene(callback: (arg0: any) => any) {
+  updateScene(callback: Function | null = null) {
     const self = this;
     this.scene.dateModified = (new Date()).toISOString();
     this.scene.current = {
       frameNumber: this.current.frameNumber
     };
     if (!this.scene.name) {
-      return Utils.prompt("What's the name of your scene?", this.scene.name, function(name: any) {
+      Utils.prompt("What's the name of your scene?", this.scene.name, function(name: any) {
         if (name) { self.scene.name = name; }
         if (callback) { return callback(self.scene); }
       });
-    } else {
-      if (callback) { return callback(self.scene); }
+    } else if (callback) {
+      callback(self.scene);
     }
   }
 
@@ -670,7 +616,7 @@ class Penciltest {
     if (update == null) { update = true; }
     const name = (this.scene.name != null) || 'Untitled';
     this.putStoredData('scene', name, this.scene);
-    if (update) { return this.unsavedChanges = false; }
+    if (update) { return this.hasUnsavedChanges = false; }
   }
 
   renderGif() {
@@ -837,18 +783,24 @@ class Penciltest {
     }
     this.goToFrame((this.current != null ? this.current.frameNumber : undefined) || 0);
     this.ui.updateStatus();
-    this.unsavedChanges = false;
+    this.hasUnsavedChanges = false;
     return this.resize(); // FIXME
   }
 
   loadScene() {
     const self = this;
-    return this.selectSceneName('Choose a scene to load', (name: any) => self.setScene(self.getStoredData('scene', name)));
+    return this.selectSceneName(
+      'Choose a scene to load',
+      (scenename: any) => self.setScene(self.getStoredData('scene', scenename) as PenciltestScene)
+    );
   }
 
   deleteScene() {
     const self = this;
-    return this.selectSceneName('Choose a scene to DELETE...FOREVER', (sceneName: any) => globalThis.localStorage.removeItem(self.encodeStorageReference('scene', sceneName)));
+    return this.selectSceneName(
+      'Choose a scene to DELETE...FOREVER',
+      (sceneName: any) => globalThis.localStorage.removeItem(self.encodeStorageReference('scene', sceneName))
+    );
   }
 
   buildSceneMeta() {
@@ -887,7 +839,7 @@ class Penciltest {
     this.scene.audio.url = audioURL;
     this.scene.audio.offset = 0;
     this.scene.audio.info = audioInfo;
-    this.unsavedChanges = true;
+    this.hasUnsavedChanges = true;
     if (!this.audioElement) { // TODO: abstract away from browser
       this.audioElement = globalThis.document.createElement('audio');
       this.audioElement.preload = true;

@@ -1,34 +1,7 @@
-interface Point { x: number; y: number; }
-
-interface PositionDescription { x: string; y: string; }
-
-interface Rect { x: number; width: number; y: number; height: number; }
-
-interface PenciltestUIOptions extends PenciltestUIComponentOptions {
-  controller?: Penciltest;
-}
-
-interface PenciltestAppAction {
-  label: string;
-  hotkey?: Array<string>;
-  gesture?: RegExp;
-  listener?: Function;
-  action?: Function;
-  triggerOnMove?: boolean;
-  repeat?: boolean;
-  cancelComplementKeyEvent: boolean;
-  text?: string;
-  title?: string;
-}
-
-type AppActionsList = {
-  [key: string]: PenciltestAppAction
-}
-
 class PenciltestUI extends PenciltestUIComponent {
   //appActions: { showMenu: { label: string; hotkey: {}; gesture: {}; listener(): any; }; renderer: { label: string; listener(): any; action(): any; }; pageFlip: { label: string; gesture: {}; triggerOnMove: boolean; listener(): any; }; playPause: { ...; }; playReverse: { ...; }; nextFrame: { ...; }; prevFrame: { ...; }; };
   menuOptions: {};
-  currentGesture: any;
+  currentGesture: PenciltestGesture;
   controller: any;
   feedbackTimeout: number;
   components: {
@@ -59,28 +32,34 @@ class PenciltestUI extends PenciltestUIComponent {
     },
     renderer: {
       label: "Set Renderer",
-      listener() {
+      listener(this: Penciltest) {
         let renderer: any;
         const self = this;
-        const rendererNames = [];
-        for (let name in this.availableRenderers) {
-          renderer = this.availableRenderers[name];
-          rendererNames.push(name);
-        }
-        return Utils.select('Set renderer', rendererNames, this.options.renderer, (selected: any) => self.setOptions({renderer: selected}));
+        return Utils.select(
+          'Set renderer',
+          [Renderers.CANVAS, Renderers.SVG],
+          this.options.renderer,
+          (selected: any) => self.setOptions({renderer: selected})
+        );
       },
-      action() {
+      action(this: Penciltest) {
         if (this.fieldElement) {
           if (this.renderer != null) {
             this.renderer.destroy();
           }
-          return this.renderer = new (this.availableRenderers[ this.options.renderer ])({
+          const rendererOptions: PenciltestRendererOptions = {
             lineColor: this.scene.lineColor,
             lineWeight: this.scene.lineWeight,
             container: this.fieldElement,
-            width: this.forceDimensions ? this.forceDimensions.width : this.width,
-            height: this.forceDimensions ? this.forceDimensions.height : this.height
-          });
+            width: this.forceDimensions ? this.forceDimensions.width as number : this.scene.width,
+            height: this.forceDimensions ? this.forceDimensions.height as number : this.scene.height
+          };
+          if (this.options.renderer === Renderers.SVG) {
+            this.renderer = new SVGRenderer(rendererOptions);
+          } else {
+            this.renderer = new CanvasRenderer(rendererOptions);
+          }
+          return this.renderer;
         }
       }
     },
@@ -88,8 +67,8 @@ class PenciltestUI extends PenciltestUIComponent {
       label: "Page Flip",
       gesture: /2 (left|right) from .* (bottom|middle)/,
       triggerOnMove: true,
-      listener() {
-        return this.goToFrame(Math.floor(this.currentGesture.startFrameNumber + (this.scene.frames.length * this.currentGesture.deltaNormalized.x * 2)));
+      listener(this: Penciltest) {
+        return this.goToFrame(Math.floor(this.ui.currentGesture.startFrameNumber + (this.scene.frames.length * this.ui.currentGesture.deltaNormalized.x * 2)));
       }
     },
     playPause: {
@@ -98,7 +77,7 @@ class PenciltestUI extends PenciltestUIComponent {
       hotkey: ['Space'],
       gesture: /2 still from center (bottom|middle)/,
       cancelComplementKeyEvent: true,
-      listener() {
+      listener(this: Penciltest) {
         this.playDirection = 1;
         return this.togglePlay();
       }
@@ -107,7 +86,7 @@ class PenciltestUI extends PenciltestUIComponent {
       label: "Play in Reverse",
       hotkey: ['Shift+Space'],
       cancelComplementKeyEvent: true,
-      listener() {
+      listener(this: Penciltest) {
         this.playDirection = -1;
         return this.togglePlay();
       }
@@ -118,7 +97,7 @@ class PenciltestUI extends PenciltestUIComponent {
       hotkey: ['D', 'J', 'Right','.'],
       gesture: /2 still from right bottom/,
       repeat: true,
-      listener() {
+      listener(this: Penciltest) {
         this.goToFrame(this.current.frameNumber + 1);
         this.stop();
         if (this.audioElement) { return this.scrubAudio(); }
@@ -130,21 +109,23 @@ class PenciltestUI extends PenciltestUIComponent {
       hotkey: ['S', 'K', 'Left',','],
       gesture: /2 still from left bottom/,
       repeat: true,
-      listener() {
+      listener(this: Penciltest) {
         this.goToFrame(this.current.frameNumber - 1);
         this.stop();
         if (this.audioElement) { return this.scrubAudio(); }
       }
     },
-    // firstFrame:
-    //   label: "First Frame"
-    //   text: '\u23EE'
-    //   hotkey: ['1', '0','Home','PgUp']
-    //   gesture: /2 left from .* (bottom|middle)/
-    //   cancelComplementKeyEvent: true
-    //   listener: ->
-    //     @goToFrame 0
-    //     @stop()
+    firstFrame: {
+      label: "First Frame",
+      text: '\u23EE',
+      hotkey: ['1', '0','Home','PgUp'],
+      gesture: /2 left from .* (bottom|middle)/,
+      cancelComplementKeyEvent: true,
+      listener(this: Penciltest) {
+        this.goToFrame(0);
+        this.stop();
+      }
+    },
     // lastFrame:
     //   label: "Last Frame"
     //   text: '⏭️'
@@ -152,44 +133,44 @@ class PenciltestUI extends PenciltestUIComponent {
     //   gesture: /2 right from .* (bottom|middle)/
     //   cancelComplementKeyEvent: true
     //   listener: ->
-    //     @goToFrame @scene.frames.length - 1
-    //     @stop()
+    //     this.goToFrame this.scene.frames.length - 1
+    //     this.stop()
     // copyFrame:
     //   label: "Copy Frame/Strokes"
     //   hotkey: ['C']
     //   listener: ->
-    //     @copyFrame()
+    //     this.copyFrame()
     // pasteFrame:
     //   label: "Paste Frame"
     //   hotkey: ['V']
     //   listener: ->
-    //     @pasteFrame()
+    //     this.pasteFrame()
     // pasteStrokes:
     //   label: "Paste Strokes"
     //   hotkey: ['Shift+V']
     //   listener: ->
-    //     @pasteStrokes()
+    //     this.pasteStrokes()
     // insertFrameBefore:
     //   label: "Insert Frame Before"
     //   hotkey: ['Shift+A', 'Shift+I']
     //   gesture: /2 still from left top/
     //   listener: ->
-    //     newIndex = @current.frameNumber
-    //     @newFrame newIndex
-    //     @goToFrame newIndex
+    //     newIndex = this.current.frameNumber
+    //     this.newFrame newIndex
+    //     this.goToFrame newIndex
     // insertFrameAfter:
     //   label: "Insert Frame After"
     //   hotkey: ['Shift+D', 'I']
     //   gesture: /2 still from right top/
     //   listener: ->
-    //     newIndex = @current.frameNumber + 1
-    //     @newFrame newIndex
-    //     @goToFrame newIndex
+    //     newIndex = this.current.frameNumber + 1
+    //     this.newFrame newIndex
+    //     this.goToFrame newIndex
     // insertSeconds:
     //   label: "Insert Seconds"
     //   hotkey: ['Alt+Shift+I']
     //   listener: ->
-    //     self = @
+    //     self = this.
     //     Utils.prompt '# of seconds to insert: ', 1, (seconds) ->
     //       first = self.current.frameNumber + 1
     //       last = self.current.frameNumber + Math.floor self.scene.framerate * Number(seconds)
@@ -201,21 +182,21 @@ class PenciltestUI extends PenciltestUIComponent {
     //   hotkey: ['Z']
     //   gesture: /3 still from left/
     //   repeat: true
-    //   listener: -> @undo()
+    //   listener: -> this.undo()
     // redo:
     //   label: "Redo"
     //   title: "Put back a line removed by 'Undo'"
     //   hotkey: ['Shift+Z']
     //   gesture: /3 still from right/
     //   repeat: true
-    //   listener: -> @redo()
+    //   listener: -> this.redo()
     // lineColor:
     //   label: "Line Color"
     //   listener: ->
-    //     self = @
+    //     self = this.
     //     Utils.prompt(
     //       'line color: ',
-    //       @scene.lineColor,
+    //       this.scene.lineColor,
     //       (lineColor) ->
     //         if not lineColor then lineColor = 'black'
     //         self.setOptions lineColor: lineColor
@@ -223,16 +204,16 @@ class PenciltestUI extends PenciltestUIComponent {
     //       'color'
     //     )
     //   action: ->
-    //     @scene.lineColor = @options.lineColor
-    //     @renderer?.lineColor = @options.lineColor
-    //     @drawCurrentFrame()
+    //     this.scene.lineColor = this.options.lineColor
+    //     this.renderer?.lineColor = this.options.lineColor
+    //     this.drawCurrentFrame()
     // background:
     //   label: "Background Color"
     //   listener: ->
-    //     self = @
+    //     self = this.
     //     Utils.prompt(
     //       'background color: ',
-    //       @scene.background,
+    //       this.scene.background,
     //       (bg) ->
     //         if not bg then bg = 'white'
     //         self.setOptions background: bg
@@ -240,22 +221,22 @@ class PenciltestUI extends PenciltestUIComponent {
     //       'color'
     //     )
     //   action: ->
-    //     @scene.background = @options.background
-    //     @renderer?.background = @options.background
-    //     @drawCurrentFrame()
+    //     this.scene.background = this.options.background
+    //     this.renderer?.background = this.options.background
+    //     this.drawCurrentFrame()
     // framerate:
     //   label: "Frame Rate"
     //   listener: ->
-    //     self = @
-    //     Utils.prompt 'frames per second: ', @scene.framerate, (rate) ->
+    //     self = this.
+    //     Utils.prompt 'frames per second: ', this.scene.framerate, (rate) ->
     //       if rate then self.setOptions framerate: Number rate
     //   action: ->
-    //     @scene.framerate = @options.framerate
-    //     @current.singleFrameDuration = 1 / @scene.framerate
+    //     this.scene.framerate = this.options.framerate
+    //     this.current.singleFrameDuration = 1 / this.scene.framerate
     // frameHold:
     //   label: "Default Frame Hold"
     //   listener: ->
-    //     self = @
+    //     self = this.
     //     Utils.prompt 'default exposures per drawing: ', self.options.frameHold, (hold) ->
     //       if hold
     //         oldHold = self.options.frameHold
@@ -268,113 +249,122 @@ class PenciltestUI extends PenciltestUIComponent {
     // hideCursor:
     //   label: "Hide Cursor"
     //   hotkey: ['H']
-    //   listener: -> @setOptions hideCursor: not @options.hideCursor
-    //   action: -> Utils.toggleClass @container, 'hide-cursor', @options.hideCursor
+    //   listener: -> this.setOptions hideCursor: not this.options.hideCursor
+    //   action: -> Utils.toggleClass this.container, 'hide-cursor', this.options.hideCursor
     // onionSkin:
     //   label: "Onion Skin"
     //   hotkey: ['F', 'O']
     //   gesture: /2 down from center (bottom|middle)/
     //   title: "show previous and next frames in red and blue"
     //   listener: ->
-    //     @setOptions onionSkin: not @options.onionSkin
-    //     @resize() # FIXME: should either not redraw, or redraw fine without this
+    //     this.setOptions onionSkin: not this.options.onionSkin
+    //     this.resize() # FIXME: should either not redraw, or redraw fine without this
     // clearFrame:
     //   label: "Clear Frame"
     //   hotkey: ['Backspace']
     //   gesture: /3 down from center middle/
     //   cancelComplementKeyEvent: true
-    //   listener: -> @clearStrokes()
+    //   listener: -> this.clearStrokes()
     // dropFrame:
     //   label: "Drop Frame"
     //   hotkey: ['Shift+X']
     //   gesture: /4 down from center top/
     //   cancelComplementKeyEvent: true
-    //   listener: -> @dropFrame()
+    //   listener: -> this.dropFrame()
     // cutFrame:
     //   label: "Cut Frame"
     //   hotkey: ['X']
     //   gesture: /3 down from center top/
     //   cancelComplementKeyEvent: true
-    //   listener: -> @cutFrame()
-    // smoothing:
-    //   label: "Smoothing..."
-    //   title: "How much your lines will be smoothed as you draw"
-    //   hotkey: ['Shift+S']
-    //   listener: ->
-    //     self = @
-    //     Utils.prompt 'Smoothing', @options.smoothing, (smoothing) ->
-    //       self.setOptions smoothing: Number smoothing
-    //   action: -> @state.smoothDrawInterval = Math.sqrt @options.smoothing
+    //   listener: -> this.cutFrame()
+
+    smoothing: {
+      label: "Smoothing...",
+      title: "How much your lines will be smoothed as you draw",
+      hotkey: ['Shift+S'],
+      listener(this: Penciltest) {
+        const self = this
+        Utils.prompt(
+          'Smoothing',
+          self.options.smoothing,
+          (smoothing: number) => self.setOptions({smoothing} as PenciltestOptions)
+        );
+      },
+      action(this: Penciltest) {
+        this.state.smoothDrawInterval = Math.sqrt(this.options.smoothing);
+      }
+    },
+
     // smoothFrame:
     //   label: "Smooth Frame"
     //   title: "Draw the frame again, with current smoothing settings"
     //   hotkey: ['Shift+M']
-    //   listener: -> @smoothFrame @current.frameNumber
+    //   listener: -> this.smoothFrame this.current.frameNumber
     // smoothScene:
     //   label: "Smooth All Frames"
     //   title: "Redraw all frames in the scene with the current smoothing setting"
     //   hotkey: ['Alt+Shift+M']
-    //   listener: -> @smoothScene()
+    //   listener: -> this.smoothScene()
     // lessHold:
     //   label: "Shorter Frame Hold"
     //   hotkey: ['Down', '-']
     //   gesture: /2 still from left middle/
     //   repeat: true
-    //   listener: -> @setCurrentFrameHold @getCurrentFrame().hold - 1
+    //   listener: -> this.setCurrentFrameHold this.getCurrentFrame().hold - 1
     // moreHold:
     //   label: "Longer Frame Hold"
     //   hotkey: ['Up', '+', '=']
     //   gesture: /2 still from right middle/
     //   repeat: true
-    //   listener: -> @setCurrentFrameHold @getCurrentFrame().hold + 1
+    //   listener: -> this.setCurrentFrameHold this.getCurrentFrame().hold + 1
     // toggleDebug:
     //   label: "Toggle Debug"
     //   title: "Verbose logs for debugging"
-    //   listener: -> @setOptions debug: not @options.debug
+    //   listener: -> this.setOptions debug: not this.options.debug
     // showStatus:
     //   label: "Show Status"
     //   title: "hide the scene status bar"
-    //   listener: -> @setOptions showStatus: not @options.showStatus
-    //   action: -> Utils.toggleClass @ui.components.statusBar.getElement(), 'hidden', not @options.showStatus
+    //   listener: -> this.setOptions showStatus: not this.options.showStatus
+    //   action: -> Utils.toggleClass this.ui.components.statusBar.getElement(), 'hidden', not this.options.showStatus
     // loop:
     //   label: "Loop"
     //   hotkey: ['L']
     //   gesture: /2 up from center (bottom|middle)/
     //   listener: ->
-    //     @setOptions loop: not @options.loop
-    //     @resize() # FIXME: should either not redraw, or redraw fine without this
+    //     this.setOptions loop: not this.options.loop
+    //     this.resize() # FIXME: should either not redraw, or redraw fine without this
     // saveScene:
     //   label: "Save"
     //   hotkey: ['Ctrl+Alt+S']
     //   gesture: /3 still from center (bottom|middle)/
     //   listener: ->
-    //     @updateScene()
-    //     @saveScene()
+    //     this.updateScene()
+    //     this.saveScene()
     // loadScene:
     //   label: "Load"
     //   hotkey: ['Alt+O']
     //   gesture: /3 up from center (bottom|middle)/
-    //   listener: -> @loadScene()
+    //   listener: -> this.loadScene()
     // newScene:
     //   label: "New"
     //   hotkey: ['Alt+N']
     //   listener: ->
-    //     self = @
-    //     if @unsavedChanges
+    //     self = this.
+    //     if this.hasUnsavedChanges
     //       Utils.confirm "Make a new scene? Unsaved changes will be lost.", -> self.newScene()
     //     else
-    //       @newScene()
+    //       this.newScene()
     // renderGif:
     //   label: "Render GIF"
     //   hotkey: ['G']
-    //   listener: -> @renderGif()
+    //   listener: -> this.renderGif()
     // resizeScene:
     //   label: "Resize Canvas"
     //   title: "Set the width and height of the canvas in this scene"
     //   hotkey: ['Alt+R']
     //   listener: ->
-    //     self = @
-    //     Utils.prompt 'Scene width & aspect (W/H)', "#{@scene.width} #{@scene.aspect}", (dimensionsResponse) ->
+    //     self = this.
+    //     Utils.prompt 'Scene width & aspect (W/H)', "#{this.scene.width} #{this.scene.aspect}", (dimensionsResponse) ->
     //       dimensions = dimensionsResponse.split ' '
     //       self.scene.width = Number dimensions[0]
     //       self.scene.aspect = dimensions[1]
@@ -384,12 +374,12 @@ class PenciltestUI extends PenciltestUIComponent {
     //   title: "Drag to reposition all frames in this scene. Useful after resizing."
     //   hotkey: ['P']
     //   listener: ->
-    //     self = @
-    //     oldMode = @state.mode
-    //     @state.mode = PenciltestModes.WORKING
+    //     self = this.
+    //     oldMode = this.state.mode
+    //     this.state.mode = PenciltestModes.WORKING
 
     //     startPoint = endPoint = deltaPoint = [0,0]
-    //     frameScale = @width / @scene.width
+    //     frameScale = this.width / this.scene.width
 
     //     dragStart = (event: PointerEvent | TouchEvent) ->
     //       startPoint = endPoint = [event.clientX, event.clientY]
@@ -411,18 +401,18 @@ class PenciltestUI extends PenciltestUIComponent {
 
     //       self.state.mode = oldMode
 
-    //     @fieldElement.addEventListener 'mousedown', dragStart
-    //     @resize()
+    //     this.fieldElement.addEventListener 'mousedown', dragStart
+    //     this.resize()
     // deleteScene:
     //   label: "Delete Scene"
     //   hotkey: ['Alt+Backspace']
-    //   listener: -> @deleteScene()
+    //   listener: -> this.deleteScene()
     // exportScene:
     //   label: "Export"
     //   hotkey: ['Ctrl+S', 'Alt+E']
     //   cancelComplementKeyEvent: true
     //   listener: ->
-    //     @updateScene (scene) =>
+    //     this.updateScene (scene) =>
     //       blob = new Blob([JSON.stringify scene], {type:'application/json'})
     //       url = globalThis.URL.createObjectURL blob
     //       fileName = (scene.name || 'untitled') + '.penciltest.json'
@@ -432,7 +422,7 @@ class PenciltestUI extends PenciltestUIComponent {
     //   hotkey: ['Ctrl+O']
     //   cancelComplementKeyEvent: true
     //   listener: ->
-    //     self = @
+    //     self = this.
     //     Utils.promptForFile(
     //       'Load a scene JSON file',
     //       (sceneJSON) ->
@@ -445,7 +435,7 @@ class PenciltestUI extends PenciltestUIComponent {
     //   label: "Link Audio"
     //   hotkey: ['Alt+A']
     //   listener: (controller, notice) ->
-    //     self = @
+    //     self = this.
     //     promptMessage = 'Audio file'
     //     promptMessage += ' ('+notice+')' if notice
     //     promptMessage += ': '
@@ -459,42 +449,42 @@ class PenciltestUI extends PenciltestUIComponent {
     // unloadAudio:
     //   label: "Unload Audio"
     //   listener: ->
-    //     @destroyAudio
+    //     this.destroyAudio
     // shiftAudioEarlier:
     //   label: "Shift Audio Earlier"
     //   hotkey: ['[']
     //   title: "Decrease the offset of the audio playback"
     //   listener: ->
     //     Utils.log "Shift Audio Earlier"
-    //     @scene.audio.offset-- if @scene.audio
-    //     @ui.updateStatus()
+    //     this.scene.audio.offset-- if this.scene.audio
+    //     this.ui.updateStatus()
     // shiftAudioLater:
     //   label: "Shift Audio Later"
     //   title: "Increase the offset of the audio playback"
     //   hotkey: [']']
     //   listener: ->
     //     Utils.log "Shift Audio Later"
-    //     @scene.audio.offset++ if @scene.audio
-    //     @ui.updateStatus()
+    //     this.scene.audio.offset++ if this.scene.audio
+    //     this.ui.updateStatus()
     // toggleInterfaceHelp:
     //   label: "Help"
     //   hotkey: ['?']
-    //   listener: -> @ui.toggleInterfaceHelp()
+    //   listener: -> this.ui.toggleInterfaceHelp()
     // reset:
     //   label: "Reset"
     //   title: "Reset the app's state and settings. Helpful if the app has stopped working."
     //   action: ->
-    //     @state = Utils.inherit {}, Penciltest.prototype.state
-    //     @setOptions Utils.inherit {}, Penciltest.prototype.options
+    //     this.state = Utils.inherit {}, Penciltest.prototype.state
+    //     this.setOptions Utils.inherit {}, Penciltest.prototype.options
 
     eraser: {
       label: "Eraser",
       hotkey: ['E'],
-      listener() {
+      listener(this: Penciltest) {
         this.useTool(
-          this.state.toolStack[0] == 'eraser'
+          this.state.toolStack[0] == PenciltestTools.ERASER
             ? this.state.toolStack[1]
-            : 'eraser'
+            : PenciltestTools.ERASER
         );
         this.ui.updateStatus();
       }
@@ -731,7 +721,7 @@ class PenciltestUI extends PenciltestUIComponent {
           this.hideMenu();
         }
 
-        if (pointerEvent.button === 1) { this.controller.useTool('eraser'); } // mouse middle button; can map stylus eraser to this
+        if (pointerEvent.button === 1) { this.controller.useTool(PenciltestTools.ERASER); } // mouse middle button; can map stylus eraser to this
 
         const pageCoords = getEventPageXY(pointerEvent);
         self.controller.track(
@@ -775,7 +765,7 @@ class PenciltestUI extends PenciltestUIComponent {
           this.doGesture(this.describeGesture(this.fieldBounds, 'final'));
           this.clearGesture(event);
         }
-        if (event.button === 1) { this.controller.useTool('pencil'); }
+        if (event.button === 1) { this.controller.useTool(PenciltestTools.PENCIL); }
         document.body.removeEventListener('mousemove', this.uiListeners.move);
         document.body.removeEventListener('touchmove', this.uiListeners.move);
         document.body.removeEventListener('mouseup', this.uiListeners.up);
@@ -830,7 +820,7 @@ class PenciltestUI extends PenciltestUIComponent {
     return this.components.toggleHelp.getElement().addEventListener('click', this.uiListeners.help);
   }
 
-  recordGesture(event: { targetTouches: { length: any; }; }, bounds: { width: number; height: number; }) {
+  recordGesture(event: TouchEvent, bounds: Bounds) {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
@@ -910,7 +900,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
   describeGesture(gestureBounds: any, extra: string) {
     if (extra == null) { extra = ''; }
-    let description = this.currentGesture.touches;
+    let description = String(this.currentGesture.touches);
     description += ' ' + this.describeMotion( this.currentGesture.origin, this.currentGesture.last );
     description += ' from ' + this.describePosition( this.currentGesture.origin, gestureBounds );
     if (extra) { description += ` ${extra}`; }
@@ -1038,7 +1028,7 @@ class PenciltestUI extends PenciltestUIComponent {
     return globalThis.addEventListener('beforeunload', function(event: BeforeUnloadEvent) {
       self.controller.putStoredData('app', 'options', self.controller.options);
       self.controller.putStoredData('app', 'state', self.controller.state);
-      if (self.controller.unsavedChanges) { return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save."; }
+      if (self.controller.hasUnsavedChanges) { return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save."; }
     });
   }
 
@@ -1105,7 +1095,7 @@ class PenciltestUI extends PenciltestUIComponent {
       sceneStatusMarkup += `${this.controller.scene.framerate} FPS`;
       sceneStatusMarkup += ` | (hold ${this.controller.getCurrentFrame().hold})`;
       sceneStatusMarkup += ` | ${this.controller.current.frameNumber + 1}/${this.controller.scene.frames.length}`;
-      sceneStatusMarkup += ` | ${Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, String)}`;
+      sceneStatusMarkup += ` | ${Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, true)}`;
       if (this.controller.scene.audio != null ? this.controller.scene.audio.offset : undefined) {
         sceneStatusMarkup += ` ${this.controller.scene.audio.offset >= 0 ? '+' : ''}${this.controller.scene.audio.offset}`;
       }

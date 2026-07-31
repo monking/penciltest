@@ -8,11 +8,12 @@
     "target": "es2018"
   },
   "files": [
+    "src/structure.ts",
     "src/utils.ts",
     "src/penciltest-ui-component.ts",
-    "src/renderer-interface.ts",
-    "src/canvas-renderer.ts",
-    "src/svg-renderer.ts",
+    "src/renderer-base.ts",
+    "src/renderer-canvas.ts",
+    "src/renderer-svg.ts",
     "src/penciltest-legacy.ts",
     "src/penciltest-menu.ts",
     "src/penciltest-timeline.ts",

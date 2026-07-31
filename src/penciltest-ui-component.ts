@@ -1,11 +1,3 @@
-interface PenciltestUIComponentOptions {
-  tagName?: string;
-  className?: string | null;
-  text?: string | null;
-  id?: string | null;
-  parent: HTMLElement;
-};
-
 class PenciltestUIComponent {
   options: PenciltestUIComponentOptions;
   el: { container?: HTMLElement; };

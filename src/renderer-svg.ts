@@ -1,25 +1,21 @@
-/*
-global: document, window
-*/
-
-class SVGRenderer extends RendererInterface {
+class SVGRenderer extends BaseRenderer {
   field: any;
-  container: any;
+  container: HTMLElement;
   drawingPath: string;
-  currentLineOptions: any;
+  currentLineOptions: PenciltestLineOptions;
 
-  constructor(options: any) {
+  constructor(options: PenciltestRendererOptions) {
     super(options);
 
     this.field = new Raphael(this.container);
   }
 
-  lineTo(x: any, y: any) {
+  lineTo(x: number, y: number) {
     super.lineTo(x, y);
     return this.drawingPath += `L${x} ${y}`;
   }
 
-  moveTo(x: any, y: any) {
+  moveTo(x: number, y: number) {
     super.moveTo(x, y);
     if (this.drawingPath == null) { this.drawingPath = ''; }
     return this.drawingPath = `M${x} ${y}`;
@@ -28,14 +24,7 @@ class SVGRenderer extends RendererInterface {
   render() {
     let path: {};
     if (this.drawingPath) { path = this.field.path(this.drawingPath); }
-    if (this.currentLineOptions.color.join((' ' !== '0 0 0') || (this.currentLineOptions.opacity !== 1))) {
-      const pathStyle = 'rgba(' +
-        this.currentLineOptions.color[0] + ',' +
-        this.currentLineOptions.color[1] + ',' +
-        this.currentLineOptions.color[2] + ',' +
-        this.currentLineOptions.opacity + ')';
-      path[0].style.stroke = pathStyle;
-    }
+    path[0].style.stroke = BaseRenderer.getColorString(this.currentLineOptions.color);
     return super.render();
   }
 

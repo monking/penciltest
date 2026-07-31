@@ -3,7 +3,8 @@
   "version": "0.3.0",
   "repository": "git@github.com:monking/penciltest.git",
   "scripts": {
-    "start": "node node_modules/grunt-cli/bin/grunt"
+    "start": "node node_modules/grunt-cli/bin/grunt",
+    "debug": "tsc --pretty --noEmit | less -R"
   },
   "devDependencies": {
     "grunt": "^0.4.4",
