@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "es2018",
+      "dom"
+    ],
+    "strict": false,
+    "target": "es2018"
+  },
+  "files": [
+    "src/utils.ts",
+    "src/penciltest-ui-component.ts",
+    "src/renderer-interface.ts",
+    "src/canvas-renderer.ts",
+    "src/svg-renderer.ts",
+    "src/penciltest-legacy.ts",
+    "src/penciltest-menu.ts",
+    "src/penciltest-timeline.ts",
+    "src/penciltest-ui.ts",
+    "src/penciltest.ts",
+    "src/app.ts"
+  ]
+}
