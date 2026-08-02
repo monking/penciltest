@@ -1,10 +1,13 @@
 class BaseRenderer implements PenciltestRenderer {
 
   options: PenciltestRendererOptions;
+  overrides: PenciltestRendererOptions;
   width: number;
   height: number;
+  container: HTMLElement;
+  currentLineOptions: PenciltestLineOptions;
 
-  static defaultOptions = {
+  static defaultOptions: PenciltestRendererOptions = {
     container: 'body',
     lineColor: 'black',
     lineWeight: 1,
@@ -14,8 +17,8 @@ class BaseRenderer implements PenciltestRenderer {
     height: 1080
   };
 
-  static getColorString(color: Color | string): string {
-    if (typeof Array.isArray(color)) {
+  getColorString(color: Color | string): string {
+    if (Array.isArray(color)) {
       if (color.length > 3) {
         return `rgba(${color.join(',')})`;
       } else {
@@ -27,10 +30,10 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   constructor(options: PenciltestRendererOptions) {
-    this.options = Utils.inherit(
-      ...super.defaultOptions,
+    this.options = {
+      ...BaseRenderer.defaultOptions,
       ...options
-    );
+    };
 
     if (typeof this.options.container === 'string') {
       this.container = document.querySelector(this.options.container);
@@ -38,17 +41,19 @@ class BaseRenderer implements PenciltestRenderer {
       this.container = this.options.container;
     }
 
+    this.overrides = {}
+
     this.composeOptions();
 
-    this.resize(this.options.width, this.options.height);
+    //this.resize(this.options.width, this.options.height);
   }
 
-  resize(width: any, height: any) {
+  resize(width: number, height: number): void {
     this.width = width;
-    return this.height = height;
+    this.height = height;
   }
 
-  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null = null) {
+  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null): void {
     const composedOptions = {
       ...this.options
     };
@@ -59,7 +64,7 @@ class BaseRenderer implements PenciltestRenderer {
 
     if (persist !== true) { Object.assign(composedOptions, overrides); }
 
-    return this.currentLineOptions = {
+    this.currentLineOptions = {
       color: composedOptions.lineColor,
       weight: composedOptions.lineWeight,
       corner: composedOptions.lineCorner,
@@ -67,20 +72,28 @@ class BaseRenderer implements PenciltestRenderer {
     };
   }
 
-  path(path: { length?: any; }) {
-    for (let i = 0; i < path.length; i++) {
-      const segment = path[i];
-      if (i === 0) {
-        this.moveTo(segment[0], segment[1]);
+  path(stroke: Stroke) {
+    // TODO apply stroke options
+    stroke.path.forEach((segment, index) => {
+      if (index === 0) {
+        this.moveTo(segment.x, segment.y);
       } else {
-        this.lineTo(segment[0], segment[1]);
+        this.lineTo(segment.x, segment.y);
       }
-    }
+    });
 
     return this.render();
   }
 
-  rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string): void {}
+  moveTo(x: number, y: number): void {}
+
+  lineTo(x: number, y: number): void {}
+
+  rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string = ''): void {}
+
+  render(): void {}
+
+  clear(): void {}
 
   destroy(): void {}
 }

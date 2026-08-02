@@ -1,13 +1,16 @@
+/// <reference path="vendor/raphael.js">
+declare function Raphael(first:HTMLElement | Function | null):void;
+
 class SVGRenderer extends BaseRenderer {
-  field: any;
-  container: HTMLElement;
+  field: RaphaelInterface;
+  //container: HTMLElement;
   drawingPath: string;
-  currentLineOptions: PenciltestLineOptions;
+  //currentLineOptions: PenciltestLineOptions;
 
   constructor(options: PenciltestRendererOptions) {
     super(options);
 
-    this.field = new Raphael(this.container);
+    this.field = new Raphael(this.container) as RaphaelInterface;
   }
 
   lineTo(x: number, y: number) {
@@ -22,9 +25,13 @@ class SVGRenderer extends BaseRenderer {
   }
 
   render() {
-    let path: {};
-    if (this.drawingPath) { path = this.field.path(this.drawingPath); }
-    path[0].style.stroke = BaseRenderer.getColorString(this.currentLineOptions.color);
+    let path: HTMLElement;
+    if (this.drawingPath) {
+      path = this.field.path(this.drawingPath);
+      Object.assign(path.style, {
+        stroke: this.getColorString(this.currentLineOptions.color)
+      });
+    }
     return super.render();
   }
 

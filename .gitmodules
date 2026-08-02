@@ -1,3 +1,3 @@
 [submodule "public/lib/jsgif"]
-	path = public/lib/jsgif
+	path = src/vendor/jsgif
 	url = https://github.com/antimatter15/jsgif.git

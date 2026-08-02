@@ -5,7 +5,10 @@
       "dom"
     ],
     "strict": false,
-    "target": "es2018"
+    "target": "es2018",
+    "rootDir": "src",
+    "outDir": "dist",
+    "allowJs": true
   },
   "files": [
     "src/structure.ts",
@@ -14,7 +17,7 @@
     "src/renderer-base.ts",
     "src/renderer-canvas.ts",
     "src/renderer-svg.ts",
-    "src/penciltest-legacy.ts",
+    "src/penciltest-versions.ts",
     "src/penciltest-menu.ts",
     "src/penciltest-timeline.ts",
     "src/penciltest-ui.ts",

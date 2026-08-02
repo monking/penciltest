@@ -8,6 +8,7 @@
 (B) 2026-07-30 2026-07-30 src/coffee/penciltest-timeline.coffee 
 (B) 2026-07-30 2026-07-30 src/coffee/renderer-interface.coffee 
 (B) 2026-07-30 2026-07-30 src/coffee/svg-renderer.coffee 
+2026-08-01 SVG render engine? This copy of Raphael is porting badly.
 2026-07-30 2026-07-30 src/coffee/penciltest-legacy.coffee 
 2026-07-30 When .ts ports are functional, move them from src/coffee/ to src/
 x 2026-07-30 +WONTFIX src/coffee/video-encoder.coffee  | Unused.

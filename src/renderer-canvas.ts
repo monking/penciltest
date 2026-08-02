@@ -1,9 +1,7 @@
 class CanvasRenderer extends BaseRenderer {
   field: HTMLElement;
-  context: any;
-  container: HTMLElement;
-  currentLineOptions: PenciltestLineOptions;
-  drawingPath: any;
+  context: CanvasRenderingContext2D;
+  //container: HTMLElement;
 
   constructor(options: PenciltestRendererOptions) {
     super(options);
@@ -12,19 +10,19 @@ class CanvasRenderer extends BaseRenderer {
     this.context = (this.field as HTMLCanvasElement).getContext('2d',
       {alpha: false});
 
-    super(options);
+    this.resize(this.options.width, this.options.height);
 
     this.container.appendChild(this.field);
 
     this.applyStrokeStyle();
   }
 
-  lineTo(x: any, y: any) {
+  lineTo(x: number, y: number) {
     super.lineTo(x, y);
     return this.context.lineTo(x, y);
   }
 
-  rect(x: any, y: any, width: any, height: any, backgroundColor: any, strokeColor: any = '') {
+  rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string = '') {
     super.rect(x, y, width, height, backgroundColor, strokeColor);
     this.context.beginPath();
     this.context.rect(x, y, width, height);
@@ -49,27 +47,25 @@ class CanvasRenderer extends BaseRenderer {
     }
   }
 
-  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null = null) {
+  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null): void {
     super.composeOptions(overrides);
     this.applyStrokeStyle();
   }
 
-  moveTo(x: number, y: number) {
+  moveTo(x: number, y: number):void {
     super.moveTo(x, y);
     this.context.moveTo(x, y);
-    return this.drawingPath = this.context.beginPath();
+    this.context.beginPath();
   }
 
-  render() {
+  render():void {
     super.render();
     if (this.context) {
       this.context.stroke();
-      return this.drawingPath = null;
     }
   }
 
   clear() {
-    this.drawingPath = null;
     this.context.clearRect(0, 0, this.width, this.height);
     return super.clear();
   }
@@ -79,9 +75,9 @@ class CanvasRenderer extends BaseRenderer {
     return super.destroy();
   }
 
-  resize(width: any, height: any) {
-    this.field.setAttribute('width', width);
-    this.field.setAttribute('height', height);
+  resize(width: number, height: number) {
+    this.field.setAttribute('width', String(width));
+    this.field.setAttribute('height', String(height));
     return super.resize(width, height);
   }
 }

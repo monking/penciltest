@@ -5707,7 +5707,7 @@
      | })(Raphael.ninja());
     \*/
     R.ninja = function () {
-        oldRaphael.was ? (g.win.Raphael = oldRaphael.is) : delete Raphael;
+        oldRaphael.was ? (g.win.Raphael = oldRaphael.is) : delete g.win.Raphael; // Originally `delete Raphael`.
         return R;
     };
     /*\
@@ -8111,7 +8111,7 @@
     // EXPOSE
     // SVG and VML are appended just before the EXPOSE line
     // Even with AMD, Raphael should be defined globally
-    oldRaphael.was ? (g.win.Raphael = R) : (Raphael = R);
+    g.win.Raphael = R;
 
     return R;
 }));

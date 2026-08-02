@@ -1,32 +1,50 @@
+declare function GIFEncoder():GIFEncoderInterface;
+
+class SceneState implements PenciltestSceneState {
+  constructor(overrides: PenciltestSceneState = {}) {
+    Object.assign(this, {
+      frames: [],
+      //exposures: [], // DELME exposures not used @1785520725
+      exposureCount: 0,
+      exposureNumber: 0,
+      frameNumber: 0,
+      ...overrides
+    });
+  }
+}
+
 class Penciltest {
 
-  static version: string = '0.2.15';
-  static instrumentIdentifier: string = 'io.lovejoy.penciltest';
+  static version = '0.3.0';
+  static instrumentIdentifier = 'io.lovejoy.penciltest';
 
   static defaultOptions: PenciltestOptions = {
+    background: 'gray',
     container: 'body',
-    hideCursor: false,
-    loop: true,
-    showStatus: true,
     frameHold: 2,
-    onionSkin: true,
-    smoothing: 1,
-    onionSkinFrameRadius: 4,
+    framerate: 12,
+    hideCursor: false,
     lineColor: 'black',
     lineWeight: 1,
-    background: 'gray',
-    renderer: Renderers.CANVAS,
+    loop: true,
+    onionSkin: true,
+    onionSkinFrameRadius: 4,
     onionSkinOpacity: 0.5,
+    renderer: Renderers.CANVAS,
+    scrubAudio: true,
+    showStatus: true,
+    smoothing: 1,
   };
+
 
   options: PenciltestOptions;
   state: PenciltestState;
-  current: { frames: {}; exposures: {}; exposureCount: number; exposureNumber: number; frameNumber: number; };
+  current: PenciltestSceneState;
   container: HTMLElement;
   ui: PenciltestUI;
   fieldContainer: HTMLElement;
   fieldElement: HTMLElement;
-  scene: PenciltestScene;
+  scene: PenciltestScene | null;
   currentStrokeIndex: number;
   renderer: CanvasRenderer | SVGRenderer;
   zoomFactor: number;
@@ -36,10 +54,14 @@ class Penciltest {
   playDirection: number | null;
   framesHeld: number;
   playInterval: any;
-  audioElement: HTMLElement;
+  audioElement: HTMLMediaElement;
+  scrubAudioTimeout: number;
   copyBuffer: any;
   redoQueue: Array<Stroke>;
   forceDimensions: Bounds | null;
+  width: number;
+  height: number;
+  workingOn: Array<Promise<any>>;
 
   constructor(options: PenciltestOptions) {
     this.options = {
@@ -55,13 +77,9 @@ class Penciltest {
     };
   
     // metadata generated while interpreting the scene data
-    this.current = {
-      frames: [],
-      exposures: [],
-      exposureCount: 0,
-      exposureNumber: 0,
-      frameNumber: 0
-    };
+    this.current = new SceneState();
+
+    this.workingOn = [];
 
     this.container = globalThis.document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
@@ -74,13 +92,13 @@ class Penciltest {
 
     this.setOptions(this.options); // do all the option actions
 
-    if (this.state.version !== Penciltest.prototype.state.version) {
-      this.state.version = PenciltestLegacy.update(this, this.state.version, Penciltest.prototype.state.version);
+    if (this.state.version !== Penciltest.version) {
+      (async () => {
+        this.state.version = await PenciltestVersions.upgrade(this, this.state.version, Penciltest.version);
+      })();
     }
 
     this.resize();
-
-    globalThis.pt = this;
   };
 
   setOptions(newOptions: PenciltestOptions) {
@@ -91,8 +109,8 @@ class Penciltest {
       const result = [];
       for (let key in newOptions) {
         const value = newOptions[key];
-        if (key in PenciltestUI.appActions && PenciltestUI.appActions[key].action) {
-          result.push(PenciltestUI.appActions[key].action.call(this));
+        if (key in this.ui.appActions && this.ui.appActions[key].action) {
+          result.push(this.ui.appActions[key].action.call(this));
         } else {
           result.push(undefined);
         }
@@ -112,18 +130,26 @@ class Penciltest {
     return this.fieldElement = this.container.querySelector('.field');
   }
 
-  newFrame(index = null) {
-    const frame = {
-      hold: this.options.frameHold,
-      strokes: []
-    };
+  newFrame(insertAtIndex = null, count:number = 1, options:PenciltestFrame = {}) {
+    // this.lift(); // FIXME This should be called elsewhere, or not at all, right? @1785601871
 
-    if (index === null) {
-      index = this.scene.frames.length;
+    if (insertAtIndex === null) {
+      insertAtIndex = this.scene.frames.length;
     }
 
-    this.lift();
-    this.scene.frames.splice(index, 0, frame);
+    //this.scene.frames.splice(insertAtIndex, 0, frame);
+    const spliceParams = [insertAtIndex, 0]
+
+    let i:number;
+    for (i = 0; i < count; i++) {
+      spliceParams.push({
+        hold: this.options.frameHold,
+        strokes: [],
+        ...options
+      });
+    }
+    Array.prototype.splice.apply(this.scene.frames, spliceParams);
+
     return this.buildSceneMeta();
   }
 
@@ -136,20 +162,18 @@ class Penciltest {
   }
 
   mark(point: Point) {
-    //const x = Utils.getDecimal(point.x, 1);
-    //const y = Utils.getDecimal(point.y, 1);
-
     if (!this.currentStrokeIndex) {
-      let base: { strokes: {}; };
-      if ((base = this.getCurrentFrame()).strokes == null) { base.strokes = []; }
-      this.currentStrokeIndex = this.getCurrentFrame().strokes.length;
-      this.getCurrentFrame().strokes.push([]);
+      let frame = this.getCurrentFrame();
+      if (!frame.strokes) { frame.strokes = []; }
+      this.currentStrokeIndex = frame.strokes.length;
+      const stroke = {path: []} as Stroke;
+      frame.strokes.push(stroke);
       this.renderer.moveTo(point.x, point.y);
     } else {
       this.renderer.lineTo(point.x, point.y);
     }
 
-    this.getCurrentStroke().push(this.scaleCoordinates([point.x, point.y], 1 / this.zoomFactor));
+    this.getCurrentStroke().path.push(Utils.scalePoint(point, 1 / this.zoomFactor));
     if (this.state.mode === PenciltestModes.DRAWING) {
       this.renderer.render();
     }
@@ -159,23 +183,18 @@ class Penciltest {
   }
 
   track(x: number,y: number) {
-    const point: Point = {
-      x,
-      y
-    };
-
+    const trackPoint = {x,y};
     if (this.state.toolStack[0] === PenciltestTools.ERASER) {
-      const screenPoint = [x, y];
-      const point = this.scaleCoordinates(screenPoint, 1 / this.zoomFactor);
+      const screenPoint = Utils.scalePoint(trackPoint, 1 / this.zoomFactor);
       let done = false;
       const currentFrame = this.getCurrentFrame();
       const screenEraseRadius = 10;
       this.drawCurrentFrame();
       for (let strokeIndex = 0; strokeIndex < currentFrame.strokes.length; strokeIndex++) {
         const stroke = currentFrame.strokes[strokeIndex];
-        for (let segment of Array.from(stroke)) {
+        for (let segment of stroke.path) {
           const realEraseRadius = screenEraseRadius / this.zoomFactor;
-          if ((Math.abs(point[0] - segment[0]) < realEraseRadius) && (Math.abs(point[1] - segment[1]) < realEraseRadius)) {
+          if ((Math.abs(screenPoint.x - segment.x) < realEraseRadius) && (Math.abs(screenPoint.y - segment.y) < realEraseRadius)) {
             currentFrame.strokes.splice(strokeIndex, 1);
             this.drawCurrentFrame();
             done = true;
@@ -185,14 +204,13 @@ class Penciltest {
         if (done) { break; }
       }
       return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
-
-    } else {
+    } else if (this.options.smoothing > 0) {
       if ((this.currentStrokeIndex == null)) {
-        this.markPoint = point;
+        this.markPoint = trackPoint;
         this.markBuffer = [];
       }
 
-      this.markBuffer.push(point);
+      this.markBuffer.push(trackPoint);
 
       // TODO  Mark multiple points per @options.smoothing
       this.markPoint.x = ((this.markPoint.x * this.options.smoothing) + x) / (this.options.smoothing + 1);
@@ -204,11 +222,9 @@ class Penciltest {
       }
 
       return this.mark(this.markPoint);
+    } else {
+      return this.mark(trackPoint);
     }
-  }
-
-  updateCurrentFrame(segment: any) {
-    return this.drawCurrentFrame();
   }
 
   resolveFrameNumber(inputIndex: number) {
@@ -221,13 +237,13 @@ class Penciltest {
     return realIndex;
   }
 
-  goToFrame(targetFrameNumber: number, overrides: PenciltestLineOptions = {}) {
+  goToFrame(targetFrameNumber: number, overrides: PenciltestRendererOptions = {}) {
     const selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
 
     this.current.frameNumber = selectedFrameNumber;
-    this.current.frame = this.scene.frames[this.current.frameNumber];
+    // this.current.frame = this.scene.frames[this.current.frameNumber]; // DELME unused @1785515083
 
-    if (this.state.mode !== "playing") {
+    if (this.state.mode !== PenciltestModes.PLAYING) {
       this.seekAudioToFrame(selectedFrameNumber);
     }
     return this.drawCurrentFrame(overrides);
@@ -235,7 +251,7 @@ class Penciltest {
 
   seekAudioToFrame(frameNumber: number) {
     if (this.scene.audio) {
-      Utils.log(this.current.frames[frameNumber]);
+      console.log(this.current.frames[frameNumber]);
       const seekTime = this.current.frames[frameNumber].time - this.scene.audio.offset;
       return this.seekAudio(seekTime);
     }
@@ -276,25 +292,25 @@ class Penciltest {
     stepListener(true);
     this.playInterval = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
-    this.state.mode = "playing";
+    this.state.mode = PenciltestModes.PLAYING;
     return this.playAudio();
   }
 
   stop() {
     if (this.audioElement) { this.pauseAudio(); }
     clearInterval(this.playInterval);
-    if (this.state.mode === "playing") {
+    if (this.state.mode === PenciltestModes.PLAYING) {
       return this.state.mode = PenciltestModes.DRAWING;
     }
   }
 
   togglePlay() {
-    if (this.state.mode !== "working") {
-      if (this.state.mode === "playing") { return this.stop(); } else { return this.play(); }
+    if (this.state.mode !== PenciltestModes.WORKING) {
+      if (this.state.mode === PenciltestModes.PLAYING) { return this.stop(); } else { return this.play(); }
     }
   }
 
-  drawCurrentFrame(overrides: {} = {}) {
+  drawCurrentFrame(overrides: PenciltestRendererOptions = {}) {
     // NOTE: This draws the background, while drawFrame() does not.
     if (!this.renderer || !this.scene.frames.length) { return; }
 
@@ -340,26 +356,23 @@ class Penciltest {
     return this.ui.updateStatus();
   }
 
-  drawFrame(frameNumber: string | number, overrides: any) {
+  drawFrame(frameNumber: number, overrides: PenciltestRendererOptions): PenciltestFrame {
     if (!this.width || !this.height) { return; }
 
     if (overrides) { this.renderer.composeOptions(overrides); }
 
-    return Array.from(this.scene.frames[frameNumber].strokes).map((stroke: any) =>
+    const frame = this.scene.frames[frameNumber]
+    frame.strokes.map((stroke: Stroke) =>
       this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
+    return frame;
   }
 
-  scaleStroke(stroke: any, factor: any) {
-    return Array.from(stroke).map((coords: any) => this.scaleCoordinates(coords, factor));
-  }
-
-  scaleCoordinates(coords: Array<number>, factor: number) {
-    const newCoords = [
-      coords[0] * factor,
-      coords[1] * factor
-    ];
-    newCoords.push(coords.slice(2));
-    return newCoords;
+  scaleStroke(stroke: Stroke, factor: number): Stroke {
+    return {
+      ...stroke,
+      // TODO: scale stroke weight, too?
+      path: stroke.path.map((point: Point) => Utils.scalePoint(point, factor))
+    };
   }
 
   useTool(toolName: any) {
@@ -377,7 +390,7 @@ class Penciltest {
   lift() {
     if (this.markBuffer && this.markBuffer.length) {
       const last = this.markBuffer.pop();
-      this.mark(last.x, last.y);
+      this.mark(last);
       this.markBuffer = [];
     }
     this.currentStrokeIndex = null;
@@ -386,7 +399,7 @@ class Penciltest {
     }
   }
 
-  copyFrame(frame: { strokes: { length: any; }; }) {
+  copyFrame(frame: PenciltestFrame | null = null) {
     if (frame == null) { frame = this.getCurrentFrame(); }
     if (frame.strokes.length) {
       return this.copyBuffer = Utils.clone(frame);
@@ -433,59 +446,51 @@ class Penciltest {
     return droppedFrame;
   }
 
-  smoothFrame(index: number, amount: any) {
+  async smoothFrame(index: number, amount: number = 1) {
     const self = this;
-    const smooth = function(amount: any) {
-      amount = Number(amount);
+    const smooth = function(amount: number) {
       const smoothingBackup = self.options.smoothing;
       self.options.smoothing = amount;
       const frame = self.scene.frames[index];
-      const oldStrokes = JSON.parse(JSON.stringify(frame.strokes));
+      const oldStrokes = JSON.parse(JSON.stringify(frame.strokes)) as Array<Stroke>;
       self.lift();
       frame.strokes = [];
       self.current.frameNumber = index;
       self.renderer.clear();
-      return (() => {
-        const result = [];
-        for (let stroke of Array.from(oldStrokes)) {
-          for (let segment of Array.from(stroke)) {
-            self.track.apply(self, segment);
-          }
-          result.push(self.lift());
+
+      const result = [];
+      for (let stroke of oldStrokes) {
+        for (let segment of stroke.path) {
+          self.track.apply(self, [segment.x, segment.y]);
         }
-        return result;
-      })();
+        result.push(self.lift());
+      }
+
+      this.options.smoothing = smoothingBackup;
+
+      return result;
     };
 
-    this.options.smoothing = smoothingBackup;
-    if (amount) {
-      return Utils.prompt('How much to smooth? 1-5', 2, smooth);
-    } else {
-      return smooth(amount);
+    if (!amount) {
+      amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
     }
+    return smooth(amount);
   }
 
-  smoothScene(amount: any) {
-    const self = this;
-    if (this.state.mode === PenciltestModes.DRAWING) {
-      return Utils.confirm('Would you like to smooth every frame of this scene?', function() {
-        const beginSmoothingScene = function(amount: any) {
-          amount = Number(amount);
-          self.state.mode = "working";
-          const lastIndex = self.scene.frames.length - 1;
-          for (let frame = 0, end = lastIndex, asc = 0 <= end; asc ? frame <= end : frame >= end; asc ? frame++ : frame--) {
-            self.smoothFrame(frame, amount);
-          }
-          return self.state.mode = PenciltestModes.DRAWING;
-        };
-        if (!amount) {
-          return Utils.prompt('How much to smooth? 1-5', 2, beginSmoothingScene);
-        } else {
-          return beginSmoothingScene(amount);
+  async smoothScene(amount: number = 1) {
+    if (this.state.mode === PenciltestModes.WORKING) {
+      if (await Utils.confirm('Would you like to smooth every frame of this scene?')) {
+        if (amount < 1) {
+          amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
         }
-      });
+        this.state.mode = PenciltestModes.WORKING;
+        this.queueWork(() => {
+          this.scene.frames.forEach((frame, i) => this.smoothFrame(i, amount))
+          this.state.mode = PenciltestModes.DRAWING;
+        });
+      }
     } else {
-      return Utils.log('Unable to alter scene while playing');
+      console.log('Unable to alter scene while playing');
     }
   }
 
@@ -524,16 +529,17 @@ class Penciltest {
       dateCreated: nowString,
       uuid: '',
       instrument: {
-        name: Penciltest.instrumentIdentifier,
+        id: Penciltest.instrumentIdentifier,
         version: Penciltest.version
       },
-      aspect: '1:1',
+      aspectRatio: '1:1',
       width: 1024,
-      framerate: 12,
+      framerate: this.options.framerate,
       background: this.options.background,
       lineColor: this.options.lineColor,
       lineWeight: this.options.lineWeight,
-      frames: []
+      frames: [],
+      current: new SceneState(sceneData.current || {})
     };
 
     if (Object.keys(sceneData).length > 0) {
@@ -596,167 +602,159 @@ class Penciltest {
     return globalThis.localStorage.setItem(storageName, JSON.stringify(data));
   }
 
-  updateScene(callback: Function | null = null) {
-    const self = this;
+  async updateScene(): Promise<PenciltestScene> {
     this.scene.dateModified = (new Date()).toISOString();
     this.scene.current = {
       frameNumber: this.current.frameNumber
     };
     if (!this.scene.name) {
-      Utils.prompt("What's the name of your scene?", this.scene.name, function(name: any) {
-        if (name) { self.scene.name = name; }
-        if (callback) { return callback(self.scene); }
-      });
-    } else if (callback) {
-      callback(self.scene);
+      await this.ui.doAppAction('renameScene')
     }
+    return this.scene;
   }
 
-  saveScene(update: boolean){
-    if (update == null) { update = true; }
-    const name = (this.scene.name != null) || 'Untitled';
-    this.putStoredData('scene', name, this.scene);
+  async saveScene(update: boolean = true){
+    const sceneName = this.scene.name || 'Untitled';
+    const scenePack = await PenciltestVersions.packScene(this.scene);
+    this.putStoredData('scene', sceneName, scenePack);
     if (update) { return this.hasUnsavedChanges = false; }
   }
 
-  renderGif() {
+  async renderGif() {
     const self = this;
-    const beginRenderingGif = function(gifConfigurationString: any) {
-      let asc: boolean, end: number;
-      const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-      // configure for rendering
-      // dimensions = [64, 64]
-      const dimensions = self.getSceneDimensions();
-      // while rendering is only useful at one size, save the step # dimensions = ().split 'x'
-      const maxGifDimension = parseInt(gifConfiguration[0], 10);
-      const gifLineWeight = parseInt(gifConfiguration[1], 10);
-      if (dimensions.width > maxGifDimension) {
-        dimensions.width = maxGifDimension;
-        dimensions.height = maxGifDimension / dimensions.aspect;
-      } else if (dimensions.height > maxGifDimension) {
-        dimensions.height = maxGifDimension;
-        dimensions.width = maxGifDimension * dimensions.aspect;
-      }
 
-      self.forceDimensions = {
-        width: dimensions.width,
-        height: dimensions.height
-      };
-      // rebuild renderer to ensure correct resolution for capture
-      self.ui.appActions.renderer.action();
-      self.resize();
-
-      const oldRendererType = self.options.renderer;
-      self.setOptions({renderer: 'canvas'});
-      self.ui.appActions.renderer.action();
-
-      const gifRenderOverrides = 
-        {lineWeight: gifLineWeight};
-
-      const baseFrameDelay = 1000 / self.scene.framerate;
-      let frameNumber = 0;
-
-      // prepare encoder
-      const gifEncoder = new GIFEncoder();
-      // gifEncoder.setSize dimensions.width, dimensions.height # no use: uses the original dimensions of the canvas, regardless of its current size
-      gifEncoder.setRepeat(0);
-      gifEncoder.setDelay(baseFrameDelay);
-      gifEncoder.start();
-
-      for (frameNumber = 0, end = self.scene.frames.length, asc = 0 <= end; asc ? frameNumber < end : frameNumber > end; asc ? frameNumber++ : frameNumber--) {
-        self.goToFrame(frameNumber, gifRenderOverrides);
-        gifEncoder.setDelay(baseFrameDelay * self.getCurrentFrame().hold); // FIXME no good; how to set individual delays for each fram in gifEncoder?
-        gifEncoder.addFrame(self.renderer.context);
-      }
-
-      gifEncoder.finish();
-      const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }));
-
-      const gifElementId = 'rendered_gif';
-      let gifElement = globalThis.document.getElementById(gifElementId);
-      const gifLinkId = 'rendered_gif_link';
-      let gifLink = globalThis.document.getElementById(gifLinkId);
-      if (!gifElement) {
-        gifElement = globalThis.document.createElement('img');
-        gifElement.id = gifElementId;
-        const gifCss = {
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translateX(-50%) translateY(-50%)',
-          maxWidth: '80%',
-          maxHeight: '80%'
-        };
-        Object.assign(gifElement.style, gifCss);
-        const gifContainer = globalThis.document.createElement('div');
-        let containerCss = {
-          position: 'absolute',
-          top: '0px',
-          left: '0px',
-          bottom: '0px',
-          right: '0px',
-          backgroundColor: 'rgba(0,0,0,0.5)'
-        };
-        Object.assign(gifContainer.style, containerCss);
-        const gifInstructions = globalThis.document.createElement('div');
-        containerCss = {
-          position: 'relative',
-          color: 'white',
-          textAlign: 'center',
-          backgroundColor: 'rgba(0,0,0,0.5)'
-        };
-        Object.assign(gifInstructions.style, containerCss);
-        gifLink = globalThis.document.createElement('a');
-        gifInstructions.innerHTML = "Click/touch image to download.<br>Click/touch outside GIF to close.";
-        gifLink.appendChild(gifElement);
-        gifContainer.appendChild(gifLink);
-        gifContainer.appendChild(gifInstructions);
-        globalThis.document.body.appendChild(gifContainer);
-
-        var gifCloseHandler = function(event: { target: any; type: boolean; key: string; }) {
-          if ((event.target !== gifElement) || ( event.type = 'keydown' && (event.key === 'escape') )) {
-            gifContainer.removeEventListener('click', gifCloseHandler);
-            gifContainer.removeEventListener('touchend', gifCloseHandler);
-            globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
-            return gifContainer.remove();
-          }
-        };
-
-        gifContainer.addEventListener('click', gifCloseHandler);
-        gifContainer.addEventListener('touchend', gifCloseHandler);
-        globalThis.document.body.addEventListener('keydown', gifCloseHandler);
-      }
-
-      gifElement.src = blobUrl;
-      gifLink.href = blobUrl;
-      gifLink.download = (self.scene.name || 'untitled')+'.penciltest.gif';
-
-      // TODO 1) render each frame small in canvas
-      // TODO 2) append with the corect duration to a GIF in memory
-      // TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
-
-      // reset to user's configuration
-      self.setOptions({renderer: oldRendererType});
-      self.forceDimensions = null;
-      return self.resize();
-    };
-
-    const gifSize = Math.min(512, self.scene.width);
+    const gifSize = Math.min(512, this.scene.width);
     const lineWeight = 1;
-    return Utils.prompt('GIF size & line weight (px)', gifSize+' '+lineWeight, beginRenderingGif);
+    const gifConfigurationString = await Utils.prompt('GIF size & line weight (px)', gifSize+' '+lineWeight);
+
+    let asc: boolean, end: number;
+    const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
+    // configure for rendering
+    // dimensions = [64, 64]
+    const dimensions = this.getSceneDimensions();
+    // while rendering is only useful at one size, save the step # dimensions = ().split 'x'
+    const maxGifDimension = parseInt(gifConfiguration[0], 10);
+    const gifLineWeight = parseInt(gifConfiguration[1], 10);
+    if (dimensions.width > maxGifDimension) {
+      dimensions.width = maxGifDimension;
+      dimensions.height = maxGifDimension / dimensions.aspect;
+    } else if (dimensions.height > maxGifDimension) {
+      dimensions.height = maxGifDimension;
+      dimensions.width = maxGifDimension * dimensions.aspect;
+    }
+
+    this.forceDimensions = {
+      width: dimensions.width,
+      height: dimensions.height
+    };
+    // rebuild renderer to ensure correct resolution for capture
+    this.ui.appActions.renderer.action();
+    this.resize();
+
+    const oldRendererType = this.options.renderer;
+    this.setOptions({renderer: Renderers.CANVAS});
+    this.ui.appActions.renderer.action();
+
+    const gifRenderOverrides = {lineWeight: gifLineWeight};
+
+    const baseFrameDelay = 1000 / this.scene.framerate;
+    let frameNumber = 0;
+
+    // prepare encoder
+    const gifEncoder = GIFEncoder();
+    // gifEncoder.setSize dimensions.width, dimensions.height # no use: uses the original dimensions of the canvas, regardless of its current size
+    gifEncoder.setRepeat(0);
+    gifEncoder.setDelay(baseFrameDelay);
+    gifEncoder.start();
+
+    for (frameNumber = 0, end = this.scene.frames.length, asc = 0 <= end; asc ? frameNumber < end : frameNumber > end; asc ? frameNumber++ : frameNumber--) {
+      this.goToFrame(frameNumber, gifRenderOverrides);
+      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold); // FIXME no good; how to set individual delays for each fram in gifEncoder?
+      gifEncoder.addFrame((this.renderer as CanvasRenderer).context);
+    }
+
+    gifEncoder.finish();
+    const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }));
+
+    const gifElementId = 'rendered_gif';
+    let gifElement:HTMLImageElement = globalThis.document.getElementById(gifElementId) as HTMLImageElement;
+    const gifLinkId = 'rendered_gif_link';
+    let gifLink:HTMLAnchorElement = globalThis.document.getElementById(gifLinkId) as HTMLAnchorElement;
+    if (!gifElement) {
+      gifElement = globalThis.document.createElement('img');
+      gifElement.id = gifElementId;
+      const gifCss = {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translateX(-50%) translateY(-50%)',
+        maxWidth: '80%',
+        maxHeight: '80%'
+      };
+      Object.assign(gifElement.style, gifCss);
+      const gifContainer = globalThis.document.createElement('div');
+      let containerCss:any = {
+        position: 'absolute',
+        top: '0px',
+        left: '0px',
+        bottom: '0px',
+        right: '0px',
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      };
+      Object.assign(gifContainer.style, containerCss);
+      const gifInstructions = globalThis.document.createElement('div');
+      containerCss = {
+        position: 'relative',
+        color: 'white',
+        textAlign: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)'
+      };
+      Object.assign(gifInstructions.style, containerCss);
+      gifLink = globalThis.document.createElement('a');
+      gifInstructions.innerHTML = "Click/touch image to download.<br>Click/touch outside GIF to close.";
+      gifLink.appendChild(gifElement);
+      gifContainer.appendChild(gifLink);
+      gifContainer.appendChild(gifInstructions);
+      globalThis.document.body.appendChild(gifContainer);
+
+      const gifCloseHandler = function(event: PointerEvent | TouchEvent | KeyboardEvent) {
+        if ((event.target !== gifElement) || ( event.type === 'keydown' && ((event as KeyboardEvent).key === 'escape') )) {
+          gifContainer.removeEventListener('click', gifCloseHandler);
+          gifContainer.removeEventListener('touchend', gifCloseHandler);
+          globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
+          return gifContainer.remove();
+        }
+      };
+
+      gifContainer.addEventListener('click', gifCloseHandler);
+      gifContainer.addEventListener('touchend', gifCloseHandler);
+      globalThis.document.body.addEventListener('keydown', gifCloseHandler);
+    }
+
+    gifElement.setAttribute('src', blobUrl);
+    gifLink.setAttribute('href', blobUrl);
+    gifLink.setAttribute('download', `${this.scene.name || 'untitled'}.penciltest.gif`);
+
+    // TODO 1) render each frame small in canvas
+    // TODO 2) append with the corect duration to a GIF in memory
+    // TODO 3) draw the GIF as a `data:` URL, prompting to right-click and save'
+
+    // reset to user's configuration
+    this.setOptions({renderer: oldRendererType});
+    this.forceDimensions = null;
+    return this.resize();
   }
 
-  selectSceneName(message: string, callback: { (name: any): any; (sceneName: any): any; (arg0: any): any; }) {
+  async selectSceneName(message: string): Promise<string | boolean> {
     const sceneNames = this.getSceneNames();
     if (sceneNames.length) {
       if (message == null) { message = 'Choose a scene'; }
-      Utils.select(message, sceneNames, this.scene.name, function(selectedSceneName: any) {
-        if (selectedSceneName) {
-          return callback(selectedSceneName);
-        } else {
-          return Utils.alert("No scene by that name.");
-        }
-      });
+      const selectedSceneName = await Utils.select(message, sceneNames, this.scene.name );
+      if (selectedSceneName) {
+        return selectedSceneName;
+      } else {
+        Utils.alert("No scene by that name.");
+      }
     } else {
       Utils.alert("You don't have any saved scenes yet.");
     }
@@ -764,15 +762,20 @@ class Penciltest {
     return false;
   }
 
-  setScene(scene: any) {
-    this.scene = Object.assign(this.defaultScene({uuid:false}), scene);
-    if (this.scene != null ? this.scene.current : undefined) {
-      this.current = this.scene.current;
-      delete this.scene.current;
+  async setScene(scene: any) {
+    this.scene = Object.assign(this.defaultScene({uuid: ''}), scene);
+
+    if (this.scene.instrument?.version && PenciltestVersions.compareVersions(this.scene.instrument.version, Penciltest.version) === -1) {
+      this.scene.instrument.version = await PenciltestVersions.upgrade(this, this.scene.instrument.version, Penciltest.version);
+    }
+
+    if (this.scene?.current) {
+      this.current = new SceneState(this.scene.current);
+      // delete this.scene.current; // FIXME Should this persist while working? Should it be saved to file?
     }
     this.buildSceneMeta();
-    if (this.scene.audio && this.scene.audio.url) {
-      this.loadAudio(this.scene.audio.url, (this.scene.audio.info != null));
+    if (this.scene.audio?.url) {
+      this.loadAudio(this.scene.audio.url, this.scene.audio.info);
     } else {
       this.destroyAudio();
     }
@@ -787,40 +790,41 @@ class Penciltest {
     return this.resize(); // FIXME
   }
 
-  loadScene() {
-    const self = this;
-    return this.selectSceneName(
-      'Choose a scene to load',
-      (scenename: any) => self.setScene(self.getStoredData('scene', scenename) as PenciltestScene)
-    );
+  async loadScene() {
+    const sceneName = await this.selectSceneName('Choose a scene to load');
+    if (typeof sceneName === 'string') {
+      this.setScene(this.getStoredData('scene', sceneName) as PenciltestScene);
+    }
   }
 
-  deleteScene() {
-    const self = this;
-    return this.selectSceneName(
-      'Choose a scene to DELETE...FOREVER',
-      (sceneName: any) => globalThis.localStorage.removeItem(self.encodeStorageReference('scene', sceneName))
-    );
+  async deleteScene() {
+    const sceneName = await this.selectSceneName('Choose a scene to DELETE...FOREVER');
+    if (typeof sceneName === 'string') {
+      globalThis.localStorage.removeItem(this.encodeStorageReference('scene', sceneName));
+    }
   }
 
   buildSceneMeta() {
-    this.current.frames = [];
-    this.current.exposures = [];
-    this.current.exposureCount = 0;
-    this.current.singleFrameDuration = 1 / this.scene.framerate;
+    Object.assign(this.current, {
+      frames: [],
+      //exposures: [], // DELME exposures not used @1785520725
+      exposureCount: 0,
+      singleFrameDuration: 1 / this.scene.framerate,
+    })
 
-    for (let i = 0, end = this.scene.frames.length, asc = 0 <= end; asc ? i < end : i > end; asc ? i++ : i--) {
-      const frame = this.scene.frames[i];
-      const frameMeta = {
-        id: i,
+    this.scene.frames.forEach((frame, index) => {
+      const frameMeta:PenciltestFrameMeta = {
+        id: index,
         exposure: this.current.exposureCount,
         duration: frame.hold * this.current.singleFrameDuration,
         time: this.current.exposureCount * this.current.singleFrameDuration
       };
       this.current.frames.push(frameMeta);
-      for (let j = 1, end1 = frame.hold, asc1 = 1 <= end1; asc1 ? j < end1 : j > end1; asc1 ? j++ : j--) { this.current.exposures.push(frameMeta); }
-      this.current.exposureCount += this.scene.frames[i].hold;
-    }
+
+      //(new Array(frame.hold)).forEach(() => this.current.exposures.push(frameMeta)); // DELME exposures not used @1785520725
+
+      this.current.exposureCount += this.scene.frames[index].hold;
+    });
 
     return this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
   }
@@ -833,25 +837,27 @@ class Penciltest {
     return frame.hold / this.scene.framerate;
   }
 
-  loadAudio(audioURL: any, audioInfo: boolean) {
+  loadAudio(audioURL: string, audioInfo: string) {
     const self = this;
-    if (this.scene.audio == null) { this.scene.audio = {}; }
-    this.scene.audio.url = audioURL;
-    this.scene.audio.offset = 0;
-    this.scene.audio.info = audioInfo;
+    this.scene.audio = {
+      url: audioURL,
+      offset: 0,
+      info: audioInfo
+    };
     this.hasUnsavedChanges = true;
     if (!this.audioElement) { // TODO: abstract away from browser
-      this.audioElement = globalThis.document.createElement('audio');
-      this.audioElement.preload = true;
+      this.audioElement = globalThis.document.createElement('audio') as HTMLMediaElement;
+      this.audioElement.setAttribute('preload', 'true');
       this.fieldContainer.appendChild(this.audioElement);
     } else {
       this.pauseAudio();
     }
     this.audioElement.addEventListener('error', (e: any) => {
       console.log('audio file error', e);
-      return self.ui.appActions.linkAudio.listener.apply(self, ["The audio URL is no longer available. Please load the file again: "+this.scene.audio.info]);
+      const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
+      return self.ui.appActions.linkAudio.listener.apply(self, [message]);
   });
-    return this.audioElement.src = audioURL;
+    return this.audioElement.setAttribute('src', audioURL);
   }
 
   destroyAudio() {
@@ -879,38 +885,36 @@ class Penciltest {
 
   scrubAudio() {
     const self = this;
-    Utils.log('scrubAudio', this.current.frameNumber);
     this.seekAudioToFrame(this.current.frameNumber);
     clearTimeout(this.scrubAudioTimeout);
     this.playAudio();
     return this.scrubAudioTimeout = setTimeout(
       () => self.pauseAudio(),
-      Math.max(this.getFrameDuration * 1000, 100)
+      Math.max(this.current.singleFrameDuration * 1000, 100)
     );
   }
-    scrubAudioTimeout(scrubAudioTimeout: any) {
-        throw new Error("Method not implemented.");
-    }
 
-  pan(deltaPoint: {}) {
-    return Array.from(this.scene.frames).map((frame: { strokes: any; }) =>
-      Array.from(frame.strokes).map((stroke: any) =>
-        (() => {
-          const result = [];
-          for (let segment of Array.from(stroke)) {
-            segment[0] += deltaPoint[0];
-            result.push(segment[1] += deltaPoint[1]);
-          }
-          return result;
-        })()));
+  pan(deltaPoint: Point) {
+    return this.scene.frames.map((frame: PenciltestFrame) => {
+      return frame.strokes.map((stroke: Stroke) => {
+        const result = [];
+        for (let segment of Array.from(stroke.path)) {
+          segment.x += deltaPoint.x;
+          segment.y += deltaPoint.y;
+          result.push(segment);
+        }
+        return result;
+      });
+    });
   }
 
-  getSceneDimensions() {
-    const aspect = this.scene.aspect || '1:1';
-    const aspectParts = aspect.split(':');
-    const dimensions = { 
+  getSceneDimensions():Bounds {
+    const aspectRatio = this.scene.aspectRatio || '1:1';
+    const ratioParts = aspectRatio.split(':').map(Number);
+    const dimensions: Bounds = { 
       width: this.scene.width,
-      aspect: aspectParts[0] / aspectParts[1]
+      aspect: ratioParts[0] / ratioParts[1],
+      aspectRatio
     };
     dimensions.height = Math.ceil(dimensions.width / dimensions.aspect);
     return dimensions;
@@ -945,6 +949,29 @@ class Penciltest {
     this.zoomFactor = this.width / this.scene.width;
     this.renderer.options.lineWeight = this.zoomFactor * this.scene.lineWeight;
     return this.drawCurrentFrame();
+  }
+
+  queueWork(work:Function, afterAll: boolean = false): Promise<any> {
+    const queueCopy = this.workingOn.map((j)=>j); // shallow clone
+    let job: Promise<any>;
+    if (afterAll) {
+      job = Promise.all(queueCopy).finally(() => work);
+    } else {
+      const lastJob = queueCopy[0]
+      if (lastJob) {
+        job = lastJob.finally(() => work);
+      } else {
+        job = new Promise((res,rej)=>res(work));
+      }
+    }
+    this.workingOn.unshift(job);
+    job.finally(() => {
+      const jobIndex = this.workingOn.indexOf(job);
+      if (jobIndex > -1) {
+        this.workingOn.splice(jobIndex, 1);
+      }
+    });
+    return job;
   }
 
 }

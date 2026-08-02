@@ -3,42 +3,40 @@ enum Renderers {
   SVG = "svg"
 };
 
-enum PenciltestModes { DRAWING, ERASING, WORKING, PLAYING };
+enum PenciltestModes {
+  DRAWING = "drawing",
+  ERASING = "erasing",
+  WORKING = "working",
+  PLAYING = "playing"
+};
 
 enum PenciltestTools { PENCIL, ERASER };
 
-enum Color {
-  black = [0,0,0],
-  blue = [0,0,255],
-  cyan = [0,255,255],
-  green = [255,255,0],
-  red = [255,0,0],
-  white = [256,255,255],
-};
-
-
 interface PenciltestOptions {
+  background?: string;
   container?: string;
-  hideCursor?: boolean;
-  loop?: boolean;
-  showStatus?: boolean;
+  debug?: boolean;
   frameHold?: number;
-  onionSkin?: boolean;
-  smoothing?: number;
-  onionSkinFrameRadius?: number;
+  framerate?: number;
+  hideCursor?: boolean;
   lineColor?: string;
   lineWeight?: number;
-  background?: string;
-  renderer?: Renderers;
+  loop?: boolean;
+  onionSkin?: boolean;
+  onionSkinFrameRadius?: number;
   onionSkinOpacity?: number;
+  renderer?: Renderers;
+  scrubAudio?: boolean;
+  showStatus?: boolean;
+  smoothing?: number;
 };
 
 interface PenciltestGesture {
   touches: number;
   origin: Point;
-  last?: Point;
   delta?: Point;
   deltaNormalized?: Point;
+  last?: Point;
   startFrameNumber?: number;
 }
 
@@ -48,59 +46,79 @@ interface PenciltestInsrument {
 }
 
 interface PenciltestFrame {
-  hold: number,
-  strokes: Array<Stroke>
+  strokes?: Array<Stroke>;
+  packedStrokes?: string;
+  hold?: number;
+  time?: number;
 }
 
 interface PenciltestFrameMeta {
-  id: number,
-  exposure: number,
-  duration: number,
-  time: number
+  duration: number;
+  exposure: number;
+  id: number;
+  time: number;
 }
 
-interface PenciltestScene { 
-  aspect: string;
-  background: string;
-  width: number;
-  height: number;
-  framerate: number;
-  frames: Array<PenciltestFrame>;
-  lineColor: string;
-  lineWeight: number;
+interface PenciltestSceneAudio {
+  url: string;
+  info?: string;
+  offset?: number;
+}
+
+interface PenciltestSceneState {
+  frames?: Array<PenciltestFrameMeta>;
+  //exposures?: Array<PenciltestFrameMeta>; // DELME exposures not used @1785520725
+  duration?: number;
+  exposureCount?: number;
+  exposureNumber?: number;
+  frameNumber?: number;
+  singleFrameDuration?: number;
+}
+
+interface PenciltestScene {
+  aspectRatio?: string;
+  audio?: PenciltestSceneAudio;
+  background?: string;
+  current?: PenciltestSceneState;
   dateCreated?: string;
   dateModified?: string;
+  framerate?: number;
+  frames?: Array<PenciltestFrame>;
+  height?: number;
+  instrument?: PenciltestInsrument;
+  lineColor?: string;
+  lineWeight?: number;
   name?: string;
   uuid?: string;
-  instrument?: PenciltestInsrument;
+  width?: number;
 };
 
 interface PenciltestState {
-  version: string;
   mode: PenciltestModes;
   toolStack: Array<PenciltestTools>;
+  version: string;
   smoothDrawInterval?: number;
 };
 
 type Color = [number, number, number, number] | [number, number, number];
 
-enum LineCorner { round, bevel, miter };
-
 interface PenciltestLineOptions {
-  color?: Color;
+  color?: Color | string;
+  corner?: CanvasLineJoin;
+  opacity?: number;
   weight?: number;
-  corner?: LineCorner;
 }
 
 
 interface PenciltestRendererOptions {
-  container: string | HTMLElement;
-  width: number;
-  height: number;
+  background?: string;
+  container?: string | HTMLElement;
+  height?: number;
   lineColor?: string;
-  lineWeight?: number;
+  lineCorner?: CanvasLineJoin;
   lineOpacity?: number;
-  lineCorner?: string;
+  lineWeight?: number;
+  width?: number;
 }
 
 interface PenciltestRenderer {
@@ -109,9 +127,9 @@ interface PenciltestRenderer {
   width: number;
   height: number;
 
-  currentLineOptions: PenciltestLineOptions;
+  getColorString(color: Color | string): string;
 
-  constructor(options: PenciltestRendererOptions): void;
+  currentLineOptions: PenciltestLineOptions;
 
   resize(width: number, height: number): void;
 
@@ -121,9 +139,9 @@ interface PenciltestRenderer {
 
   rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string): void
 
-  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null = null): void;
+  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null): void;
 
-  path(path: Stroke): void;
+  path(stroke: Stroke): void;
 
   render(): void
 
@@ -136,16 +154,18 @@ interface PenciltestRenderer {
 
 interface Point { x: number; y: number; }
 
-interface Mark extends Point { weight: number; }
-
-interface Stroke {
-  path: Array<Mark>,
-  options?: PenciltestLineOptions
+interface Stroke extends PenciltestLineOptions {
+  path: Array<Point>;
 }
 
 interface PositionDescription { x: string; y: string; }
 
-interface Bounds { width: number; height: number; }
+interface Bounds {
+  width?: number;
+  height?: number;
+  aspect?: number;
+  aspectRatio?: string;
+}
 
 interface Rect extends Point, Bounds {};
 
@@ -161,7 +181,7 @@ interface PenciltestAppAction {
   action?: Function;
   triggerOnMove?: boolean;
   repeat?: boolean;
-  cancelComplementKeyEvent: boolean;
+  cancelComplementKeyEvent?: boolean;
   text?: string;
   title?: string;
 }
@@ -178,3 +198,39 @@ interface PenciltestUIComponentOptions {
   parent: HTMLElement;
 };
 
+interface GIFEncoderInterface {
+  setDelay(ms: number): void;
+  setDispose(code: number): void;
+  setRepeat(iter: number): void;
+  setTransparent(c: number | null): void;
+  setComment(c:string): void;
+  addFrame(im:CanvasRenderingContext2D | null, ...is_imageData: boolean[]): boolean;
+  finish(): void;
+  setFrameRate(fps:number): void;
+  setQuality(quality:number): void;
+  setSize(w:number, h:number): void;
+  start(): boolean;
+  cont(): boolean;
+  stream(): { bin:Array<number> } | null;
+  setProperties(has_start:boolean, is_first:boolean): null;
+};
+
+interface RaphaelInterface {
+  version: string;
+  eve(name:string, scope:any, ...varargs:any): Array<any>;
+  // eve._events: Array<any>
+  // eve.listeners(name:string): Array<Function>
+  // eve.on(name:string, f:Function): (z:number) => any
+  // eve.f(event:string, ...args:any): Function
+  // eve.stop(): void
+  // eve.nt(subname:string): string | boolean
+  _ISURL: RegExp;
+  _availableAttrs: any;
+  _availableAnimAttrs: any;
+  _radial_gradient: RegExp;
+  _rectPath(x, y, w, h, r): Array<Array<any>>
+  _getPath: any;
+  clear(): void;
+  remove(): void;
+  path(pathString:string): HTMLElement
+};

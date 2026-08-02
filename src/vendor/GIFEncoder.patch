@@ -1,0 +1,4 @@
+10c10
+< GIFEncoder = function() {
+---
+> globalThis.GIFEncoder = function() {
