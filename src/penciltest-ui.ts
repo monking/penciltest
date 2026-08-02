@@ -4,19 +4,10 @@ class PenciltestUI extends PenciltestUIComponent {
   currentGesture: PenciltestGesture;
   controller: any;
   feedbackTimeout: number;
-  components: {
-    appStatus?: any;
-    help?: any;
-    menu?: any;
-    sceneStatus?: any;
-    statusBar?: any;
-    toggleHelp?: any;
-    toggleMenu?: any;
-    toggleTool?: any;
-  };
+  components: { [key: string]: any /* FIXME: Setting to `PenciltestUIComponent` causes `.getElement().addEventListener()` to complain: `Argument of type 'Function' is not assignable to parameter of type 'EventListenerOrEventListenerObject'.` @1785650080*/; };
   previousEvent: PointerEvent | MouseEvent | WheelEvent | KeyboardEvent | null;
   pointer: { coords: Point; };
-  uiListeners: { fieldDown: any; context: any; tool: any; help(): any; };
+  uiListeners: { [key:string]: Function; };
   menuItems: Array<HTMLElement>;
   keyBindings: { keydown: {}; keyup: {}; };
   menuIsVisible: any;
@@ -50,15 +41,15 @@ class PenciltestUI extends PenciltestUIComponent {
           'redo',
           'moreHold',
           'lessHold',
-          'copyFrame',
-          'cutFrame',
-          'pasteFrame',
+          'copyFrames',
+          'cutFrames',
+          'pasteFrames',
           'pasteStrokes',
           'insertFrameAfter',
           'insertFrameBefore',
           'insertSeconds',
           'clearFrame',
-          'dropFrame'
+          'dropFrames'
         ],
         Playback: [
           'loop',
@@ -101,7 +92,9 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Show Menu",
         hotkey: ['Tab'],
         gesture: /4 still/,
-        listener(this: Penciltest) { return this.ui.toggleMenu(this.ui.pointer.coords || {x: 10, y: 10}); }
+        listener(this: Penciltest) {
+          this.ui.toggleMenu(this.ui.pointer.coords || {x: 10, y: 10});
+        }
       },
 
       renderer: {
@@ -143,7 +136,8 @@ class PenciltestUI extends PenciltestUIComponent {
         gesture: /2 (left|right) from .* (bottom|middle)/,
         triggerOnMove: true,
         listener(this: Penciltest) {
-          return this.goToFrame(Math.floor(this.ui.currentGesture.startFrameNumber + (this.scene.frames.length * this.ui.currentGesture.deltaNormalized.x * 2)));
+          const frameOffset = this.scene.frames.length * this.ui.currentGesture.deltaNormalized.x * 2
+          this.goToFrame(Math.floor(this.ui.currentGesture.startFrameNumber + frameOffset));
         }
       },
 
@@ -155,7 +149,7 @@ class PenciltestUI extends PenciltestUIComponent {
         cancelComplementKeyEvent: true,
         listener(this: Penciltest) {
           this.playDirection = 1;
-          return this.togglePlay();
+          this.togglePlay();
         }
       },
 
@@ -172,26 +166,40 @@ class PenciltestUI extends PenciltestUIComponent {
       nextFrame: {
         label: "Next Frame",
         text: '\u27A1',
-        hotkey: ['D', 'J', 'Right','.'],
+        hotkey: ['Right', '.'],
+        hotkeyModifiers: ['Shift'],
         gesture: /2 still from right bottom/,
         repeat: true,
-        listener(this: Penciltest) {
-          this.goToFrame(this.current.frameNumber + 1);
+        listener(this: Penciltest, event) {
+          const toFrame = this.current.frameNumber + 1
+          if ((event as KeyboardEvent)?.shiftKey) {
+            this.ui.expandSelection(this.current.frameNumber, toFrame);
+          } else {
+            this.ui.clearSelection();
+          }
+          this.goToFrame(toFrame);
           this.stop();
-          if (this.options.scrubAudio && this.audioElement) { return this.scrubAudio(); }
+          this.scrubAudio();
         }
       },
 
       prevFrame: {
         label: "Previous Frame",
         text: '\u2B05',
-        hotkey: ['S', 'K', 'Left',','],
+        hotkey: ['Left', ','],
+        hotkeyModifiers: ['Shift'],
         gesture: /2 still from left bottom/,
         repeat: true,
-        listener(this: Penciltest) {
-          this.goToFrame(this.current.frameNumber - 1);
+        listener(this: Penciltest, event) {
+          const toFrame = this.current.frameNumber - 1
+          if ((event as KeyboardEvent)?.shiftKey) {
+            this.ui.expandSelection(this.current.frameNumber, toFrame);
+          } else {
+            this.ui.clearSelection();
+          }
+          this.goToFrame(toFrame);
           this.stop();
-          if (this.options.scrubAudio && this.audioElement) { return this.scrubAudio(); }
+          this.scrubAudio();
         }
       },
 
@@ -199,9 +207,16 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "First Frame",
         text: '\u23EE',
         hotkey: ['1', '0','Home','PgUp'],
+        hotkeyModifiers: ['Shift'],
         gesture: /2 left from .* (bottom|middle)/,
         cancelComplementKeyEvent: true,
-        listener(this: Penciltest) {
+        listener(this: Penciltest, event) {
+          const toFrame = 0
+          if ((event as KeyboardEvent)?.shiftKey) {
+            this.ui.expandSelection(this.current.frameNumber, toFrame);
+          } else {
+            this.ui.clearSelection();
+          }
           this.goToFrame(0);
           this.stop();
         }
@@ -211,27 +226,38 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Last Frame",
         text: '⏭️',
         hotkey: ['$','End','PgDn'],
+        hotkeyModifiers: ['Shift'],
         gesture: /2 right from .* (bottom|middle)/,
         cancelComplementKeyEvent: true,
-        listener(this: Penciltest) {
-          this.goToFrame(this.scene.frames.length - 1);
+        listener(this: Penciltest, event) {
+          const toFrame = this.scene.frames.length - 1
+          if ((event as KeyboardEvent)?.shiftKey) {
+            this.ui.expandSelection(this.current.frameNumber, toFrame);
+          } else {
+            this.ui.clearSelection();
+          }
+          this.goToFrame(toFrame);
           this.stop();
         }
       },
 
-      copyFrame: {
-        label: "Copy Frame/Strokes",
+      copyFrames: {
+        label: "Copy Frames/Strokes",
         hotkey: ['C'],
+        hotkeyModifiers: ['Control'],
         listener(this: Penciltest) {
-          this.copyFrame();
+          const [ copiedFrames ] = this.copyFrames();
+          this.ui.showFeedback(`Copied ${copiedFrames.length} frame${copiedFrames.length !== 1 ? 's' : ''}`);
         }
       },
 
-      pasteFrame: {
-        label: "Paste Frame",
+      pasteFrames: {
+      label: "Paste Frames",
         hotkey: ['V'],
+        hotkeyModifiers: ['Control'],
         listener(this: Penciltest) {
-          this.pasteFrame();
+          this.pasteFrames();
+          this.ui.showFeedback(`Pasted ${this.copyBuffer.length} frame${this.copyBuffer.length !== 1 ? 's' : ''}`);
         }
       },
 
@@ -240,6 +266,7 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Shift+V'],
         listener(this: Penciltest) {
           this.pasteStrokes()
+          this.ui.showFeedback('Pasted strokes');
         }
       },
 
@@ -251,6 +278,7 @@ class PenciltestUI extends PenciltestUIComponent {
           const newIndex = this.current.frameNumber;
           this.newFrame(newIndex);
           this.goToFrame(newIndex);
+          this.ui.showFeedback('Inserted frame before');
         }
       },
 
@@ -262,6 +290,7 @@ class PenciltestUI extends PenciltestUIComponent {
           const newIndex = this.current.frameNumber + 1;
           this.newFrame(newIndex);
           this.goToFrame(newIndex);
+          this.ui.showFeedback('Inserted frame after');
         }
       },
 
@@ -271,9 +300,10 @@ class PenciltestUI extends PenciltestUIComponent {
         async listener(this: Penciltest) {
           const newIndex = this.current.frameNumber + 1;
           const seconds = Number(await Utils.prompt('# of seconds to insert: ', 1));
-          const insertFrameCount = Math.floor(this.scene.framerate * seconds);
+          const insertFrameCount = Math.floor(this.scene.framerate / this.options.frameHold * seconds);
           this.newFrame(null, insertFrameCount);
           this.goToFrame(newIndex);
+          this.ui.showFeedback(`Inserted ${insertFrameCount} frames, beginnging at frame ${newIndex}`);
         }
       },
 
@@ -283,7 +313,10 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Z'],
         gesture: /3 still from left/,
         repeat: true,
-        listener(this: Penciltest) { this.undo(); }
+        listener(this: Penciltest) {
+          this.undo();
+          this.ui.showFeedback(`undo`);
+        }
       },
 
       redo: {
@@ -292,7 +325,10 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Shift+Z'],
         gesture: /3 still from right/,
         repeat: true,
-        listener(this: Penciltest) { this.redo(); }
+        listener(this: Penciltest) {
+          this.redo();
+          this.ui.showFeedback(`redo`);
+        }
       },
 
       lineColor: {
@@ -336,9 +372,21 @@ class PenciltestUI extends PenciltestUIComponent {
       framerate: {
         label: "Frame Rate",
         async listener(this: Penciltest) {
-          const rate = Number(await Utils.prompt('frames per second: ', this.scene.framerate));
-          if (rate) {
-            this.setOptions({framerate: rate});
+          const oldFrameRate = this.scene.framerate;
+          const newFramerate = Number(await Utils.prompt(`Set the frame rate of the scene:<br><small>FPS, frames per second</small>`, this.scene.framerate));
+          if (newFramerate && newFramerate !== oldFrameRate) {
+            const newOptions:PenciltestOptions = {framerate: newFramerate};
+            const [ isMultiple, absFactor, factorError, newIsLarger ] = Utils.isMultiple(newFramerate, oldFrameRate, 0.002);
+            const promptMessage = `Adjust all frame hold times?\nThe new frame rate is ${isMultiple ? 'exactly' : `approximately`} ${absFactor} times ${newIsLarger ? 'faster' : 'slower'} than before${isMultiple ? '' : ` (${Utils.getDecimal(factorError, 3)} off)`}.`
+            const factor = newIsLarger ? absFactor : 1/absFactor;
+            if (await Utils.confirm(promptMessage)) {
+              newOptions.frameHold = Math.round(this.options.frameHold * factor);
+              this.scene.frames.forEach((frame) => {
+                const oldHold = frame.hold || 1;
+                frame.hold = Math.round(oldHold * factor);
+              });
+            }
+            this.setOptions(newOptions);
           }
         },
         action(this: Penciltest) {
@@ -354,17 +402,16 @@ class PenciltestUI extends PenciltestUIComponent {
       frameHold: {
         label: "Default Frame Hold",
         async listener(this: Penciltest) {
-          const self = this
-          const hold = await Utils.prompt('default exposures per drawing: ', self.options.frameHold);
+          const hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
           if (hold) {
-            const oldHold = self.options.frameHold;
-            self.setOptions({frameHold: Number(hold)});
-            if (await Utils.confirm('update hold for existing frames in proportion to new setting??: ')) {
-              const magnitudeDelta = self.options.frameHold / oldHold;
-              self.scene.frames.forEach((frame) => {
+            const oldHold = this.options.frameHold;
+            this.setOptions({frameHold: Number(hold)});
+            if (await Utils.confirm('Update hold for existing frames in proportion to new setting?')) {
+              const magnitudeDelta = this.options.frameHold / oldHold;
+              this.scene.frames.forEach((frame) => {
                 frame.hold = Math.round(frame.hold * magnitudeDelta);
               });
-              self.drawCurrentFrame() // FIXME: not sure why I need to redraw here. something about `setoptions frameHold` above?
+              this.drawCurrentFrame()
             }
           }
         }
@@ -396,20 +443,27 @@ class PenciltestUI extends PenciltestUIComponent {
         listener(this: Penciltest) { this.clearStrokes(); }
       },
 
-      dropFrame: {
+      dropFrames: {
         label: "Drop Frame",
         hotkey: ['Shift+X'],
         gesture: /4 down from center top/,
         cancelComplementKeyEvent: true,
-        listener(this: Penciltest) { this.dropFrame(); }
+        listener(this: Penciltest) {
+          const [ frames, start ] = this.dropFrames();
+          this.ui.showFeedback(`Dropped ${frames.length} frame${frames.length !== 1 ? 's' : ''}`);
+        }
       },
 
-      cutFrame: {
+      cutFrames: {
         label: "Cut Frame",
         hotkey: ['X'],
         gesture: /3 down from center top/,
         cancelComplementKeyEvent: true,
-        listener(this: Penciltest) { this.cutFrame(); }
+        hotkeyModifiers: ['Control'],
+        listener(this: Penciltest) {
+          const [ frames ] = this.cutFrames();
+          this.ui.showFeedback(`Cut ${frames.length} frame${frames.length !== 1 ? 's' : ''}`);
+        }
       },
 
       smoothing: {
@@ -427,7 +481,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
       smoothFrame: {
         label: "Smooth Frame",
-        title: "Draw the frame again, with current smoothing settings",
+        title: "Redraws the current frame, using current smoothing settings",
         hotkey: ['Shift+M'],
         listener(this: Penciltest) { this.smoothFrame(this.current.frameNumber); }
       },
@@ -455,7 +509,10 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Down', '-'],
         gesture: /2 still from left middle/,
         repeat: true,
-        listener(this: Penciltest) { this.setCurrentFrameHold(this.getCurrentFrame().hold - 1); }
+        listener(this: Penciltest) {
+          this.setCurrentFrameHold(this.getCurrentFrame().hold - 1);
+          this.scrubAudio(-1);
+        }
       },
 
       moreHold: {
@@ -463,7 +520,10 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Up', '+', '='],
         gesture: /2 still from right middle/,
         repeat: true,
-        listener(this: Penciltest) { this.setCurrentFrameHold(this.getCurrentFrame().hold + 1); }
+        listener(this: Penciltest) {
+          this.setCurrentFrameHold(this.getCurrentFrame().hold + 1);
+          this.scrubAudio(-1);
+        }
       },
 
       debug: {
@@ -474,7 +534,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
       showStatus: {
         label: "Show Status",
-        title: "hide the scene status bar",
+        title: "Show/hide the scene status bar",
         listener(this: Penciltest) { this.setOptions({showStatus: !this.options.showStatus}); },
         action(this: Penciltest) { Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus); },
       },
@@ -485,40 +545,83 @@ class PenciltestUI extends PenciltestUIComponent {
         gesture: /2 up from center (bottom|middle)/,
         listener(this: Penciltest) {
           this.setOptions({ loop: !this.options.loop });
+          this.ui.showFeedback(`Loop: ${this.options.loop ? 'ON' : 'OFF'}`);
         }
       },
 
       scrubAudio: {
         label: "Scrub audio",
+        hotkey: ['A'],
         title: "Play audio at the current frame when changing frames, other than regular playback.",
         listener(this: Penciltest) {
           this.setOptions({ scrubAudio: !this.options.scrubAudio });
+          this.ui.showFeedback(`Scrub audio: ${this.options.scrubAudio ? 'ON' : 'OFF'}`);
+        }
+      },
+
+      splitFrame: {
+        label: "Split frame",
+        hotkey: ['B'],
+        title: "Split the current frame into two.",
+        async listener(this: Penciltest) {
+          const frame = this.getCurrentFrame();
+          if (!frame) {
+            this.ui.showFeedback('No frame to split');
+            return;
+          }
+          if (frame.hold < 2) {
+            this.ui.showFeedback('Frame must be held for 2 or more exposures to split.');
+            return;
+          }
+          let splitOffset = Math.floor(frame.hold/2);
+          if (frame.hold > 2) {
+            const promptOptions = {
+              'input':'range',
+              'inputAttrs': {
+                'min':1,
+                'max':frame.hold - 1
+              },
+              'labelLogic': (offset:string) => offset
+            };
+            splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${frame.hold} exposures, where to split?</small>`, splitOffset, promptOptions))
+          }
+          if (splitOffset) {
+            this.splitFrame(this.current.frameNumber, splitOffset);
+            this.ui.triggerAppAction('nextFrame');
+          }
         }
       },
 
       saveScene: {
         label: "Save",
-        hotkey: ['Ctrl+Alt+S'],
+        hotkey: ['S'],
         gesture: /3 still from center (bottom|middle)/,
         async listener(this: Penciltest) {
           await this.updateScene();
           this.saveScene();
+          this.ui.showFeedback(`Saved scene to browser local storage`);
         }
       },
 
       renameScene: {
         label: "Name Scene",
         async listener(this: Penciltest) {
-          const newName = await Utils.prompt("What's the name of your scene?", this.scene.name);
-          if (newName) { this.scene.name = newName; }
+          const newName = await Utils.prompt("Scene name:", this.scene.name);
+          if (newName) {
+            this.scene.name = newName;
+            this.ui.updateStatus();
+          }
         }
       },
 
       loadScene: {
         label: "Load",
-        hotkey: ['Alt+O'],
+        hotkey: ['Shift+O'],
         gesture: /3 up from center (bottom|middle)/,
-        async listener(this: Penciltest) { return this.loadScene(); }
+        async listener(this: Penciltest) {
+          await this.loadScene();
+          this.ui.showFeedback(`Loaded scene: ${this.scene.name}`);
+        }
       },
 
       newScene: {
@@ -607,7 +710,12 @@ class PenciltestUI extends PenciltestUIComponent {
       deleteScene: {
         label: "Delete Scene",
         hotkey: ['Alt+Backspace'],
-        async listener(this: Penciltest) { return this.deleteScene(); }
+        async listener(this: Penciltest) {
+          const deletedSceneName = await this.deleteScene();
+          if (deletedSceneName) {
+            this.ui.showFeedback(`Deleted scene: ${deletedSceneName}`);
+          }
+        }
       },
 
       exportScene: {
@@ -636,7 +744,7 @@ class PenciltestUI extends PenciltestUIComponent {
             submitOnChange: true
           };
           const [sceneJSON, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
-          const scene = PenciltestVersions.unpackScene(JSON.parse(sceneJSON));
+          const scene = await PenciltestVersions.unpackScene(JSON.parse(sceneJSON));
           this.setScene(scene);
           this.saveScene(false);
         }
@@ -669,11 +777,12 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['['],
         title: "Decrease the offset of the audio playback",
         listener(this: Penciltest) {
-          console.log("Shift Audio Earlier");
-          if (this.scene.audio) {
-            this.scene.audio.offset--;
+          if (!this.scene.audio) {
+            this.scene.audio = {offset:0};
           }
+          this.scene.audio.offset--;
           this.ui.updateStatus();
+          this.ui.showFeedback(`Audio shift: ${this.scene.audio.offset} s`);
         }
       },
 
@@ -682,13 +791,12 @@ class PenciltestUI extends PenciltestUIComponent {
         title: "Increase the offset of the audio playback",
         hotkey: [']'],
         listener(this: Penciltest) {
-          if (this.scene.audio) {
-            console.log("Shift Audio Later");
-            this.scene.audio.offset++;
-            this.ui.updateStatus();
-          } else {
-            console.log("No audio to shift");
+          if (!this.scene?.audio?.offset) {
+            this.scene.audio = {offset:0};
           }
+          this.scene.audio.offset++;
+          this.ui.updateStatus();
+          this.ui.showFeedback(`Audio shift: ${this.scene.audio.offset} s`);
         }
       },
 
@@ -704,6 +812,7 @@ class PenciltestUI extends PenciltestUIComponent {
         action(this: Penciltest) {
           this.state = { ...Penciltest.prototype.state };
           this.setOptions(Penciltest.prototype.options);
+          this.currentStrokeIndex = -1;
         }
       },
 
@@ -716,7 +825,6 @@ class PenciltestUI extends PenciltestUIComponent {
               ? this.state.toolStack[1]
               : PenciltestTools.ERASER
           );
-          this.ui.updateStatus();
         }
       },
     };
@@ -798,12 +906,15 @@ class PenciltestUI extends PenciltestUIComponent {
     return this.components.menu.setHTML(this.menuWalker(this.menuOptions));
   }
 
-  doAppAction(optionName: string, args: object = {}) {
-    if (args == null) { args = []; }
-    if (this.appActions[optionName] != null ? this.appActions[optionName].listener : undefined) {
-      return (this.appActions[optionName].listener != null ? this.appActions[optionName].listener.call(this.controller, args) : undefined);
-    } else if (this.appActions[optionName] != null ? this.appActions[optionName].action : undefined) {
-      return this.appActions[optionName].action.call(this.controller, args);
+  async triggerAppAction(optionName: string, ...args: Array<any>) {
+    if (typeof this.appActions[optionName]?.listener === 'function') {
+      await this.appActions[optionName].listener.apply(this.controller, args);
+    }
+  }
+
+  async handleAppReaction(optionName: string, ...args: Array<any>) {
+    if (typeof this.appActions[optionName]?.action === 'function') {
+      await this.appActions[optionName].action.apply(this.controller, args);
     }
   }
 
@@ -868,7 +979,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
     //const trackFromEvent = (pageCoords: any) => self.pointer.coords = pageCoords; // DELME: unused @1785514531
 
-    const mouseDownListener = function(event: PointerEvent | TouchEvent) {
+    const fieldMouseDownListener = function(event: PointerEvent | TouchEvent) {
       this.previousEvent = event;
       if (this.controller.state.mode !== PenciltestModes.DRAWING) { return; }
       event.preventDefault();
@@ -881,7 +992,7 @@ class PenciltestUI extends PenciltestUIComponent {
           height: this.controller.height
         };
         if (!this.currentGesture) {
-          this.doAppAction('undo');
+          this.triggerAppAction('undo');
         }
         this.clearGesture();
         this.recordGesture(event as TouchEvent, this.fieldBounds);
@@ -949,7 +1060,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
     const toggleToolListener = function(event: PointerEvent | TouchEvent) {
       event.preventDefault();
-      return this.appActions.eraser.listener.call(this.controller);
+      return this.triggerAppAction('eraser');
     };
 
     const contextMenuListener = function(event: PointerEvent | TouchEvent) {
@@ -957,6 +1068,19 @@ class PenciltestUI extends PenciltestUIComponent {
       if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
         return this.toggleMenu(getEventPageXY(event));
       }
+    };
+
+    const globalMouseDownListener = function(event: PointerEvent | TouchEvent) {
+      if (this.menuIsVisible && !this.components.menu.getElement().contains(event.target)) {
+        this.hideMenu();
+      }
+    };
+
+    const statusClickListener = function(event: PointerEvent | TouchEvent) {
+      const targetElement = event.target as HTMLElement
+      if (typeof targetElement?.hasAttribute !== 'function' || !targetElement.hasAttribute('rel')) { return; }
+      const statusRel = targetElement.getAttribute('rel');
+      this.triggerAppAction(statusRel, event);
     };
 
     // # doesn't work; Chrome warns: 
@@ -979,15 +1103,21 @@ class PenciltestUI extends PenciltestUIComponent {
     // document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
 
     this.uiListeners = {
-      fieldDown: mouseDownListener.bind(this),
+      globalDown: globalMouseDownListener.bind(this),
+      statusClick: statusClickListener.bind(this),
+      fieldDown: fieldMouseDownListener.bind(this),
       context: contextMenuListener.bind(this),
       tool: toggleToolListener.bind(this),
-      help() { return self.doAppAction('toggleInterfaceHelp'); }
+      help() { self.triggerAppAction('toggleInterfaceHelp'); }
     };
 
+    this.components.appStatus.getElement().addEventListener('click', this.uiListeners.statusClick);
+    this.components.sceneStatus.getElement().addEventListener('click', this.uiListeners.statusClick);
     this.controller.fieldElement.addEventListener('mousedown', this.uiListeners.fieldDown);
     this.controller.fieldElement.addEventListener('touchstart', this.uiListeners.fieldDown);
     this.controller.fieldElement.addEventListener('contextmenu', this.uiListeners.context);
+    this.controller.container.addEventListener('mousedown', this.uiListeners.globalDown);
+    this.controller.container.addEventListener('touchstart', this.uiListeners.globalDown);
     this.components.toggleTool.getElement().addEventListener('click', this.uiListeners.tool);
     this.components.toggleMenu.getElement().addEventListener('click', this.uiListeners.context);
     return this.components.toggleHelp.getElement().addEventListener('click', this.uiListeners.help);
@@ -1018,7 +1148,7 @@ class PenciltestUI extends PenciltestUIComponent {
       const action = this.appActions[name];
       if (!action.triggerOnMove && action.gesture && action.gesture.test(gestureDescription)) {
         this.controller.options.debug && console.debug("action '%s' triggered by gesture '%s'", name, gestureDescription);
-        return this.doAppAction(name);
+        this.triggerAppAction(name);
       }
     }
   }
@@ -1085,7 +1215,8 @@ class PenciltestUI extends PenciltestUIComponent {
     for (let name in this.appActions) {
       const action = this.appActions[name];
       if (action.triggerOnMove && action.gesture && action.gesture.test(gestureDescription)) {
-        return this.doAppAction(name);
+        this.triggerAppAction(name);
+        return;
       }
     }
   }
@@ -1118,7 +1249,7 @@ class PenciltestUI extends PenciltestUIComponent {
       } else if (this.hasAttribute('rel')) {
         event.preventDefault();
         const optionName = this.getAttribute('rel');
-        self.doAppAction(optionName);
+        self.triggerAppAction(optionName);
         return self.hideMenu();
       }
     };
@@ -1148,6 +1279,11 @@ class PenciltestUI extends PenciltestUIComponent {
         for (let hotkey of action.hotkey) {
           if (action.repeat) {
             this.keyBindings.keydown[hotkey] = name;
+            if (action.hotkeyModifiers) {
+              action.hotkeyModifiers.forEach((modifierKey) => {
+                this.keyBindings.keydown[`${modifierKey}+${hotkey}`] = name;
+              });
+            }
 
             if (action.cancelComplementKeyEvent) {
               this.keyBindings.keyup[hotkey] = null;
@@ -1156,6 +1292,11 @@ class PenciltestUI extends PenciltestUIComponent {
           } else {
 
             this.keyBindings.keyup[hotkey] = name;
+            if (action.hotkeyModifiers) {
+              action.hotkeyModifiers.forEach((modifierKey) => {
+                this.keyBindings.keyup[`${modifierKey}+${hotkey}`] = name;
+              });
+            }
 
             if (action.cancelComplementKeyEvent) {
               this.keyBindings.keydown[hotkey] = null;
@@ -1174,7 +1315,7 @@ class PenciltestUI extends PenciltestUIComponent {
           event.preventDefault();
 
           if (actionName) {
-            return self.doAppAction(actionName);
+            self.triggerAppAction(actionName, event);
           }
         }
       }
@@ -1193,9 +1334,9 @@ class PenciltestUI extends PenciltestUIComponent {
         return;
       }
       if (event.deltaY > 0) {
-        return self.doAppAction('nextFrame');
+        return self.triggerAppAction('nextFrame');
       } else {
-        return self.doAppAction('prevFrame');
+        return self.triggerAppAction('prevFrame');
       }
     });
     return globalThis.addEventListener('beforeunload', function(event: BeforeUnloadEvent) {
@@ -1259,25 +1400,44 @@ class PenciltestUI extends PenciltestUIComponent {
 
   updateStatus() {
     if (this.controller.options.showStatus) {
-      let appStatusMarkup = `v${Penciltest.version}`;
-      const statuses = []
-      statuses.push(this.controller.state.mode);
-      statuses.push(`~${this.controller.options.smoothing}`);
-      appStatusMarkup += ` (${statuses.join(' | ')})`;
+      const appStatuses = [];
 
-      this.components.appStatus.setHTML(appStatusMarkup);
-
-      let sceneStatusMarkup = "<div class=\"frame\">";
-      sceneStatusMarkup += `${this.controller.scene.framerate} FPS`;
-      sceneStatusMarkup += ` | (hold ${this.controller.getCurrentFrame().hold})`;
-      sceneStatusMarkup += ` | ${this.controller.current.frameNumber + 1}/${this.controller.scene.frames.length}`;
-      sceneStatusMarkup += ` | ${Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, true)}`;
-      if (this.controller.scene.audio != null ? this.controller.scene.audio.offset : undefined) {
-        sceneStatusMarkup += ` ${this.controller.scene.audio.offset >= 0 ? '+' : ''}${this.controller.scene.audio.offset}`;
+      let versionStatus = `v${Penciltest.version}`
+      if (this.controller?.scene?.version && this.controller.version !== this.controller.scene.version) {
+        versionStatus += ` (@v${this.controller.scene.version})`
       }
-      sceneStatusMarkup += "</div>";
+      appStatuses.push(`<span rel="upgrade">${versionStatus}</span>`);
 
-      this.components.sceneStatus.setHTML(sceneStatusMarkup);
+      appStatuses.push(`<span title="Current mode. If you're stuck, try the Reset option in Settings.">${this.controller.state.mode}</span>`);
+
+      appStatuses.push(`<span title="Drawing smoothing factor (click to change)" rel="smoothing">~${this.controller.options.smoothing}</span>`);
+
+      appStatuses.push(`<span title="Current scene name (click to rename)" rel="renameScene"><small>SCN:</small>${this.controller.scene.name || 'untitled'}</span>`);
+
+      this.components.appStatus.setHTML(`${appStatuses.join(' | ')}`);
+
+      const sceneStatuses = [];
+
+      const framerate = this.controller?.scene?.framerate;
+      if (framerate) {
+        let rateInfo = `<small>FPS:</small>${framerate}`;
+
+        const hold = this.controller.getCurrentFrame()?.hold;
+        if (hold) {
+          rateInfo+=`/<span title="Holding this frame for ${hold} exposures.">${hold}</span>`
+        }
+
+        sceneStatuses.push(`<span rel="framerate" title="Frame rate (click to change), and the hold duration for the current frame.">${rateInfo}</span>`);
+      }
+
+      sceneStatuses.push(`<small>frame:</small>${this.controller.current.frameNumber + 1}/${this.controller.scene.frames.length}`);
+
+      sceneStatuses.push(`<span title="The time position of the current frame, in seconds. Click to insert many frames." rel="insertSeconds"><small>time:</small>${Utils.getDecimal(this.controller.current.frames[this.controller.current.frameNumber].time, 1, true)}</span>`);
+      if (this.controller.scene.audio?.offset) {
+        sceneStatuses.push(`${this.controller.scene.audio.offset >= 0 ? '+' : ''}${this.controller.scene.audio.offset}`);
+      }
+
+      this.components.sceneStatus.setHTML(`<div class="frame">${sceneStatuses.join(' | ')}</div>`);
       return this.components.toggleTool.getElement().className = `toggle-tool fa fa-${this.controller.state.toolStack[0]}`;// FIXME: use a helper to do this
     }
   }
@@ -1311,19 +1471,16 @@ class PenciltestUI extends PenciltestUIComponent {
         menuElement.style.bottom = "auto";
       }
 
-      return (() => {
-        const result = [];
-        for (let option of Array.from(this.menuItems)) {
-          if (option.hasAttribute('rel')) { result.push(this.updateMenuOption(option)); } else {
-            result.push(undefined);
-          }
+      this.menuItems.forEach((option) => {
+        if (option.hasAttribute('rel')) {
+          this.updateMenuOption(option);
         }
-        return result;
-      })();
+      });
     }
   }
 
   hideMenu() {
+    //console.info(`called hideMenu`); // XXX
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
       return Utils.toggleClass(this.components.menu.getElement(), 'active', false);
@@ -1334,9 +1491,7 @@ class PenciltestUI extends PenciltestUIComponent {
     if (this.menuIsVisible) { return this.hideMenu(); } else { return this.showMenu(coords); }
   }
 
-  showFeedback(message: any, duration: number) {
-    if (duration == null) { duration = 2000; }
-    const self = this;
+  showFeedback(message: any, duration: number = 2000) {
     if (!this.feedbackElement) {
       this.feedbackElement = new PenciltestUIComponent({id: 'pt-feedback', parent: this});
     }
@@ -1344,7 +1499,28 @@ class PenciltestUI extends PenciltestUIComponent {
     this.feedbackElement.getElement().style.opacity = 1;
 
     clearTimeout(this.feedbackTimeout);
-    const hideFeedback = () => self.feedbackElement.getElement().style.opacity = 0;
+    const hideFeedback = () => this.feedbackElement.getElement().style.opacity = 0;
     return this.feedbackTimeout = setTimeout(hideFeedback, duration);
+  }
+
+  expandSelection(from:number = NaN, to:number = NaN) {
+    if (isNaN(from)) {
+      from = this.controller.current.frameNumber;
+    }
+    if (isNaN(to)) {
+      to = from;
+    }
+    from = Math.min(this.controller.current.frames.length - 1, Math.max(0, from));
+    to = Math.min(this.controller.current.frames.length - 1, Math.max(0, to));
+    if (!this.controller.state.frameSelection) {
+      this.controller.state.frameSelection = {start:from};
+    }
+    this.controller.state.frameSelection.end = to;
+    const selectionCount = Math.abs(this.controller.state.frameSelection.end - this.controller.state.frameSelection.start) + 1;
+    this.showFeedback(`Selecting ${selectionCount} frame${selectionCount !== 1 ? 's' : ''}`);
+  }
+
+  clearSelection() {
+    delete this.controller.state.frameSelection;
   }
 }

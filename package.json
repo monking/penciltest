@@ -4,7 +4,7 @@
   "repository": "git@github.com:monking/penciltest.git",
   "scripts": {
     "start": "tsc && node node_modules/grunt-cli/bin/grunt",
-    "debug": ">&2 echo -n \"ENTER to run and paginate \\`tsc --pretty --noEmit\\`. Ctrl+D to end. > \"; while read -s; do tsc --pretty --noEmit | less -R; done; >&2 echo DONE;"
+    "debug": ">&2 echo -n \"ENTER to run and paginate \\`tsc --pretty --noEmit\\`. Ctrl+D to end. > \"; i=0; while [[ $i == 0 ]] || read -s; do let i++; tsc --pretty --noEmit | less -R; done; >&2 echo DONE;"
   },
   "devDependencies": {
     "grunt": "^0.4.4",

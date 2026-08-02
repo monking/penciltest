@@ -65,10 +65,10 @@ class BaseRenderer implements PenciltestRenderer {
     if (persist !== true) { Object.assign(composedOptions, overrides); }
 
     this.currentLineOptions = {
-      color: composedOptions.lineColor,
-      weight: composedOptions.lineWeight,
-      corner: composedOptions.lineCorner,
-      opacity: composedOptions.lineOpacity
+      lineColor: composedOptions.lineColor,
+      lineWeight: composedOptions.lineWeight,
+      lineCorner: composedOptions.lineCorner,
+      lineOpacity: composedOptions.lineOpacity
     };
   }
 

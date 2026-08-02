@@ -21,12 +21,7 @@ class Penciltest {
   static defaultOptions: PenciltestOptions = {
     background: 'gray',
     container: 'body',
-    frameHold: 2,
-    framerate: 12,
     hideCursor: false,
-    lineColor: 'black',
-    lineWeight: 1,
-    loop: true,
     onionSkin: true,
     onionSkinFrameRadius: 4,
     onionSkinOpacity: 0.5,
@@ -34,6 +29,13 @@ class Penciltest {
     scrubAudio: true,
     showStatus: true,
     smoothing: 1,
+
+    /* These options are in common with PenciltestScene */
+    frameHold: 1,
+    framerate: 12,
+    lineColor: 'black',
+    lineWeight: 1,
+    loop: false
   };
 
 
@@ -56,7 +58,7 @@ class Penciltest {
   playInterval: any;
   audioElement: HTMLMediaElement;
   scrubAudioTimeout: number;
-  copyBuffer: any;
+  copyBuffer: Array<PenciltestFrame>;
   redoQueue: Array<Stroke>;
   forceDimensions: Bounds | null;
   width: number;
@@ -75,6 +77,7 @@ class Penciltest {
       toolStack: [PenciltestTools.PENCIL,PenciltestTools.ERASER],
       ...this.getStoredData('app', 'state') as PenciltestState,
     };
+    this.currentStrokeIndex = -1;
   
     // metadata generated while interpreting the scene data
     this.current = new SceneState();
@@ -103,20 +106,12 @@ class Penciltest {
 
   setOptions(newOptions: PenciltestOptions) {
     Object.assign(this.options, newOptions);
-    //...Penciltest.state, // FIXME, was this meaningful? @1785486819
-
-    return (() => {
-      const result = [];
-      for (let key in newOptions) {
-        const value = newOptions[key];
-        if (key in this.ui.appActions && this.ui.appActions[key].action) {
-          result.push(this.ui.appActions[key].action.call(this));
-        } else {
-          result.push(undefined);
-        }
+    for (let optionName in newOptions) {
+      if (optionName in this.ui.appActions && typeof this.ui.appActions[optionName].action === 'function') {
+        this.ui.handleAppReaction(optionName);
       }
-      return result;
-    })();
+    }
+    this.ui.updateStatus();
   }
 
   buildContainer() {
@@ -128,6 +123,20 @@ class Penciltest {
 
     this.fieldContainer = this.container.querySelector('.field-container');
     return this.fieldElement = this.container.querySelector('.field');
+  }
+
+  setMode(mode:PenciltestModes): boolean {
+    if (mode !== this.state.mode) {
+      this.state.previousMode = this.state.mode;
+      this.state.mode = mode;
+      this.ui.updateStatus();
+      return true;
+    }
+    return false;
+  }
+
+  resetMode(): boolean {
+    return this.setMode(this.state.previousMode || PenciltestModes.DRAWING);
   }
 
   newFrame(insertAtIndex = null, count:number = 1, options:PenciltestFrame = {}) {
@@ -158,11 +167,11 @@ class Penciltest {
   }
 
   getCurrentStroke() {
-    return this.getCurrentFrame().strokes[this.currentStrokeIndex || 0];
+    return this.getCurrentFrame().strokes[this.currentStrokeIndex > -1 ? this.currentStrokeIndex : 0];
   }
 
   mark(point: Point) {
-    if (!this.currentStrokeIndex) {
+    if (this.currentStrokeIndex < 0) {
       let frame = this.getCurrentFrame();
       if (!frame.strokes) { frame.strokes = []; }
       this.currentStrokeIndex = frame.strokes.length;
@@ -173,7 +182,9 @@ class Penciltest {
       this.renderer.lineTo(point.x, point.y);
     }
 
-    this.getCurrentStroke().path.push(Utils.scalePoint(point, 1 / this.zoomFactor));
+    const stroke = this.getCurrentStroke();
+    if (!stroke) { return; } // FIXME This shouldn't happen, right?
+    stroke.path.push(Utils.scalePoint(point, 1 / this.zoomFactor));
     if (this.state.mode === PenciltestModes.DRAWING) {
       this.renderer.render();
     }
@@ -205,7 +216,7 @@ class Penciltest {
       }
       return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
     } else if (this.options.smoothing > 0) {
-      if ((this.currentStrokeIndex == null)) {
+      if ((this.currentStrokeIndex < 0)) {
         this.markPoint = trackPoint;
         this.markBuffer = [];
       }
@@ -244,21 +255,21 @@ class Penciltest {
     // this.current.frame = this.scene.frames[this.current.frameNumber]; // DELME unused @1785515083
 
     if (this.state.mode !== PenciltestModes.PLAYING) {
+      this.lift();
       this.seekAudioToFrame(selectedFrameNumber);
     }
+    this.ui.updateStatus(); // FIXME: Probably too slow, rewriting all status DOM elemets, on each frame of play.
     return this.drawCurrentFrame(overrides);
   }
 
-  seekAudioToFrame(frameNumber: number) {
+  seekAudioToFrame(frameNumber: number, exposureOffset:number = 0) {
     if (this.scene.audio) {
-      console.log(this.current.frames[frameNumber]);
-      const seekTime = this.current.frames[frameNumber].time - this.scene.audio.offset;
+      const seekTime = this.current.frames[frameNumber].time + exposureOffset * this.current.singleFrameDuration - this.scene.audio.offset;
       return this.seekAudio(seekTime);
     }
   }
 
   play() {
-    const self = this;
     if (this.playDirection == null) { this.playDirection = 1; }
     if (this.current.frameNumber < this.scene.frames.length) { // i.e. it is a frame in the scene (in case @current.frameNumber was
       this.framesHeld = 0;
@@ -268,22 +279,23 @@ class Penciltest {
       this.goToFrame(0);
     }
 
-    const stepListener = function(firstStep: boolean) {
-      self.framesHeld++;
-      const currentFrame = self.getCurrentFrame();
-      let newIndex = self.current.frameNumber + self.playDirection;
-      if ((self.framesHeld >= currentFrame.hold) || ( firstStep && (newIndex === self.scene.frames.length) )) {
-        self.framesHeld = 0;
-        if ((newIndex >= self.scene.frames.length) || (newIndex < 0)) {
-          if (self.options.loop || firstStep) {
-            newIndex = (newIndex + self.scene.frames.length) % self.scene.frames.length;
-            self.goToFrame(newIndex);
-            return self.seekAudioToFrame(0);
+    const stepListener = (firstStep: boolean) => {
+      this.framesHeld++;
+      const currentFrame = this.getCurrentFrame();
+      let newIndex = this.current.frameNumber + this.playDirection;
+      if ((this.framesHeld >= currentFrame.hold) || ( firstStep && (newIndex === this.scene.frames.length) )) {
+        this.framesHeld = 0;
+        if ((newIndex >= this.scene.frames.length) || (newIndex < 0)) {
+          if (this.options.loop || firstStep) {
+            newIndex = (newIndex + this.scene.frames.length) % this.scene.frames.length;
+            this.goToFrame(newIndex);
+            return this.seekAudioToFrame(newIndex);
           } else {
-            return self.stop();
+            this.stop();
+            this.ui.updateStatus();
           }
         } else {
-          return self.goToFrame(newIndex);
+          return this.goToFrame(newIndex);
         }
       }
     };
@@ -292,7 +304,7 @@ class Penciltest {
     stepListener(true);
     this.playInterval = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
-    this.state.mode = PenciltestModes.PLAYING;
+    this.setMode(PenciltestModes.PLAYING);
     return this.playAudio();
   }
 
@@ -300,13 +312,17 @@ class Penciltest {
     if (this.audioElement) { this.pauseAudio(); }
     clearInterval(this.playInterval);
     if (this.state.mode === PenciltestModes.PLAYING) {
-      return this.state.mode = PenciltestModes.DRAWING;
+      this.resetMode();
     }
   }
 
   togglePlay() {
     if (this.state.mode !== PenciltestModes.WORKING) {
-      if (this.state.mode === PenciltestModes.PLAYING) { return this.stop(); } else { return this.play(); }
+      if (this.state.mode === PenciltestModes.PLAYING) {
+        return this.stop();
+      } else {
+        return this.play();
+      }
     }
   }
 
@@ -353,7 +369,6 @@ class Penciltest {
     }
     this.renderer.composeOptions();
     this.drawFrame(this.current.frameNumber, overrides);
-    return this.ui.updateStatus();
   }
 
   drawFrame(frameNumber: number, overrides: PenciltestRendererOptions): PenciltestFrame {
@@ -362,8 +377,10 @@ class Penciltest {
     if (overrides) { this.renderer.composeOptions(overrides); }
 
     const frame = this.scene.frames[frameNumber]
-    frame.strokes.map((stroke: Stroke) =>
-      this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
+    if (frame?.strokes?.length > 0) {
+      frame.strokes.map((stroke: Stroke) =>
+        this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
+    }
     return frame;
   }
 
@@ -375,16 +392,25 @@ class Penciltest {
     };
   }
 
-  useTool(toolName: any) {
+  useTool(toolName: PenciltestTools) {
     const index = this.state.toolStack.indexOf(toolName);
     if (index > -1) {
-      return this.state.toolStack.unshift(this.state.toolStack.splice(index, 1)[0]);
+      this.state.toolStack.splice(index, 1);
     }
+    this.state.toolStack.unshift(toolName);
+    if (toolName === PenciltestTools.ERASER) {
+      if (this.state.mode === PenciltestModes.DRAWING) {
+        this.setMode(PenciltestModes.ERASING);
+      }
+    } else if (PenciltestModes.ERASING) {
+      this.setMode(PenciltestModes.DRAWING);
+    }
+    this.ui.updateStatus();
   }
 
   cancelStroke() {
     this.markBuffer = [];
-    return this.currentStrokeIndex = null;
+    return this.currentStrokeIndex = -1;
   }
 
   lift() {
@@ -393,31 +419,61 @@ class Penciltest {
       this.mark(last);
       this.markBuffer = [];
     }
-    this.currentStrokeIndex = null;
+    this.currentStrokeIndex = -1;
     if (this.state.toolStack[0] === PenciltestTools.ERASER) {
       return this.drawCurrentFrame();
     }
   }
 
-  copyFrame(frame: PenciltestFrame | null = null) {
-    if (frame == null) { frame = this.getCurrentFrame(); }
-    if (frame.strokes.length) {
-      return this.copyBuffer = Utils.clone(frame);
+  getSelectedFrames(frames: Array<PenciltestFrame> = [], cut:boolean = false): [ Array<PenciltestFrame>, number ] {
+    if (frames.length > 0) {
+      return [ frames, -1 ];
+    } else {
+      const [ selection, index ] = Utils.getRange(this.state.frameSelection, this.scene.frames, cut);
+      if (cut) { this.buildSceneMeta(); }
+      if (selection.length > 0) {
+        return [ selection, index ];
+      } else if (cut) {
+        return [ this.scene.frames.splice(this.current.frameNumber, 1), this.current.frameNumber ];
+      } else {
+        return [ [this.getCurrentFrame()], this.current.frameNumber];
+      }
     }
   }
 
-  pasteFrame() {
+  copyFrames(): [ Array<PenciltestFrame>, number ] {
+    const [ frames, start ] = this.getSelectedFrames();
+    debugger
+    this.copyBuffer = Utils.clone(frames);
+    return [ this.copyBuffer, start ];
+  }
+
+  pasteFrames() {
     if (this.copyBuffer) {
       const newFrameNumber = this.current.frameNumber + 1;
-      this.scene.frames.splice(newFrameNumber, 0, Utils.clone(this.copyBuffer));
-      this.buildSceneMeta();
-      return this.goToFrame(newFrameNumber);
+      this.insertFrames(Utils.clone(this.copyBuffer), newFrameNumber);
+      this.goToFrame(newFrameNumber);
     }
+  }
+
+  insertFrames(frames:Array<PenciltestFrame>, position:number) {
+    Array.prototype.splice.apply(this.scene.frames, [position, 0].concat(frames as Array<any>));
+    this.buildSceneMeta();
+    this.ui.updateStatus();
+  }
+
+  splitFrame(frameNumber:number, splitOffset:number) {
+    const frame = this.scene?.frames[frameNumber];
+    const oldHold = frame.hold;
+    frame.hold = splitOffset;
+    const newFrame = Utils.clone(frame);
+    newFrame.hold = oldHold - splitOffset;
+    this.insertFrames([newFrame], frameNumber + 1);
   }
 
   pasteStrokes() {
-    if (this.copyBuffer) {
-      this.scene.frames[this.current.frameNumber].strokes = this.scene.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer.strokes));
+    if (this.copyBuffer?.length > 0) {
+      this.scene.frames[this.current.frameNumber].strokes = this.scene.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer[0].strokes));
       return this.drawCurrentFrame();
     }
   }
@@ -427,43 +483,49 @@ class Penciltest {
     return this.drawCurrentFrame();
   }
 
-  cutFrame() {
-    const droppedFrame = this.dropFrame();
-    if (droppedFrame.strokes.length) { return this.copyFrame(droppedFrame); }
+  cutFrames(): [ Array<PenciltestFrame>, number ] {
+    const [ droppedFrames, start ] = this.dropFrames();
+    this.copyBuffer = droppedFrames;
+    return [ droppedFrames, start ];
   }
 
-  dropFrame() {
-    const droppedFrame = this.getCurrentFrame();
-    this.scene.frames.splice(this.current.frameNumber, 1);
-    if ((this.current.frameNumber >= this.scene.frames.length) && (this.current.frameNumber > 0)) { this.current.frameNumber--; }
+  dropFrames(): [ Array<PenciltestFrame>, number ] {
+    const [ droppedFrames, start ] = this.getSelectedFrames([], true);
     if (this.scene.frames.length === 0) {
       this.newFrame();
     }
+    if (this.current.frameNumber >= start) {
+      if (this.current.frameNumber - start <= droppedFrames.length) {
+        this.current.frameNumber = Math.min(start, this.scene.frames.length - 1);
+      } else {
+        this.current.frameNumber -= droppedFrames.length;
+      }
+    }
 
-    this.buildSceneMeta();
     this.drawCurrentFrame();
 
-    return droppedFrame;
+    this.ui.updateStatus();
+
+    return [ droppedFrames, start ];
   }
 
   async smoothFrame(index: number, amount: number = 1) {
-    const self = this;
-    const smooth = function(amount: number) {
-      const smoothingBackup = self.options.smoothing;
-      self.options.smoothing = amount;
-      const frame = self.scene.frames[index];
+    const smooth = (amount: number) => {
+      const smoothingBackup = this.options.smoothing;
+      this.options.smoothing = amount;
+      const frame = this.scene.frames[index];
       const oldStrokes = JSON.parse(JSON.stringify(frame.strokes)) as Array<Stroke>;
-      self.lift();
+      this.lift();
       frame.strokes = [];
-      self.current.frameNumber = index;
-      self.renderer.clear();
+      this.current.frameNumber = index;
+      this.renderer.clear();
 
       const result = [];
       for (let stroke of oldStrokes) {
         for (let segment of stroke.path) {
-          self.track.apply(self, [segment.x, segment.y]);
+          this.track.apply(this, [segment.x, segment.y]);
         }
-        result.push(self.lift());
+        result.push(this.lift());
       }
 
       this.options.smoothing = smoothingBackup;
@@ -483,10 +545,10 @@ class Penciltest {
         if (amount < 1) {
           amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
         }
-        this.state.mode = PenciltestModes.WORKING;
+        this.setMode(PenciltestModes.WORKING);
         this.queueWork(() => {
           this.scene.frames.forEach((frame, i) => this.smoothFrame(i, amount))
-          this.state.mode = PenciltestModes.DRAWING;
+          this.resetMode();
         });
       }
     } else {
@@ -520,7 +582,7 @@ class Penciltest {
     return this.ui.updateStatus();
   }
 
-  defaultScene(sceneData:PenciltestScene = {}) {
+  makeDefaultScene(sceneData:PenciltestScene = {}) {
     const now = new Date();
     const nowString = now.toISOString();
     const scene:PenciltestScene = {
@@ -556,7 +618,7 @@ class Penciltest {
   }
 
   newScene() {
-    this.scene = this.defaultScene();
+    this.scene = this.makeDefaultScene();
 
     this.hasUnsavedChanges = false;
 
@@ -608,7 +670,7 @@ class Penciltest {
       frameNumber: this.current.frameNumber
     };
     if (!this.scene.name) {
-      await this.ui.doAppAction('renameScene')
+      await this.ui.triggerAppAction('renameScene')
     }
     return this.scene;
   }
@@ -762,8 +824,8 @@ class Penciltest {
     return false;
   }
 
-  async setScene(scene: any) {
-    this.scene = Object.assign(this.defaultScene({uuid: ''}), scene);
+  async setScene(scene: PenciltestScene) {
+    this.scene = this.makeDefaultScene(scene);
 
     if (this.scene.instrument?.version && PenciltestVersions.compareVersions(this.scene.instrument.version, Penciltest.version) === -1) {
       this.scene.instrument.version = await PenciltestVersions.upgrade(this, this.scene.instrument.version, Penciltest.version);
@@ -793,15 +855,16 @@ class Penciltest {
   async loadScene() {
     const sceneName = await this.selectSceneName('Choose a scene to load');
     if (typeof sceneName === 'string') {
-      this.setScene(this.getStoredData('scene', sceneName) as PenciltestScene);
+      await this.setScene(this.getStoredData('scene', sceneName) as PenciltestScene);
     }
   }
 
-  async deleteScene() {
-    const sceneName = await this.selectSceneName('Choose a scene to DELETE...FOREVER');
+  async deleteScene(): Promise<string | boolean> {
+    const sceneName = await this.selectSceneName('Choose a scene to delete from local browser storage:');
     if (typeof sceneName === 'string') {
       globalThis.localStorage.removeItem(this.encodeStorageReference('scene', sceneName));
     }
+    return sceneName
   }
 
   buildSceneMeta() {
@@ -855,7 +918,7 @@ class Penciltest {
     this.audioElement.addEventListener('error', (e: any) => {
       console.log('audio file error', e);
       const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
-      return self.ui.appActions.linkAudio.listener.apply(self, [message]);
+      return self.ui.triggerAppAction('linkAudio', [message]);
   });
     return this.audioElement.setAttribute('src', audioURL);
   }
@@ -883,14 +946,19 @@ class Penciltest {
     if (this.audioElement) { return ( this.audioElement.currentTime = time ); }
   }
 
-  scrubAudio() {
-    const self = this;
-    this.seekAudioToFrame(this.current.frameNumber);
+  scrubAudio(exposureOffset:number = 0) {
+    if (!this.options.scrubAudio || !this.audioElement) { return; }
+    const frame = this.getCurrentFrame();
+    const frameExposures = frame.hold || 1;
+    if (exposureOffset < 0) {
+      exposureOffset += frameExposures;
+    }
+    this.seekAudioToFrame(this.current.frameNumber, exposureOffset);
     clearTimeout(this.scrubAudioTimeout);
     this.playAudio();
     return this.scrubAudioTimeout = setTimeout(
-      () => self.pauseAudio(),
-      Math.max(this.current.singleFrameDuration * 1000, 100)
+      () => this.pauseAudio(),
+      Math.max(this.current.singleFrameDuration * (frameExposures - exposureOffset) * 1000, 200)
     );
   }
 

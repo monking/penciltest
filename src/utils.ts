@@ -1,7 +1,10 @@
 interface PromptOptions {
   input?: HTMLInputElement | HTMLSelectElement | string;
-  submitOnChange?: boolean;
+  inputAttrs?: { [key:string]: any; };
+  inputLabel?: string;
+  labelLogic?: (value:string) => string;
   onOpen?: Function;
+  submitOnChange?: boolean;
 }
 
 interface FilePromptOptions extends PromptOptions {
@@ -62,6 +65,9 @@ class Utils {
     const {
       input: givenPromptInput,
       submitOnChange: shouldSubmitOnChange,
+      inputAttrs,
+      inputLabel,
+      labelLogic,
     } = options;
 
     let property: string | number, value: any;
@@ -88,15 +94,46 @@ class Utils {
     promptForm.innerHTML = message;
     promptModal.appendChild(promptForm);
 
+    const inputRow = document.createElement('div');
+
     const promptInput = (typeof givenPromptInput === 'string' || !givenPromptInput
       ? document.createElement('input')
       : givenPromptInput) as HTMLInputElement;
     if (typeof givenPromptInput === 'string') {
       promptInput.setAttribute('type', givenPromptInput);
     }
+    if (inputAttrs) {
+      for (let key in inputAttrs) {
+        promptInput.setAttribute(key, inputAttrs[key]);
+      }
+    }
+    if (!promptInput.hasAttribute('id')) {
+      promptInput.setAttribute('id', 'promptInputLabel');
+    }
     if (defaultValue !== null) { promptInput.value = defaultValue; }
-    promptInput.style.display = 'block';
-    promptForm.appendChild(promptInput);
+
+    inputRow.appendChild(promptInput);
+
+    if (inputLabel || labelLogic) {
+      const labelElement = document.createElement('label')
+      labelElement.setAttribute('for', promptInput.getAttribute('id'));
+      if (labelLogic) {
+        promptInput.addEventListener('input', (event) => {
+          labelElement.innerText = labelLogic(promptInput.value);
+        });
+        labelElement.innerText = labelLogic(defaultValue);
+      } else if (inputLabel) {
+        labelElement.innerText = inputLabel;
+      }
+      Object.assign(labelElement.style, {
+        padding: '0.5em 1em',
+        'vertical-align': 'top',
+        'line-height': '1.6em'
+      });
+      inputRow.appendChild(labelElement);
+    }
+
+    promptForm.appendChild(inputRow);
 
     return new Promise((resolve, reject) => {
       const promptKeyListener = function(event: KeyboardEvent):any {
@@ -235,7 +272,6 @@ class Utils {
   };
 
   static shiftKeyCodeNames = {
-    48  : ')',
     49  : '!',
     50  : '@',
     51  : '#',
@@ -245,10 +281,26 @@ class Utils {
     55  : '&',
     56  : '*',
     57  : '(',
-    79  : ')',
+    48  : ')',
     187 : '+',
     189 : '_',
     191 : '?'
+  };
+
+  static shiftKeyNameCodes = {
+    '!': 49,
+    '@': 50,
+    '#': 51,
+    '$': 52,
+    '%': 53,
+    '^': 54,
+    '&': 55,
+    '*': 56,
+    '(': 57,
+    ')': 48,
+    '+': 187,
+    '_': 189,
+    '?': 191
   };
 
   static getKeyCodeName(keyCode: number, shiftKey: boolean = false, key: string = ''):string {
@@ -258,23 +310,24 @@ class Utils {
     } else if (Utils.keyCodeNames.hasOwnProperty(keyCode)) {
       keyCodeName = Utils.keyCodeNames[keyCode];
     } else {
-      keyCodeName = `${shiftKey ? 'Shift+' : ''}${key || String.fromCharCode(keyCode)}`;
+      keyCodeName = `${key || String.fromCharCode(keyCode)}`;
     }
 
     return keyCodeName;
   };
 
   static describeKeyCombo(event: KeyboardEvent):string {
+    const keyName = Utils.getKeyCodeName(event.keyCode, event.shiftKey);
+
     const combo = [];
     if (event.metaKey) { combo.push('Super'); }
     if (event.ctrlKey) { combo.push('Ctrl'); }
     if (event.altKey) { combo.push('Alt'); }
-    if (event.shiftKey && !Utils.shiftKeyCodeNames.hasOwnProperty(event.keyCode)) {
-      combo.push('Shift');
-    }
+    if (event.shiftKey && !(keyName in this.shiftKeyNameCodes)) { combo.push('Shift'); }
 
-    const keyName = Utils.getKeyCodeName(event.keyCode, event.shiftKey);
     if (!/^Ctrl|Alt|Shift$/.test(keyName)) { combo.push(keyName); }
+
+    //console.info(`combo: ${combo.join('+')} (#${event.keyCode})`);
 
     return combo.join('+');
   };
@@ -347,6 +400,22 @@ class Utils {
 
     return value;
   };
+
+  static isMultiple(a:number, b:number, precision:number = 0.001):[boolean, number, number, boolean] {
+    let isALarger = a > b
+    let factor = isALarger ? a / b : b / a;
+    let wholeFactor = Math.round(factor);
+    let wholeDiff = Math.abs(factor - wholeFactor);
+    return [ wholeDiff < precision, wholeFactor, wholeDiff, isALarger ];
+  }
+
+  static getRange(range:PenciltestRange, subject:Array<any>, cut: boolean = false): [ Array<any>, number ] {
+    if (typeof range?.start !== 'number' || typeof range.end !== 'number') { return [[], -1]; }
+    const low = Math.max(0, Math.min(range.start, range.end, subject.length - 1));
+    const high = Math.min(Math.max(0, range.start, range.end), subject.length - 1);
+    const frames = cut ? subject.splice(low, high - low + 1) : subject.slice(low, high + 1);
+    return [ frames, low ];
+  }
 
   static encodeBase64(input: any) {
     return btoa(input);

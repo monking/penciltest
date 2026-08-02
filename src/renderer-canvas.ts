@@ -41,9 +41,9 @@ class CanvasRenderer extends BaseRenderer {
   applyStrokeStyle() {
     if (this.context) {
       this.context.fillStyle = null;
-      this.context.lineWidth = this.currentLineOptions.weight;
-      this.context.lineJoin = this.currentLineOptions.corner;
-      this.context.strokeStyle = super.getColorString(this.currentLineOptions.color);
+      this.context.lineWidth = this.currentLineOptions.lineWeight;
+      this.context.lineJoin = this.currentLineOptions.lineCorner;
+      this.context.strokeStyle = super.getColorString(this.currentLineOptions.lineColor);
     }
   }
 

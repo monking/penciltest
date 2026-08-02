@@ -106,6 +106,7 @@ class PenciltestVersions {
         coord: ' '
       },
       packScene(scene:PenciltestScene):PenciltestScene {
+        return scene; // FIXME
         const packStroke = (stroke:Stroke):string => {
           const packedStrokeObject = { ...stroke };
           delete packedStrokeObject.path
@@ -123,10 +124,12 @@ class PenciltestVersions {
         const packFrame = (frame:PenciltestFrame):PenciltestFrame => {
           const packedFrame:PenciltestFrame = {
             ...frame,
+          };
+          if (frame.strokes.length > 0) {
             packedStrokes: frame.strokes
               .map(packStroke)
               .join(this.sep.stroke)
-          };
+          }
           delete packedFrame.strokes;
           return packedFrame;
         };
@@ -135,14 +138,17 @@ class PenciltestVersions {
           ...scene,
           frames: scene.frames.map(packFrame)
         };
-        delete packedScene.current;
-        debugger;
         return packedScene;
       },
-      unpackScene(packedScene:PenciltestScene):PenciltestScene {
+      unpackScene(scene:PenciltestScene):PenciltestScene {
+        return scene; // FIXME
         const unpackStroke = (packedStroke:string):Stroke => {
           const jsonIndex = packedStroke.indexOf('{');
-          const stroke:Stroke = JSON.parse(packedStroke.slice(jsonIndex)) as Stroke;
+          const stroke:Stroke = (
+            jsonIndex !== -1
+              ? JSON.parse(packedStroke.slice(jsonIndex))
+              : {}
+            ) as Stroke;
           stroke.path = packedStroke.substr(0, jsonIndex)
             .split(this.sep.point)
             .map((packedPoint) => {
@@ -151,19 +157,23 @@ class PenciltestVersions {
             });
           return stroke;
         };
-        const unpackFrame = (packedFrame:PenciltestFrame):PenciltestFrame => {
-          const frame:PenciltestFrame = {
-            ...packedFrame,
-            strokes: packedFrame.packedStrokes
+
+        const unpackFrame = (frame:PenciltestFrame):PenciltestFrame => {
+          if (!frame.packedStrokes?.length) { return frame; }
+
+          const unpackedFrame:PenciltestFrame = {
+            ...frame,
+            strokes: frame.packedStrokes
               .split(this.sep.stroke)
               .map(unpackStroke)
           };
-          delete frame.packedStrokes;
-          return frame;
+          delete unpackedFrame.packedStrokes;
+          return unpackedFrame;
         };
+
         return {
-          ...packedScene,
-          frames: packedScene.frames.map(unpackFrame)
+          ...scene,
+          frames: scene.frames.map(unpackFrame)
         };
       }
     },

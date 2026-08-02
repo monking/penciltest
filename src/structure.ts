@@ -12,16 +12,29 @@ enum PenciltestModes {
 
 enum PenciltestTools { PENCIL, ERASER };
 
-interface PenciltestOptions {
+type Color = [number, number, number, number] | [number, number, number];
+
+interface PenciltestLineOptions { /* Redundant member names for blending with other option sets. */
+  lineColor?: Color | string;
+  lineCorner?: CanvasLineJoin;
+  lineOpacity?: number;
+  lineWeight?: number;
+}
+
+interface PenciltestSceneOptions extends PenciltestLineOptions {
+  aspectRatio?: string;
   background?: string;
-  container?: string;
-  debug?: boolean;
   frameHold?: number;
   framerate?: number;
-  hideCursor?: boolean;
-  lineColor?: string;
-  lineWeight?: number;
+  height?: number;
   loop?: boolean;
+  width?: number;
+}
+
+interface PenciltestOptions extends PenciltestSceneOptions {
+  container?: string;
+  debug?: boolean;
+  hideCursor?: boolean;
   onionSkin?: boolean;
   onionSkinFrameRadius?: number;
   onionSkinOpacity?: number;
@@ -60,7 +73,7 @@ interface PenciltestFrameMeta {
 }
 
 interface PenciltestSceneAudio {
-  url: string;
+  url?: string;
   info?: string;
   offset?: number;
 }
@@ -75,50 +88,30 @@ interface PenciltestSceneState {
   singleFrameDuration?: number;
 }
 
-interface PenciltestScene {
-  aspectRatio?: string;
+interface PenciltestScene extends PenciltestSceneOptions {
   audio?: PenciltestSceneAudio;
-  background?: string;
   current?: PenciltestSceneState;
   dateCreated?: string;
   dateModified?: string;
-  framerate?: number;
   frames?: Array<PenciltestFrame>;
-  height?: number;
   instrument?: PenciltestInsrument;
-  lineColor?: string;
-  lineWeight?: number;
   name?: string;
   uuid?: string;
-  width?: number;
 };
+
+type PenciltestRange = { start?: number; end?: number; }
 
 interface PenciltestState {
+  frameSelection?: PenciltestRange;
   mode: PenciltestModes;
+  previousMode?: PenciltestModes;
+  smoothDrawInterval?: number;
   toolStack: Array<PenciltestTools>;
   version: string;
-  smoothDrawInterval?: number;
 };
 
-type Color = [number, number, number, number] | [number, number, number];
-
-interface PenciltestLineOptions {
-  color?: Color | string;
-  corner?: CanvasLineJoin;
-  opacity?: number;
-  weight?: number;
-}
-
-
-interface PenciltestRendererOptions {
-  background?: string;
+interface PenciltestRendererOptions extends PenciltestLineOptions, PenciltestSceneOptions {
   container?: string | HTMLElement;
-  height?: number;
-  lineColor?: string;
-  lineCorner?: CanvasLineJoin;
-  lineOpacity?: number;
-  lineWeight?: number;
-  width?: number;
 }
 
 interface PenciltestRenderer {
@@ -174,16 +167,17 @@ interface PenciltestUIOptions extends PenciltestUIComponentOptions {
 }
 
 interface PenciltestAppAction {
-  label: string;
-  hotkey?: Array<string>;
-  gesture?: RegExp;
-  listener?: Function;
   action?: Function;
-  triggerOnMove?: boolean;
-  repeat?: boolean;
   cancelComplementKeyEvent?: boolean;
+  gesture?: RegExp;
+  hotkey?: Array<string>;
+  hotkeyModifiers?: Array<string>;
+  label?: string;
+  listener?: Function;
+  repeat?: boolean;
   text?: string;
   title?: string;
+  triggerOnMove?: boolean;
 }
 
 type AppActionsList = {
@@ -196,6 +190,10 @@ interface PenciltestUIComponentOptions {
   text?: string | null;
   id?: string | null;
   parent: HTMLElement;
+};
+
+interface PenciltestStatusMessageOptions {
+  messageTimeout: number;
 };
 
 interface GIFEncoderInterface {
