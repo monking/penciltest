@@ -26,63 +26,72 @@ class Penciltest {
     onionSkinFrameRadius: 4,
     onionSkinOpacity: 0.5,
     renderer: Renderers.CANVAS,
-    scrubAudio: true,
+    scrubAudio: false,
     showStatus: true,
     smoothing: 1,
-
-    /* These options are in common with PenciltestScene */
-    frameHold: 1,
-    framerate: 12,
-    lineColor: 'black',
-    lineWeight: 1,
-    loop: false
   };
 
+  static defaultPlayback: PlaybackState = {
+    heldExposures: 0,
+    direction: 1,
+    muteAudio: false,
+    stepId: -1,
+    scrubAudioId: -1,
+  };
 
-  options: PenciltestOptions;
-  state: PenciltestState;
-  current: PenciltestSceneState;
-  container: HTMLElement;
+  static defaultState: PenciltestState = {
+    version: Penciltest.version,
+    mode: PenciltestModes.DRAWING,
+    toolStack: [PenciltestTools.PENCIL,PenciltestTools.ERASER],
+    previousMode: null
+  };
+
+  // components
+  renderer: CanvasRenderer | SVGRenderer;
+  scene: PenciltestScene | null;
   ui: PenciltestUI;
+
+  // global config/state
+  forceDimensions: Bounds | null;
+  hasUnsavedChanges: boolean;
+  height: number;
+  options: PenciltestOptions;
+  playback: PlaybackState;
+  state: PenciltestState;
+  width: number;
+  zoomFactor: number;
+
+  // elements
+  audioElement: HTMLMediaElement;
+  container: HTMLElement;
   fieldContainer: HTMLElement;
   fieldElement: HTMLElement;
-  scene: PenciltestScene | null;
-  currentStrokeIndex: number;
-  renderer: CanvasRenderer | SVGRenderer;
-  zoomFactor: number;
-  hasUnsavedChanges: boolean;
-  markPoint: Point;
-  markBuffer: Array<Point>;
-  playDirection: number | null;
-  framesHeld: number;
-  playInterval: any;
-  audioElement: HTMLMediaElement;
-  scrubAudioTimeout: number;
+
+  // operation buffers
   copyBuffer: Array<PenciltestFrame>;
+  currentStrokeIndex: number;
+  markBuffer: Array<Point>;
+  markPoint: Point;
   redoQueue: Array<Stroke>;
-  forceDimensions: Bounds | null;
-  width: number;
-  height: number;
   workingOn: Array<Promise<any>>;
+
 
   constructor(options: PenciltestOptions) {
     this.options = {
+      ...PenciltestScene.defaultOptions,
       ...Penciltest.defaultOptions,
       ...this.getStoredData('app', 'options') as PenciltestOptions,
     };
   
     this.state = {
-      version: Penciltest.version,
-      mode: PenciltestModes.DRAWING,
-      toolStack: [PenciltestTools.PENCIL,PenciltestTools.ERASER],
+      ...Penciltest.defaultState,
       ...this.getStoredData('app', 'state') as PenciltestState,
     };
     this.currentStrokeIndex = -1;
   
-    // metadata generated while interpreting the scene data
-    this.current = new SceneState();
-
     this.workingOn = [];
+
+    this.playback = { ...Penciltest.defaultPlayback };
 
     this.container = globalThis.document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
@@ -97,7 +106,9 @@ class Penciltest {
 
     if (this.state.version !== Penciltest.version) {
       (async () => {
-        this.state.version = await PenciltestVersions.upgrade(this, this.state.version, Penciltest.version);
+        // User is not prompted about migration on launch, only on loading a scene.
+        // The app won't work without compatible state data.
+        this.state.version = await PenciltestVersions.migrate(this, this.state.version, Penciltest.version);
       })();
     }
 
@@ -106,12 +117,30 @@ class Penciltest {
 
   setOptions(newOptions: PenciltestOptions) {
     Object.assign(this.options, newOptions);
-    for (let optionName in newOptions) {
-      if (optionName in this.ui.appActions && typeof this.ui.appActions[optionName].action === 'function') {
-        this.ui.handleAppReaction(optionName);
+    for (let key in newOptions) {
+      if (key in this.ui.appActions && typeof this.ui.appActions[key].action === 'function') {
+        this.ui.handleAppReaction(key);
       }
     }
-    this.ui.updateStatus();
+    //this.ui.updateStatus();
+  }
+
+
+  resetOptionsAndState() {
+    this.state = { ...Penciltest.defaultState };
+    this.setOptions(Penciltest.defaultOptions);
+    this.currentStrokeIndex = -1;
+    this.resize();
+  }
+
+  setPlayback(newPlayback: PlaybackState) {
+    Object.assign(this.playback, newPlayback);
+    for (let key in newPlayback) {
+      if (key in this.ui.appActions && typeof this.ui.appActions[key].action === 'function') {
+        this.ui.handleAppReaction(key);
+      }
+    }
+    //this.ui.updateStatus();
   }
 
   buildContainer() {
@@ -139,7 +168,7 @@ class Penciltest {
     return this.setMode(this.state.previousMode || PenciltestModes.DRAWING);
   }
 
-  newFrame(insertAtIndex = null, count:number = 1, options:PenciltestFrame = {}) {
+  newFrame(insertAtIndex = null, count:number = 1, options:PenciltestFrame = {}): Array<PenciltestFrame> {
     // this.lift(); // FIXME This should be called elsewhere, or not at all, right? @1785601871
 
     if (insertAtIndex === null) {
@@ -150,20 +179,23 @@ class Penciltest {
     const spliceParams = [insertAtIndex, 0]
 
     let i:number;
+    const newFrames = []
     for (i = 0; i < count; i++) {
-      spliceParams.push({
+      newFrames.push({
         hold: this.options.frameHold,
         strokes: [],
         ...options
-      });
+      } as PenciltestFrame);
     }
-    Array.prototype.splice.apply(this.scene.frames, spliceParams);
+    Array.prototype.splice.apply(this.scene.frames, spliceParams.concat(newFrames));
 
-    return this.buildSceneMeta();
+    this.scene.updateState();
+
+    return newFrames;
   }
 
   getCurrentFrame() {
-    return this.scene.frames[this.current.frameNumber || 0];
+    return this.scene.frames[this.scene.current.frameNumber || 0];
   }
 
   getCurrentStroke() {
@@ -251,8 +283,7 @@ class Penciltest {
   goToFrame(targetFrameNumber: number, overrides: PenciltestRendererOptions = {}) {
     const selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
 
-    this.current.frameNumber = selectedFrameNumber;
-    // this.current.frame = this.scene.frames[this.current.frameNumber]; // DELME unused @1785515083
+    this.scene.current.frameNumber = selectedFrameNumber;
 
     if (this.state.mode !== PenciltestModes.PLAYING) {
       this.lift();
@@ -264,27 +295,27 @@ class Penciltest {
 
   seekAudioToFrame(frameNumber: number, exposureOffset:number = 0) {
     if (this.scene.audio) {
-      const seekTime = this.current.frames[frameNumber].time + exposureOffset * this.current.singleFrameDuration - this.scene.audio.offset;
+      const seekTime = (this.scene.current.frames[frameNumber].time + exposureOffset * this.scene.current.singleFrameDuration - this.scene.audio.offset) / 1000;
       return this.seekAudio(seekTime);
     }
   }
 
   play() {
-    if (this.playDirection == null) { this.playDirection = 1; }
-    if (this.current.frameNumber < this.scene.frames.length) { // i.e. it is a frame in the scene (in case @current.frameNumber was
-      this.framesHeld = 0;
-      this.goToFrame(this.current.frameNumber); // reset the audio position to the _beginning_ of the current frame
+    if (this.playback.direction == null) { this.playback.direction = 1; }
+    if (this.scene.current.frameNumber < this.scene.frames.length) { // i.e. it is a frame in the scene (in case this.scene.current.frameNumber was
+      this.playback.heldExposures = 0;
+      this.goToFrame(this.scene.current.frameNumber); // reset the audio position to the _beginning_ of the current frame
     } else {
-      this.framesHeld = -1;
+      this.playback.heldExposures = -1;
       this.goToFrame(0);
     }
 
     const stepListener = (firstStep: boolean) => {
-      this.framesHeld++;
-      const currentFrame = this.getCurrentFrame();
-      let newIndex = this.current.frameNumber + this.playDirection;
-      if ((this.framesHeld >= currentFrame.hold) || ( firstStep && (newIndex === this.scene.frames.length) )) {
-        this.framesHeld = 0;
+      this.playback.heldExposures++;
+      const frameHold = this.scene.getFrameHold();
+      let newIndex = this.scene.current.frameNumber + this.playback.direction;
+      if ((this.playback.heldExposures >= frameHold) || ( firstStep && (newIndex === this.scene.frames.length) )) {
+        this.playback.heldExposures = 0;
         if ((newIndex >= this.scene.frames.length) || (newIndex < 0)) {
           if (this.options.loop || firstStep) {
             newIndex = (newIndex + this.scene.frames.length) % this.scene.frames.length;
@@ -302,7 +333,7 @@ class Penciltest {
 
     this.stop();
     stepListener(true);
-    this.playInterval = setInterval(stepListener, 1000 / this.scene.framerate);
+    this.playback.stepId = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
     this.setMode(PenciltestModes.PLAYING);
     return this.playAudio();
@@ -310,7 +341,7 @@ class Penciltest {
 
   stop() {
     if (this.audioElement) { this.pauseAudio(); }
-    clearInterval(this.playInterval);
+    clearInterval(this.playback.stepId);
     if (this.state.mode === PenciltestModes.PLAYING) {
       this.resetMode();
     }
@@ -338,9 +369,9 @@ class Penciltest {
 
     if (this.options.onionSkin) {
       for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
-        const previousFrameNumber = this.resolveFrameNumber(this.current.frameNumber - i);
+        const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
         const lineOpacity = Math.pow(this.options.onionSkinOpacity, i)
-        if (previousFrameNumber !== this.current.frameNumber) {
+        if (previousFrameNumber !== this.scene.current.frameNumber) {
           this.drawFrame(
             previousFrameNumber,
             Object.assign(
@@ -352,8 +383,8 @@ class Penciltest {
             )
           );
         }
-        const nextFrameNumber = this.resolveFrameNumber(this.current.frameNumber + i);
-        if (nextFrameNumber !== this.current.frameNumber) {
+        const nextFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber + i);
+        if (nextFrameNumber !== this.scene.current.frameNumber) {
           this.drawFrame(
             nextFrameNumber,
             Object.assign(
@@ -368,7 +399,7 @@ class Penciltest {
       }
     }
     this.renderer.composeOptions();
-    this.drawFrame(this.current.frameNumber, overrides);
+    this.drawFrame(this.scene.current.frameNumber, overrides);
   }
 
   drawFrame(frameNumber: number, overrides: PenciltestRendererOptions): PenciltestFrame {
@@ -430,27 +461,26 @@ class Penciltest {
       return [ frames, -1 ];
     } else {
       const [ selection, index ] = Utils.getRange(this.state.frameSelection, this.scene.frames, cut);
-      if (cut) { this.buildSceneMeta(); }
+      if (cut) { this.scene.updateState(); }
       if (selection.length > 0) {
         return [ selection, index ];
       } else if (cut) {
-        return [ this.scene.frames.splice(this.current.frameNumber, 1), this.current.frameNumber ];
+        return [ this.scene.frames.splice(this.scene.current.frameNumber, 1), this.scene.current.frameNumber ];
       } else {
-        return [ [this.getCurrentFrame()], this.current.frameNumber];
+        return [ [this.getCurrentFrame()], this.scene.current.frameNumber];
       }
     }
   }
 
   copyFrames(): [ Array<PenciltestFrame>, number ] {
     const [ frames, start ] = this.getSelectedFrames();
-    debugger
     this.copyBuffer = Utils.clone(frames);
     return [ this.copyBuffer, start ];
   }
 
   pasteFrames() {
     if (this.copyBuffer) {
-      const newFrameNumber = this.current.frameNumber + 1;
+      const newFrameNumber = this.scene.current.frameNumber + 1;
       this.insertFrames(Utils.clone(this.copyBuffer), newFrameNumber);
       this.goToFrame(newFrameNumber);
     }
@@ -458,13 +488,13 @@ class Penciltest {
 
   insertFrames(frames:Array<PenciltestFrame>, position:number) {
     Array.prototype.splice.apply(this.scene.frames, [position, 0].concat(frames as Array<any>));
-    this.buildSceneMeta();
+    this.scene.updateState();
     this.ui.updateStatus();
   }
 
   splitFrame(frameNumber:number, splitOffset:number) {
     const frame = this.scene?.frames[frameNumber];
-    const oldHold = frame.hold;
+    const oldHold = this.scene.getFrameHold();
     frame.hold = splitOffset;
     const newFrame = Utils.clone(frame);
     newFrame.hold = oldHold - splitOffset;
@@ -473,13 +503,13 @@ class Penciltest {
 
   pasteStrokes() {
     if (this.copyBuffer?.length > 0) {
-      this.scene.frames[this.current.frameNumber].strokes = this.scene.frames[this.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer[0].strokes));
+      this.scene.frames[this.scene.current.frameNumber].strokes = this.scene.frames[this.scene.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer[0].strokes));
       return this.drawCurrentFrame();
     }
   }
 
   clearStrokes() {
-    this.scene.frames[this.current.frameNumber].strokes = [];
+    this.scene.frames[this.scene.current.frameNumber].strokes = [];
     return this.drawCurrentFrame();
   }
 
@@ -494,11 +524,11 @@ class Penciltest {
     if (this.scene.frames.length === 0) {
       this.newFrame();
     }
-    if (this.current.frameNumber >= start) {
-      if (this.current.frameNumber - start <= droppedFrames.length) {
-        this.current.frameNumber = Math.min(start, this.scene.frames.length - 1);
+    if (this.scene.current.frameNumber >= start) {
+      if (this.scene.current.frameNumber - start <= droppedFrames.length) {
+        this.scene.current.frameNumber = Math.min(start, this.scene.frames.length - 1);
       } else {
-        this.current.frameNumber -= droppedFrames.length;
+        this.scene.current.frameNumber -= droppedFrames.length;
       }
     }
 
@@ -514,10 +544,10 @@ class Penciltest {
       const smoothingBackup = this.options.smoothing;
       this.options.smoothing = amount;
       const frame = this.scene.frames[index];
-      const oldStrokes = JSON.parse(JSON.stringify(frame.strokes)) as Array<Stroke>;
+      const oldStrokes = Utils.clone(frame.strokes) as Array<Stroke>;
       this.lift();
       frame.strokes = [];
-      this.current.frameNumber = index;
+      this.scene.current.frameNumber = index;
       this.renderer.clear();
 
       const result = [];
@@ -576,49 +606,14 @@ class Penciltest {
     return this.redoQueue = [];
   }
 
-  setCurrentFrameHold(newHold: any) {
-    this.getCurrentFrame().hold = Math.max(1, newHold);
-    this.buildSceneMeta();
+  setCurrentFrameHold(newHold: number) {
+    this.scene.setFrameHold(Math.max(1, newHold));
+    this.scene.updateState();
     return this.ui.updateStatus();
   }
 
-  makeDefaultScene(sceneData:PenciltestScene = {}) {
-    const now = new Date();
-    const nowString = now.toISOString();
-    const scene:PenciltestScene = {
-      name: '',
-      dateModified: nowString,
-      dateCreated: nowString,
-      uuid: '',
-      instrument: {
-        id: Penciltest.instrumentIdentifier,
-        version: Penciltest.version
-      },
-      aspectRatio: '1:1',
-      width: 1024,
-      framerate: this.options.framerate,
-      background: this.options.background,
-      lineColor: this.options.lineColor,
-      lineWeight: this.options.lineWeight,
-      frames: [],
-      current: new SceneState(sceneData.current || {})
-    };
-
-    if (Object.keys(sceneData).length > 0) {
-      Object.assign(scene, sceneData);
-    }
-
-    if (scene.uuid.length === 0) {
-      if (typeof crypto !== 'undefined' && crypto !== null) {
-        crypto.randomUUID();
-      }
-    }
-
-    return scene;
-  }
-
   newScene() {
-    this.scene = this.makeDefaultScene();
+    this.scene = new PenciltestScene(this.options);
 
     this.hasUnsavedChanges = false;
 
@@ -638,7 +633,7 @@ class Penciltest {
     return sceneNames;
   }
 
-  encodeStorageReference(namespace: string, name: any) {
+  encodeStorageReference(namespace: string, name: any):string {
     return `${namespace}:${name}`;
   }
 
@@ -654,38 +649,43 @@ class Penciltest {
     }
   }
 
-  getStoredData(namespace: string, name: string) {
+  getStoredData(namespace: string, name: string): any {
     const storageName = this.encodeStorageReference(namespace, name);
-    return JSON.parse(globalThis.localStorage.getItem(storageName));
-  }
-
-  putStoredData(namespace: string, name: string | boolean, data: any) {
-    const storageName = this.encodeStorageReference(namespace, name);
-    return globalThis.localStorage.setItem(storageName, JSON.stringify(data));
-  }
-
-  async updateScene(): Promise<PenciltestScene> {
-    this.scene.dateModified = (new Date()).toISOString();
-    this.scene.current = {
-      frameNumber: this.current.frameNumber
-    };
-    if (!this.scene.name) {
-      await this.ui.triggerAppAction('renameScene')
+    try {
+      return JSON.parse(globalThis.localStorage.getItem(storageName));
+    } catch(e) {
+      console.error(e);
+      this.ui.showFeedback(`Failed to parse stored data at name '${storageName}'.`);
+      return null;
     }
-    return this.scene;
   }
 
-  async saveScene(update: boolean = true){
+  putStoredData(namespace: string, name: string | boolean, data: any): boolean {
+    const storageName = this.encodeStorageReference(namespace, name);
+    try {
+      globalThis.localStorage.setItem(storageName, JSON.stringify(data));
+      return true;
+    } catch(e) {
+      console.error(e);
+      this.ui.showFeedback(`Failed to store local data at name '${storageName}': ${e.message}.`);
+      return false;
+    }
+  }
+
+  async saveScene(update: boolean = true): Promise<boolean> {
     const sceneName = this.scene.name || 'Untitled';
     const scenePack = await PenciltestVersions.packScene(this.scene);
-    this.putStoredData('scene', sceneName, scenePack);
-    if (update) { return this.hasUnsavedChanges = false; }
+    if (scenePack && this.putStoredData('scene', sceneName, scenePack)) {
+      this.hasUnsavedChanges = false;
+      return true;
+    }
+    return false;
   }
 
   async renderGif() {
     const self = this;
 
-    const gifSize = Math.min(512, this.scene.width);
+    const gifSize = Math.min(512, this.scene.height);
     const lineWeight = 1;
     const gifConfigurationString = await Utils.prompt('GIF size & line weight (px)', gifSize+' '+lineWeight);
 
@@ -693,7 +693,7 @@ class Penciltest {
     const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
     // configure for rendering
     // dimensions = [64, 64]
-    const dimensions = this.getSceneDimensions();
+    const dimensions = this.scene.getDimensions();
     // while rendering is only useful at one size, save the step # dimensions = ().split 'x'
     const maxGifDimension = parseInt(gifConfiguration[0], 10);
     const gifLineWeight = parseInt(gifConfiguration[1], 10);
@@ -731,7 +731,7 @@ class Penciltest {
 
     for (frameNumber = 0, end = this.scene.frames.length, asc = 0 <= end; asc ? frameNumber < end : frameNumber > end; asc ? frameNumber++ : frameNumber--) {
       this.goToFrame(frameNumber, gifRenderOverrides);
-      gifEncoder.setDelay(baseFrameDelay * this.getCurrentFrame().hold); // FIXME no good; how to set individual delays for each fram in gifEncoder?
+      gifEncoder.setDelay(baseFrameDelay * this.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
       gifEncoder.addFrame((this.renderer as CanvasRenderer).context);
     }
 
@@ -807,35 +807,17 @@ class Penciltest {
     return this.resize();
   }
 
-  async selectSceneName(message: string): Promise<string | boolean> {
-    const sceneNames = this.getSceneNames();
-    if (sceneNames.length) {
-      if (message == null) { message = 'Choose a scene'; }
-      const selectedSceneName = await Utils.select(message, sceneNames, this.scene.name );
-      if (selectedSceneName) {
-        return selectedSceneName;
-      } else {
-        Utils.alert("No scene by that name.");
-      }
+  async setScene(scene: PenciltestSceneData, shouldUnpack:boolean = false): Promise<PenciltestScene> {
+    if (shouldUnpack) {
+      this.scene = await PenciltestVersions.unpackScene(scene);
     } else {
-      Utils.alert("You don't have any saved scenes yet.");
+      this.scene = new PenciltestScene(scene);
     }
-
-    return false;
-  }
-
-  async setScene(scene: PenciltestScene) {
-    this.scene = this.makeDefaultScene(scene);
 
     if (this.scene.instrument?.version && PenciltestVersions.compareVersions(this.scene.instrument.version, Penciltest.version) === -1) {
-      this.scene.instrument.version = await PenciltestVersions.upgrade(this, this.scene.instrument.version, Penciltest.version);
+      this.scene.instrument.version = await PenciltestVersions.migrate(this, this.scene.instrument.version, Penciltest.version);
     }
 
-    if (this.scene?.current) {
-      this.current = new SceneState(this.scene.current);
-      // delete this.scene.current; // FIXME Should this persist while working? Should it be saved to file?
-    }
-    this.buildSceneMeta();
     if (this.scene.audio?.url) {
       this.loadAudio(this.scene.audio.url, this.scene.audio.info);
     } else {
@@ -846,66 +828,35 @@ class Penciltest {
       if (this.scene.lineColor) { this.renderer.options.lineColor = this.scene.lineColor; }
       if (this.scene.lineWeight) { this.renderer.options.lineWeight = this.scene.lineWeight; }
     }
-    this.goToFrame((this.current != null ? this.current.frameNumber : undefined) || 0);
-    this.ui.updateStatus();
+    this.scene.updateState();
+    this.goToFrame(this.scene.current.frameNumber || 0);
     this.hasUnsavedChanges = false;
-    return this.resize(); // FIXME
+    this.resize();
+    return this.scene;
   }
 
-  async loadScene() {
-    const sceneName = await this.selectSceneName('Choose a scene to load');
-    if (typeof sceneName === 'string') {
-      await this.setScene(this.getStoredData('scene', sceneName) as PenciltestScene);
-    }
+  async loadScene(sceneName:string): Promise<PenciltestScene | boolean> {
+    const storedScene:PenciltestSceneData | null = this.getStoredData('scene', sceneName);
+    if (!storedScene) { return false; }
+    return await this.setScene(storedScene, true);
   }
 
-  async deleteScene(): Promise<string | boolean> {
-    const sceneName = await this.selectSceneName('Choose a scene to delete from local browser storage:');
-    if (typeof sceneName === 'string') {
-      globalThis.localStorage.removeItem(this.encodeStorageReference('scene', sceneName));
-    }
-    return sceneName
-  }
-
-  buildSceneMeta() {
-    Object.assign(this.current, {
-      frames: [],
-      //exposures: [], // DELME exposures not used @1785520725
-      exposureCount: 0,
-      singleFrameDuration: 1 / this.scene.framerate,
-    })
-
-    this.scene.frames.forEach((frame, index) => {
-      const frameMeta:PenciltestFrameMeta = {
-        id: index,
-        exposure: this.current.exposureCount,
-        duration: frame.hold * this.current.singleFrameDuration,
-        time: this.current.exposureCount * this.current.singleFrameDuration
-      };
-      this.current.frames.push(frameMeta);
-
-      //(new Array(frame.hold)).forEach(() => this.current.exposures.push(frameMeta)); // DELME exposures not used @1785520725
-
-      this.current.exposureCount += this.scene.frames[index].hold;
-    });
-
-    return this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
-  }
-
-  getFrameDuration(frameNumber: string | number) {
-    if (frameNumber == null) { ({
-      frameNumber
-    } = this.current); }
-    const frame = this.scene.frames[frameNumber];
-    return frame.hold / this.scene.framerate;
+  async deleteScene(sceneName:string): Promise<boolean> {
+      try {
+        globalThis.localStorage.removeItem(this.encodeStorageReference('scene', sceneName));
+        return true;
+      } catch(e) {
+        console.error(e);
+      }
+    return false;
   }
 
   loadAudio(audioURL: string, audioInfo: string) {
     const self = this;
     this.scene.audio = {
+      ...PenciltestScene.defaultAudioOptions,
       url: audioURL,
-      offset: 0,
-      info: audioInfo
+      info: audioInfo,
     };
     this.hasUnsavedChanges = true;
     if (!this.audioElement) { // TODO: abstract away from browser
@@ -919,7 +870,7 @@ class Penciltest {
       console.log('audio file error', e);
       const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
       return self.ui.triggerAppAction('linkAudio', [message]);
-  });
+    });
     return this.audioElement.setAttribute('src', audioURL);
   }
 
@@ -948,17 +899,16 @@ class Penciltest {
 
   scrubAudio(exposureOffset:number = 0) {
     if (!this.options.scrubAudio || !this.audioElement) { return; }
-    const frame = this.getCurrentFrame();
-    const frameExposures = frame.hold || 1;
+    const frameExposures = this.scene.getFrameHold();
     if (exposureOffset < 0) {
       exposureOffset += frameExposures;
     }
-    this.seekAudioToFrame(this.current.frameNumber, exposureOffset);
-    clearTimeout(this.scrubAudioTimeout);
+    this.seekAudioToFrame(this.scene.current.frameNumber, exposureOffset);
+    clearTimeout(this.playback.scrubAudioId);
     this.playAudio();
-    return this.scrubAudioTimeout = setTimeout(
+    return this.playback.scrubAudioId = setTimeout(
       () => this.pauseAudio(),
-      Math.max(this.current.singleFrameDuration * (frameExposures - exposureOffset) * 1000, 200)
+      Math.max(this.scene.current.singleFrameDuration * (frameExposures - exposureOffset), 200)
     );
   }
 
@@ -976,18 +926,6 @@ class Penciltest {
     });
   }
 
-  getSceneDimensions():Bounds {
-    const aspectRatio = this.scene.aspectRatio || '1:1';
-    const ratioParts = aspectRatio.split(':').map(Number);
-    const dimensions: Bounds = { 
-      width: this.scene.width,
-      aspect: ratioParts[0] / ratioParts[1],
-      aspectRatio
-    };
-    dimensions.height = Math.ceil(dimensions.width / dimensions.aspect);
-    return dimensions;
-  }
-
   resize() {
     let containerHeight: number, containerWidth: number;
     if (this.forceDimensions) {
@@ -1000,7 +938,7 @@ class Penciltest {
         containerHeight -= 36;
       }
     }
-    const sceneDimensions = this.getSceneDimensions();
+    const sceneDimensions = this.scene.getDimensions();
     const containerAspect = containerWidth / containerHeight;
 
     if (containerAspect > sceneDimensions.aspect) {
@@ -1040,6 +978,155 @@ class Penciltest {
       }
     });
     return job;
+  }
+
+}
+
+class PenciltestScene implements PenciltestSceneData {
+
+  static defaultOptions: PenciltestSceneOptions = {
+    frameHold: 2,
+    framerate: 24,
+    loop: false,
+
+    lineColor: 'black',
+    lineCorner: 'round',
+    lineOpacity: 1,
+    lineWeight: 1,
+
+    aspectRatio: '1:1',
+    height: 1024
+	};
+
+  static defaultAudioOptions:PenciltestSceneAudio = {
+    offset: 0,
+    volume: 100,
+  };
+
+  audio: PenciltestSceneAudio;
+  current: PenciltestSceneState;
+  dateCreated: string;
+  dateModified: string;
+  frames: Array<PenciltestFrame>;
+  instrument: PenciltestInsrument;
+  name: string;
+  uuid: string;
+
+  background: string;
+  frameHold: number;
+  framerate: number;
+  loop: boolean;
+
+  aspectRatio: string;
+  aspect: number;
+  width: number;
+  height: number;
+
+  lineColor: Color | string;
+  lineCorner: CanvasLineJoin;
+  lineOpacity: number;
+  lineWeight: number;
+
+  constructor(sceneData:PenciltestSceneData) {
+    const now = new Date();
+    const nowString = now.toISOString();
+
+    this.name = '';
+    this.dateModified = nowString;
+    this.dateCreated = nowString;
+    this.uuid = '';
+    this.instrument = {
+      id: Penciltest.instrumentIdentifier,
+      version: Penciltest.version
+    };
+    this.aspectRatio = '1:1';
+    this.width = 1024;
+    this.framerate = 24;
+    this.frameHold = 2;
+    this.background = 'gray';
+    this.lineColor = 'black';
+    this.lineWeight = 1;
+    this.frames = [];
+    this.current = new SceneState(sceneData.current || {});
+
+    // Restrict assignment to existing keys in new scene.
+    Object.keys(sceneData).forEach((key) => {
+      if (key in this) {
+        this[key] = sceneData[key];
+      }
+    });
+
+    if (!this.uuid) {
+      if (typeof crypto !== 'undefined' && crypto !== null) {
+        crypto.randomUUID();
+      }
+    }
+  }
+
+  getDimensions():Bounds {
+    const aspectRatio = this.aspectRatio || '1:1';
+    const ratioParts = aspectRatio.split(':').map(Number);
+    const dimensions: Bounds = { 
+      width: this.width,
+      height: this.height,
+      aspect: ratioParts[0] / ratioParts[1],
+      aspectRatio
+    };
+    if (!dimensions.width && !dimensions.height) {
+      throw new Error('Either width or height must be defined.');
+    } else if (!dimensions.width) {
+      dimensions.width = Math.ceil(dimensions.height * dimensions.aspect);
+    } else {
+      dimensions.height = Math.ceil(dimensions.height / dimensions.aspect);
+    }
+    return dimensions;
+  }
+
+  updateState(): PenciltestSceneState {
+    Object.assign(this.current, {
+      frames: [],
+      exposureCount: 0,
+      singleFrameDuration: 1000 / this.framerate,
+    })
+
+    this.frames.forEach((frame, frameNumber) => {
+      const hold = this.getFrameHold(frameNumber);
+      const frameMeta:PenciltestFrameMeta = {
+        id: frameNumber,
+        exposure: this.current.exposureCount,
+        duration: hold * this.current.singleFrameDuration,
+        time: this.current.exposureCount * this.current.singleFrameDuration
+      };
+      this.current.frames.push(frameMeta);
+
+      this.current.exposureCount += hold;
+    });
+
+    this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
+
+    return this.current;
+  }
+
+  setModified(date:Date | null = null): Date {
+    if (date === null) {
+      date = new Date();
+    }
+    this.dateModified = date.toISOString();
+    return date;
+  }
+
+  getFrameHold(frameNumber:number = -1) {
+    if (frameNumber === -1) {
+      frameNumber = this.current.frameNumber;
+    }
+    return this.frames[frameNumber]?.hold || this.frameHold;
+  }
+
+  setFrameHold(frameHold:number = 1, frameNumber:number = -1) {
+    if (frameNumber === -1) {
+      frameNumber = this.current.frameNumber;
+    }
+    this.frames[frameNumber].hold = frameHold;
   }
 
 }

@@ -2,181 +2,212 @@ type comparisonTrinary = -1 | 0 | 1;
 
 interface PenciltestVersionMunger {
   version:string;
-  upgrade?:Function;
+  migrate?:Function;
   packScene?:Function;
   unpackScene?:Function;
   sep?:{stroke:string, point:string, coord:string};
 };
 
+const PenciltestVersionMungerV0_0_4 = {
+  version:'0.0.4',
+  migrate(this:Penciltest) {
+    // change strokes from Raphael SVG format to simple arrays
+    const filmNamePattern = /^film:/;
+    return (() => {
+      const result = [];
+      for (let storageName in globalThis.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          const film = JSON.parse(globalThis.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) { continue; }
+
+          for (let frameIndex = 0; frameIndex < film.frames.length; frameIndex++) {
+            const frame = film.frames[frameIndex];
+            for (let strokeIndex = 0; strokeIndex < frame.strokes.length; strokeIndex++) {
+              const stroke = frame.strokes[strokeIndex];
+              for (let segmentIndex = 0; segmentIndex < stroke.length; segmentIndex++) {
+                const segment = stroke[segmentIndex];
+                if (typeof segment === 'string') {
+                  const newSegment = segment.replace(/[ML]/g, '').split(' ').map(Number);
+                  if (newSegment.length !== 2) {
+                    throw new Error(`bad stroke segment '${segment}': ${storageName}:f${frameIndex}:p${strokeIndex}:s${segmentIndex}`);
+                  }
+                  if (isNaN(newSegment[0]) || isNaN(newSegment[1])) {
+                    throw new Error(`NaN stroke segment '${segment}':  ${storageName}:f${frameIndex}:p${strokeIndex}:s${segmentIndex}`);
+                  }
+                  for (let i = 0, end = newSegment.length, asc = 0 <= end; asc ? i < end : i > end; asc ? i++ : i--) { newSegment[i] = Number(newSegment[i]); }
+                  film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment;
+                }
+              }
+            }
+          }
+
+          film.version = '0.0.4';
+          result.push(globalThis.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          result.push(undefined);
+        }
+      }
+      return result;
+    })();
+  }
+};
+
+const PenciltestVersionMungerV0_0_5 = {
+  version:'0.0.5',
+  migrate(this:Penciltest) {
+    // enable scaling, assuming 16:9, 720 width for undefined
+    const filmNamePattern = /^film:/;
+    return (() => {
+      const result = [];
+      for (let storageName in globalThis.localStorage) {
+        if (filmNamePattern.test(storageName)) {
+          const film = JSON.parse(globalThis.localStorage.getItem(storageName));
+          if (!film || !film.frames || !film.frames.length) { continue; }
+
+          if (film.aspect == null) { film.aspect = '16:9'; }
+          if (film.width == null) { film.width = 720; }
+          film.version = '0.0.5';
+          result.push(globalThis.localStorage.setItem(storageName, JSON.stringify(film)));
+        } else {
+          result.push(undefined);
+        }
+      }
+      return result;
+    })();
+  }
+};
+
+const PenciltestVersionMungerV0_3_0 = {
+  version:'0.3.0',
+  migrate(this:Penciltest) {
+    const scene = (this?.scene) as any;
+    // BEGIN: `aspect` is a number, and `aspectRatio` is a string.
+    if (typeof scene?.aspect === 'string' && typeof scene?.aspectRatio !== 'string') {
+      scene.aspectRatio = scene.aspect;
+      delete scene.aspect;
+    }
+    // BEGIN: `stroke` has other properties, so points moved to `.path[]`.
+    if (Array.isArray(scene?.frames)) {
+      scene?.frames.forEach((frame) => {
+        if (Array.isArray(frame.strokes)) {
+          frame.strokes = frame.strokes.map((stroke) => {
+            if (Array.isArray(stroke)) {
+              return {path:stroke.map((coords) => { return {x:coords[0],y:coords[1]}; })};
+            }
+            return stroke; // 🤷
+          });
+        }
+      });
+    }
+    // BEGIN: All times recorded in milliseconds.
+    if (scene?.audio?.offset) {
+      scene.audio.offset *= 1000;
+    }
+    if (scene?.current?.duration) {
+      scene.current.duration *= 1000;
+    }
+    if (scene?.current?.singleFrameDuration) {
+      scene.current.singleFrameDuration *= 1000;
+    }
+  },
+  sep: {
+    stroke: "|",
+    point: ',',
+    coord: ' '
+  },
+  packScene(scene:PenciltestScene):PenciltestSceneData {
+    const packStroke = (stroke:Stroke, scene:PenciltestScene):string => {
+      const packedStrokeObject = { ...stroke };
+      delete packedStrokeObject.path
+      let packedStrokeString = stroke.path
+        .map((point) => {
+          return Utils.getDecimal(point.x, 2) + this.sep.coord + Utils.getDecimal(point.y, 2) 
+        })
+        .join(this.sep.point)
+      if (Object.keys(packedStrokeObject).length > 0) {
+        packedStrokeString += JSON.stringify(packedStrokeObject);
+      }
+      return packedStrokeString;
+    };
+
+    const packFrame = (frame:PenciltestFrame, scene:PenciltestScene):PenciltestFrame => {
+      const packedFrame:PenciltestFrame = {
+        ...frame,
+      };
+      if (frame.strokes?.length > 0) {
+        packedFrame.packedStrokes = frame.strokes
+          .map((stroke) => packStroke(stroke, scene))
+          .join(this.sep.stroke);
+      }
+      if (packedFrame.hold === scene.frameHold) {
+        delete packedFrame.hold;
+      }
+      delete packedFrame.strokes;
+      return packedFrame;
+    };
+
+    const packedScene:PenciltestSceneData = {
+      ...scene,
+      frames: scene.frames.map((frame) => packFrame(frame, scene))
+    };
+    return packedScene;
+  },
+  unpackScene(packedScene:PenciltestSceneData):PenciltestScene {
+    const unpackStroke = (packedStroke:string):Stroke => {
+      const jsonIndex = packedStroke.indexOf('{');
+      const stroke:Stroke = {} as Stroke;
+      if (jsonIndex !== -1) {
+        try {
+          Object.assign(stroke, JSON.parse(packedStroke.slice(jsonIndex)))
+        } catch(e) {
+          console.error(e);
+        }
+      }
+      stroke.path = (jsonIndex > -1 ? packedStroke.substr(0, jsonIndex) : packedStroke)
+        .split(this.sep.point)
+        .map((packedPoint) => {
+          const coords = packedPoint.split(this.sep.coord).map(Number);
+          return {x:coords[0], y:coords[1]};
+        });
+      return stroke;
+    };
+
+    const unpackFrame = (frame:PenciltestFrame, scene:PenciltestSceneData):PenciltestFrame => {
+      if (!frame.packedStrokes?.length) { return frame; }
+
+      const unpackedFrame:PenciltestFrame = {
+        hold: scene.frameHold,
+        ...frame,
+        strokes: frame.packedStrokes
+          .split(this.sep.stroke)
+          .map((stroke) => unpackStroke(stroke))
+      };
+      delete unpackedFrame.packedStrokes;
+      return unpackedFrame;
+    };
+
+    const scene = new PenciltestScene(packedScene);
+    scene.frames = scene.frames.map((frame) => unpackFrame(frame, scene));
+
+    return scene;
+  }
+};
+
+// e.g.
+//const PenciltestVersionMungerVNEXT = {
+//  ...PenciltestVersionMungerVPREV,
+//  migrate(this:Penciltest) {},
+//  pack(scene:PenciltestScene) {},
+//  unpack(scene:PenciltestScene) {}
+//};
+
 class PenciltestVersions {
 
   static mungers:Array<PenciltestVersionMunger> = [
-    {
-      version:'0.0.4',
-      upgrade(this:Penciltest) {
-        // change strokes from Raphael SVG format to simple arrays
-        const filmNamePattern = /^film:/;
-        return (() => {
-          const result = [];
-          for (let storageName in globalThis.localStorage) {
-            if (filmNamePattern.test(storageName)) {
-              const film = JSON.parse(globalThis.localStorage.getItem(storageName));
-              if (!film || !film.frames || !film.frames.length) { continue; }
-
-              for (let frameIndex = 0; frameIndex < film.frames.length; frameIndex++) {
-                const frame = film.frames[frameIndex];
-                for (let strokeIndex = 0; strokeIndex < frame.strokes.length; strokeIndex++) {
-                  const stroke = frame.strokes[strokeIndex];
-                  for (let segmentIndex = 0; segmentIndex < stroke.length; segmentIndex++) {
-                    const segment = stroke[segmentIndex];
-                    if (typeof segment === 'string') {
-                      const newSegment = segment.replace(/[ML]/g, '').split(' ').map(Number);
-                      if (newSegment.length !== 2) {
-                        throw new Error(`bad stroke segment '${segment}': ${storageName}:f${frameIndex}:p${strokeIndex}:s${segmentIndex}`);
-                      }
-                      if (isNaN(newSegment[0]) || isNaN(newSegment[1])) {
-                        throw new Error(`NaN stroke segment '${segment}':  ${storageName}:f${frameIndex}:p${strokeIndex}:s${segmentIndex}`);
-                      }
-                      for (let i = 0, end = newSegment.length, asc = 0 <= end; asc ? i < end : i > end; asc ? i++ : i--) { newSegment[i] = Number(newSegment[i]); }
-                      film.frames[frameIndex].strokes[strokeIndex][segmentIndex] = newSegment;
-                    }
-                  }
-                }
-              }
-
-              film.version = '0.0.4';
-              result.push(globalThis.localStorage.setItem(storageName, JSON.stringify(film)));
-            } else {
-              result.push(undefined);
-            }
-          }
-          return result;
-        })();
-      }
-    },
-    {
-      version:'0.0.5',
-      upgrade(this:Penciltest) {
-        // enable scaling, assuming 16:9, 720 width for undefined
-        const filmNamePattern = /^film:/;
-        return (() => {
-          const result = [];
-          for (let storageName in globalThis.localStorage) {
-            if (filmNamePattern.test(storageName)) {
-              const film = JSON.parse(globalThis.localStorage.getItem(storageName));
-              if (!film || !film.frames || !film.frames.length) { continue; }
-
-              if (film.aspect == null) { film.aspect = '16:9'; }
-              if (film.width == null) { film.width = 720; }
-              film.version = '0.0.5';
-              result.push(globalThis.localStorage.setItem(storageName, JSON.stringify(film)));
-            } else {
-              result.push(undefined);
-            }
-          }
-          return result;
-        })();
-      }
-    },
+    PenciltestVersionMungerV0_0_4,
+    PenciltestVersionMungerV0_0_5,
     // TODO rename 'film' localStorage namespace to 'scene'. Which version did that happen in?  2026-07-31 uuid:ee574c36-476a-4a59-86ca-7c9a203b52f8
-    {
-      version:'0.3.0',
-      upgrade(this:Penciltest) {
-        const scene = (this?.scene) as any;
-        if (typeof scene?.aspect === 'string' && typeof scene?.aspectRatio !== 'string') {
-          scene.aspectRatio = scene.aspect;
-          delete scene.aspect;
-        }
-        if (Array.isArray(scene?.frames)) {
-          scene?.frames.forEach((frame) => {
-            if (Array.isArray(frame.strokes)) {
-              frame.strokes = frame.strokes.map((stroke) => {
-                if (Array.isArray(stroke)) {
-                  return {path:stroke.map((coords) => { return {x:coords[0],y:coords[1]}; })};
-                }
-                return stroke; // 🤷
-              });
-            }
-          });
-        }
-      },
-      sep: {
-        stroke: "|",
-        point: ',',
-        coord: ' '
-      },
-      packScene(scene:PenciltestScene):PenciltestScene {
-        return scene; // FIXME
-        const packStroke = (stroke:Stroke):string => {
-          const packedStrokeObject = { ...stroke };
-          delete packedStrokeObject.path
-          let packedStrokeString = stroke.path
-            .map((point) => {
-              return Utils.getDecimal(point.x, 2) + this.sep.coord + Utils.getDecimal(point.x, 2) 
-            })
-            .join(this.sep.point)
-          if (Object.keys(packedStrokeObject).length > 0) {
-            packedStrokeString += JSON.stringify(packedStrokeObject);
-          }
-          return packedStrokeString;
-        };
-
-        const packFrame = (frame:PenciltestFrame):PenciltestFrame => {
-          const packedFrame:PenciltestFrame = {
-            ...frame,
-          };
-          if (frame.strokes.length > 0) {
-            packedStrokes: frame.strokes
-              .map(packStroke)
-              .join(this.sep.stroke)
-          }
-          delete packedFrame.strokes;
-          return packedFrame;
-        };
-
-				const packedScene = {
-          ...scene,
-          frames: scene.frames.map(packFrame)
-        };
-        return packedScene;
-      },
-      unpackScene(scene:PenciltestScene):PenciltestScene {
-        return scene; // FIXME
-        const unpackStroke = (packedStroke:string):Stroke => {
-          const jsonIndex = packedStroke.indexOf('{');
-          const stroke:Stroke = (
-            jsonIndex !== -1
-              ? JSON.parse(packedStroke.slice(jsonIndex))
-              : {}
-            ) as Stroke;
-          stroke.path = packedStroke.substr(0, jsonIndex)
-            .split(this.sep.point)
-            .map((packedPoint) => {
-              const coords = packedPoint.split(this.sep.coord).map(Number);
-              return {x:coords[0], y:coords[1]};
-            });
-          return stroke;
-        };
-
-        const unpackFrame = (frame:PenciltestFrame):PenciltestFrame => {
-          if (!frame.packedStrokes?.length) { return frame; }
-
-          const unpackedFrame:PenciltestFrame = {
-            ...frame,
-            strokes: frame.packedStrokes
-              .split(this.sep.stroke)
-              .map(unpackStroke)
-          };
-          delete unpackedFrame.packedStrokes;
-          return unpackedFrame;
-        };
-
-        return {
-          ...scene,
-          frames: scene.frames.map(unpackFrame)
-        };
-      }
-    },
+    PenciltestVersionMungerV0_3_0,
   ];
 
   static compareVersions(va: string, vb:string): comparisonTrinary {
@@ -190,18 +221,18 @@ class PenciltestVersions {
     }, 0) as comparisonTrinary;
   }
 
-  static async upgrade(controller: Penciltest, fromVersion: string, toVersion: string) {
+  static async migrate(controller: Penciltest, fromVersion: string, toVersion: string) {
     let atVersion = fromVersion;
-    const confirmMessage = `Upgrade scene data from v${fromVersion} to v${toVersion}?`;
+    const confirmMessage = `Migrate scene data from v${fromVersion} to v${toVersion}?`;
     if (await Utils.confirm(confirmMessage)) {
       try {
         const result = PenciltestVersions.mungers.reduce((acc, munger) => {
           const fromVersionComparison = PenciltestVersions.compareVersions(fromVersion, munger.version)
           const isUpgradeGreaterThanFromVersion = fromVersionComparison === -1
-          if (!isUpgradeGreaterThanFromVersion || typeof munger.upgrade !== 'function') {
+          if (!isUpgradeGreaterThanFromVersion || typeof munger.migrate !== 'function') {
             return acc;
           }
-          munger.upgrade.apply(controller);
+          munger.migrate.apply(controller);
           atVersion = munger.version;
         });
       } catch (error) {
@@ -213,7 +244,12 @@ class PenciltestVersions {
     return atVersion;
   }
 
-  static getMunger(version:string, comparison: comparisonTrinary = 0) {
+  /**
+   * comparisonTrinary: 0 => EXACT match for version
+   * comparisonTrinary: -1 => EXACT or latest OLDER version
+   * comparisonTrinary: 1 => EXACT or earliest NEWER version
+   */
+  static getMunger(version:string, comparison: comparisonTrinary = -1) {
     let munger:PenciltestVersionMunger;
     const step = comparison === -1 ? -1 : 1;
     const left = 0;
@@ -224,7 +260,7 @@ class PenciltestVersions {
     for (i = start; end > start ? i <= end : i >= end; i += step) {
       const munger = PenciltestVersions.mungers[i];
       const mungerComparison = PenciltestVersions.compareVersions(version, munger.version);
-      if (mungerComparison === comparison) {
+      if (mungerComparison === 0 || mungerComparison === comparison) { // exact, or in comparison direction
         return munger;
       }
     }
@@ -239,13 +275,16 @@ class PenciltestVersions {
           return;
         } catch(e) {
           console.error(e);
+          reject(`Error packing scene: ${e.message}`);
         }
+      } else {
+        console.warn(`No packScene method found for scene version ${scene.instrument.version}.`);
       }
       resolve(scene);
     });
   }
 
-  static async unpackScene(packedScene:PenciltestScene): Promise<PenciltestScene> {
+  static async unpackScene(packedScene:PenciltestSceneData): Promise<PenciltestScene> {
     return new Promise((resolve, reject) => {
       const munger = PenciltestVersions.getMunger(packedScene.instrument.version);
       if (typeof munger?.unpackScene === 'function') {
@@ -256,7 +295,7 @@ class PenciltestVersions {
           console.error(e);
         }
       }
-      resolve(packedScene);
+      resolve(new PenciltestScene(packedScene));
     });
   }
 

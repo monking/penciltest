@@ -21,14 +21,11 @@ interface PenciltestLineOptions { /* Redundant member names for blending with ot
   lineWeight?: number;
 }
 
-interface PenciltestSceneOptions extends PenciltestLineOptions {
-  aspectRatio?: string;
+interface PenciltestSceneOptions extends PenciltestLineOptions, Bounds {
   background?: string;
   frameHold?: number;
   framerate?: number;
-  height?: number;
   loop?: boolean;
-  width?: number;
 }
 
 interface PenciltestOptions extends PenciltestSceneOptions {
@@ -62,33 +59,34 @@ interface PenciltestFrame {
   strokes?: Array<Stroke>;
   packedStrokes?: string;
   hold?: number;
-  time?: number;
+  time?: number; // milliseconds
 }
 
 interface PenciltestFrameMeta {
-  duration: number;
+  duration: number; // milliseconds
   exposure: number;
   id: number;
-  time: number;
+  time: number; // milliseconds
 }
 
 interface PenciltestSceneAudio {
   url?: string;
   info?: string;
-  offset?: number;
+  offset?: number; // milliseconds
+  volume?: number; // 0 to 100
 }
 
 interface PenciltestSceneState {
   frames?: Array<PenciltestFrameMeta>;
   //exposures?: Array<PenciltestFrameMeta>; // DELME exposures not used @1785520725
-  duration?: number;
+  duration?: number; // milliseconds
   exposureCount?: number;
   exposureNumber?: number;
   frameNumber?: number;
-  singleFrameDuration?: number;
+  singleFrameDuration?: number; // milliseconds
 }
 
-interface PenciltestScene extends PenciltestSceneOptions {
+interface PenciltestSceneData extends PenciltestSceneOptions {
   audio?: PenciltestSceneAudio;
   current?: PenciltestSceneState;
   dateCreated?: string;
@@ -97,6 +95,15 @@ interface PenciltestScene extends PenciltestSceneOptions {
   instrument?: PenciltestInsrument;
   name?: string;
   uuid?: string;
+  getDimensions?():Bounds;
+};
+
+interface PlaybackState {
+  direction?: number | null;
+  heldExposures?: number;
+  stepId?: any;
+  muteAudio?: boolean;
+  scrubAudioId?: number;
 };
 
 type PenciltestRange = { start?: number; end?: number; }

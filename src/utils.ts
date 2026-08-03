@@ -385,20 +385,45 @@ class Utils {
     };
   };
 
-  static getDecimal(input: number, precision: number, toString: boolean = false): string | number {
+  static getDecimal(input: number, precision: number, toString: boolean = false, leftPad:number = 0): string | number {
     const factor = Math.pow(10, precision);
     const value = Math.round(input * factor) / factor;
 
     if (toString) {
       const parts = String(value).split('.');
-      if (parts.length === 1) {
-        parts.push('0');
+      if (precision > 0) {
+        if (parts.length === 1) {
+          parts.push('0');
+        }
+        while (parts[1].length < precision) { parts[1] += '0'; }
       }
-      while (parts[1].length < precision) { parts[1] += '0'; }
-      return parts.join('.');
+      while (parts[0].length < leftPad) { parts[0] = `0${parts[0]}`; }
+      if (precision > 0) {
+        return parts.join('.');
+      } else {
+        return parts[0];
+      }
     }
 
     return value;
+  };
+
+  static getTimecode(milliseconds: number, precision: number = 2): string {
+    const factors = [1000, 60, 60];
+    let remainderMs = milliseconds;
+    let cumulativeFactor = 1;
+    return factors
+      .map((factor, index) => {
+        cumulativeFactor *= factor;
+        let segment = (remainderMs / cumulativeFactor)
+        if (index < factors.length - 1) {
+          segment %= factors[index + 1];
+        }
+        remainderMs -= segment * cumulativeFactor;
+        return Utils.getDecimal(segment, index === 0 ? precision : 0, true, 2);
+      })
+      .reverse()
+      .join(':');
   };
 
   static isMultiple(a:number, b:number, precision:number = 0.001):[boolean, number, number, boolean] {
