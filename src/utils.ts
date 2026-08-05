@@ -53,14 +53,11 @@ class Utils {
 
   static confirm(message: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (globalThis.confirm(message)) {
-        resolve(true);
-      } else {
-        reject();
-      }
+      resolve(globalThis.confirm(message));
     });
   };
 
+  static promptCanceled = 'canceled';
   static async prompt(message: string, defaultValue: any = null, options: PromptOptions = {}): Promise<string> {
     const {
       input: givenPromptInput,
@@ -71,7 +68,6 @@ class Utils {
     } = options;
 
     let property: string | number, value: any;
-    globalThis.pauseKeyboardListeners = true; // FIXME: needed so that the penciltest-ui.coffee keyboard listener can not interfere. Find a better way (event driven?)
     const promptModal = document.createElement('div');
     Object.assign(promptModal.style, {
       position: 'absolute',
@@ -148,12 +144,11 @@ class Utils {
       const closePromptModal = function() {
         promptModal.remove();
         document.removeEventListener('keydown', promptKeyListener);
-        globalThis.pauseKeyboardListeners = false;
       };
 
       const cancelPrompt = ():void => {
         closePromptModal();
-        reject(promptInput.value);
+        reject(Utils.promptCanceled);
       };
 
       const submitPrompt = ():void => {
@@ -169,7 +164,7 @@ class Utils {
       promptCancelButton.addEventListener('click', function(event: { preventDefault: () => void; }) {
         event.preventDefault();
         closePromptModal();
-        reject();
+        reject(Utils.promptCanceled);
       });
       promptForm.appendChild(promptCancelButton);
 
@@ -196,7 +191,7 @@ class Utils {
   };
 
 
-  static select(message: string, choices: Array<string>, defaultValue: string, options: PromptOptions = {}): Promise<string | boolean> {
+  static promptSelect(message: string, choices: Array<string>, defaultValue: string, options: PromptOptions = {}): Promise<string | boolean> {
     // TODO: update the application core to handle async prompts (e.g. selectSceneNames)
     const selectInput = document.createElement('select');
     choices.forEach((choice, index) => {
@@ -345,7 +340,7 @@ class Utils {
     return sumPoints;
   };
 
-  static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: "client" | "page" = "client"):Point {
+  static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: AnyPointerScope = "client"):Point {
     const points = Array.from(event.touches)
       .slice(0, touchLimit)
       .map((touch) => {
@@ -361,7 +356,7 @@ class Utils {
     }
   };
 
-  static eventPoint(event: PointerEvent | TouchEvent, scope: "client" | "page" = "client", mode: "first" | "average" = "first"):Point {
+  static eventPoint(event: AnyPointerEvent, scope: AnyPointerScope = "client", touchLimit: number = 1):Point {
     if (event.type.substr(5) === 'touch') {
       return Utils.touchPoint(event as TouchEvent);
     }
@@ -378,10 +373,62 @@ class Utils {
     }
   };
 
+  static unionBounds(points:Array<Point | Bounds>, bounds:Bounds = {}): Bounds {
+    if (points.length === 0) { return bounds; }
+
+    points.forEach((point) => {
+      if (!("x" in bounds)) {
+        bounds.x = point.x;
+        bounds.width = 0; // Ignoring if bounds had width without x.
+      } else if (point.x < bounds.x) {
+        bounds.x = point.x;
+      } else if (point.x > bounds.x + bounds.width) {
+        bounds.width = point.x - bounds.x;
+      } else if ("width" in point && point.x + point.width > bounds.x + bounds.width) {
+        bounds.width = point.x + point.width - bounds.x;
+      }
+
+      if (!("y" in bounds)) {
+        bounds.y = point.y;
+        bounds.height = 0; // Ignoring if bounds had height without y.
+      } else if (point.y < bounds.y) {
+        bounds.y = point.y;
+      } else if (point.y > bounds.y + bounds.height) {
+        bounds.height = point.y - bounds.y;
+      } else if ("height" in point && point.y + point.height > bounds.y + bounds.height) {
+        bounds.height = point.y + point.height - bounds.y;
+      }
+    });
+
+    return bounds;
+  }
+
+  static boundsCenter(bounds:Bounds): Point {
+    const positionBounds = {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      ...bounds
+    };
+
+    return {
+      x:positionBounds.x + positionBounds.width / 2,
+      y:positionBounds.y + positionBounds.height / 2
+    };
+  }
+
   static diffPoints(point1: Point, point2: Point):Point {
     return {
       x: point1.x - point2.x,
       y: point1.y - point2.y
+    };
+  };
+
+  static negatePoint(point):Point {
+    return {
+      x: -point.x,
+      y: -point.y
     };
   };
 
@@ -440,6 +487,10 @@ class Utils {
     const high = Math.min(Math.max(0, range.start, range.end), subject.length - 1);
     const frames = cut ? subject.splice(low, high - low + 1) : subject.slice(low, high + 1);
     return [ frames, low ];
+  }
+
+  static getIntersection(a:Array<any>, b:Array<any>): Array<any> {
+    return a.filter((A) => b.indexOf(A) !== -1);
   }
 
   static encodeBase64(input: any) {

@@ -1,2 +1,4 @@
-@include penciltest {
+@use "config";
+
+@include config.penciltest {
 }

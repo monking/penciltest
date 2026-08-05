@@ -2,30 +2,30 @@ class PenciltestUI extends PenciltestUIComponent {
   appActions: AppActionsList;
   menuOptions: Array<any>;
   currentGesture: PenciltestGesture;
-  controller: any;
+  controller: Penciltest;
   feedbackTimeout: number;
-  components: { [key: string]: any /* FIXME: Setting to `PenciltestUIComponent` causes `.getElement().addEventListener()` to complain: `Argument of type 'Function' is not assignable to parameter of type 'EventListenerOrEventListenerObject'.` @1785650080*/; };
-  previousEvent: PointerEvent | MouseEvent | WheelEvent | KeyboardEvent | null;
-  pointer: { coords: Point; };
-  uiListeners: { [key:string]: Function; };
+  previousEvent: AnyPointerEvent | WheelEvent | KeyboardEvent | null;
+  pointer: Point;
   menuItemElements: Array<HTMLElement>;
   keyBindings: { keydown: {}; keyup: {}; };
   menuIsVisible: any;
-  feedbackElement: any;
+  feedbackComponent: PenciltestUIComponent;
+  defaultDragOptions: PenciltestDragOptions;
 
   // action and listener functions are called in controller scope
 
 
-  constructor(initOptions:PenciltestUIOptions) {
+  constructor(controller:Penciltest, initOptions:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
     const options = {
       className: 'penciltest-ui',
-      parent: document.body,
       ...initOptions,
     };
 
     super(options);
 
-    this.controller = options.controller;
+    this.components = components;
+
+    this.controller = controller;
 
     this.menuOptions = [
       {
@@ -37,6 +37,8 @@ class PenciltestUI extends PenciltestUIComponent {
           'lastFrame',
         ],
         Edit: [
+          'panFrame',
+          'rescueFrame',
           'undo',
           'redo',
           'moreHold',
@@ -73,11 +75,15 @@ class PenciltestUI extends PenciltestUIComponent {
               'renameScene',
               'deleteScene',
             ],
+            'audio': [
+              'linkAudio',
+              'volume',
+              'offsetAudio',
+            ],
           },
           'loop',
           'framerate',
           'frameHold',
-          'linkAudio',
           'background',
           'lineColor',
           'resizeScene',
@@ -98,7 +104,7 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Tab'],
         gesture: /4 still/,
         listener(this: Penciltest) {
-          this.ui.toggleMenu(this.ui.pointer.coords || {x: 10, y: 10});
+          this.ui.toggleMenu(this.ui.pointer || {x: 10, y: 10});
         }
       },
 
@@ -107,7 +113,7 @@ class PenciltestUI extends PenciltestUIComponent {
         async listener(this: Penciltest) {
           let renderer: any;
           const self = this;
-          const selectedRenderer = await Utils.select(
+          const selectedRenderer = await Utils.promptSelect(
             'Set renderer',
             [Renderers.CANVAS, Renderers.SVG],
             this.options.renderer
@@ -119,12 +125,13 @@ class PenciltestUI extends PenciltestUIComponent {
             if (this.renderer != null) {
               this.renderer.destroy();
             }
+            const sceneDimensions = this.scene.getDimensions();
             const rendererOptions: PenciltestRendererOptions = {
               lineColor: this.scene.lineColor,
               lineWeight: this.scene.lineWeight,
               container: this.fieldElement,
-              width: this.forceDimensions ? this.forceDimensions.width as number : this.scene.width,
-              height: this.forceDimensions ? this.forceDimensions.height as number : this.scene.height
+              width: this.forceDimensions ? this.forceDimensions.width as number : sceneDimensions.width,
+              height: this.forceDimensions ? this.forceDimensions.height as number : sceneDimensions.height
             };
             if (this.options.renderer === Renderers.SVG) {
               this.renderer = new SVGRenderer(rendererOptions);
@@ -179,8 +186,6 @@ class PenciltestUI extends PenciltestUIComponent {
           const toFrame = this.scene.current.frameNumber + 1
           if ((event as KeyboardEvent)?.shiftKey) {
             this.ui.expandSelection(this.scene.current.frameNumber, toFrame);
-          } else {
-            this.ui.clearSelection();
           }
           this.goToFrame(toFrame);
           this.stop();
@@ -199,8 +204,6 @@ class PenciltestUI extends PenciltestUIComponent {
           const toFrame = this.scene.current.frameNumber - 1
           if ((event as KeyboardEvent)?.shiftKey) {
             this.ui.expandSelection(this.scene.current.frameNumber, toFrame);
-          } else {
-            this.ui.clearSelection();
           }
           this.goToFrame(toFrame);
           this.stop();
@@ -219,8 +222,6 @@ class PenciltestUI extends PenciltestUIComponent {
           const toFrame = 0
           if ((event as KeyboardEvent)?.shiftKey) {
             this.ui.expandSelection(this.scene.current.frameNumber, toFrame);
-          } else {
-            this.ui.clearSelection();
           }
           this.goToFrame(0);
           this.stop();
@@ -238,11 +239,20 @@ class PenciltestUI extends PenciltestUIComponent {
           const toFrame = this.scene.frames.length - 1
           if ((event as KeyboardEvent)?.shiftKey) {
             this.ui.expandSelection(this.scene.current.frameNumber, toFrame);
-          } else {
-            this.ui.clearSelection();
           }
           this.goToFrame(toFrame);
           this.stop();
+        }
+      },
+
+      selectAllFrames: {
+        label: "Select scene",
+        title: "Select all the frames in this scene.",
+        hotkey: ['Ctrl+A'],
+        cancelComplementKeyEvent: true,
+        listener(this: Penciltest, event) {
+          this.state.frameSelection = {start: 0, end: this.scene.frames.length - 1};
+          this.ui.showFeedback({text:`Selected all ${this.scene.frames.length} frames`});
         }
       },
 
@@ -252,7 +262,7 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkeyModifiers: ['Control'],
         listener(this: Penciltest) {
           const [ copiedFrames ] = this.copyFrames();
-          this.ui.showFeedback(`Copied ${copiedFrames.length} frame${copiedFrames.length !== 1 ? 's' : ''}`);
+          this.ui.showFeedback({text:`Copied ${copiedFrames.length} frame${copiedFrames.length !== 1 ? 's' : ''}`});
         }
       },
 
@@ -262,7 +272,8 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkeyModifiers: ['Control'],
         listener(this: Penciltest) {
           this.pasteFrames();
-          this.ui.showFeedback(`Pasted ${this.copyBuffer.length} frame${this.copyBuffer.length !== 1 ? 's' : ''}`);
+          this.ui.showFeedback({text:`Pasted ${this.copyBuffer.length} frame${this.copyBuffer.length !== 1 ? 's' : ''}`});
+          this.scrubAudio();
         }
       },
 
@@ -271,19 +282,19 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Shift+V'],
         listener(this: Penciltest) {
           this.pasteStrokes()
-          this.ui.showFeedback('Pasted strokes');
+          this.ui.showFeedback({text:'Pasted strokes'});
         }
       },
 
       insertFrameBefore: {
         label: "Insert Frame Before",
-        hotkey: ['Shift+A', 'Shift+I'],
+        hotkey: ['Shift+I'],
         gesture: /2 still from left top/,
         listener(this: Penciltest) {
           const newIndex = this.scene.current.frameNumber;
-          this.newFrame(newIndex);
+          this.scene.newFrame(newIndex);
           this.goToFrame(newIndex);
-          this.ui.showFeedback('Inserted frame before');
+          this.ui.showFeedback({text:'Inserted frame before'});
         }
       },
 
@@ -293,9 +304,9 @@ class PenciltestUI extends PenciltestUIComponent {
         gesture: /2 still from right top/,
         listener(this: Penciltest) {
           const newIndex = this.scene.current.frameNumber + 1;
-          this.newFrame(newIndex);
+          this.scene.newFrame(newIndex);
           this.goToFrame(newIndex);
-          this.ui.showFeedback('Inserted frame after');
+          this.ui.showFeedback({text:'Inserted frame after'});
         }
       },
 
@@ -304,11 +315,19 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Alt+Shift+I'],
         async listener(this: Penciltest) {
           const newIndex = this.scene.current.frameNumber + 1;
-          const seconds = Number(await Utils.prompt('# of seconds to insert: ', 1));
-          const insertFrameCount = Math.floor(this.scene.framerate / this.options.frameHold * seconds);
-          this.newFrame(null, insertFrameCount);
+          let seconds;
+          try {
+            seconds = Number(await Utils.prompt('# of seconds to insert: ', 1));
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
+          const insertFrameCount = Math.floor(this.scene.framerate / (this.scene.getFrameHold() * seconds));
+          this.scene.newFrame(null, insertFrameCount);
           this.goToFrame(newIndex);
-          this.ui.showFeedback(`Inserted ${insertFrameCount} frames, beginnging at frame ${newIndex}`);
+          this.ui.showFeedback({text:`Inserted ${insertFrameCount} frames, beginnging at frame ${newIndex}`});
         }
       },
 
@@ -320,7 +339,7 @@ class PenciltestUI extends PenciltestUIComponent {
         repeat: true,
         listener(this: Penciltest) {
           this.undo();
-          this.ui.showFeedback(`undo`);
+          this.ui.showFeedback({text:`undo`});
         }
       },
 
@@ -332,14 +351,22 @@ class PenciltestUI extends PenciltestUIComponent {
         repeat: true,
         listener(this: Penciltest) {
           this.redo();
-          this.ui.showFeedback(`redo`);
+          this.ui.showFeedback({text:`redo`});
         }
       },
 
       lineColor: {
         label: "Line Color",
         async listener(this: Penciltest) {
-          const lineColor = await Utils.prompt('line color: ', this.scene.lineColor, {'input':'color'});
+          let lineColor;
+          try {
+            lineColor = await Utils.prompt('line color: ', this.scene.lineColor, {'input':'color'});
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (lineColor) {
             this.setOptions({lineColor: lineColor});
           }
@@ -358,7 +385,15 @@ class PenciltestUI extends PenciltestUIComponent {
       background: {
         label: "Background Color",
         async listener(this: Penciltest) {
-          const bg = await Utils.prompt('background color: ', this.scene.background, {'input':'color'});
+          let bg;
+          try {
+            bg = await Utils.prompt('background color: ', this.scene.background, {'input':'color'});
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (bg) {
             this.setOptions({background: bg});
           }
@@ -378,7 +413,15 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Frame rate",
         async listener(this: Penciltest) {
           const oldFrameRate = this.scene.framerate;
-          const newFramerate = Number(await Utils.prompt(`Set the frame rate of the scene:<br><small>FPS, frames per second</small>`, this.scene.framerate));
+          let newFramerate;
+          try {
+            newFramerate = Number(await Utils.prompt(`${lc('promptSetFramerate'), true}:<br><small>FPS, frames per second</small>`, this.scene.framerate));
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (newFramerate && newFramerate !== oldFrameRate) {
             const newOptions:PenciltestOptions = {framerate: newFramerate};
             const [ isMultiple, absFactor, factorError, newIsLarger ] = Utils.isMultiple(newFramerate, oldFrameRate, 0.002);
@@ -392,11 +435,14 @@ class PenciltestUI extends PenciltestUIComponent {
               });
             }
             this.setOptions(newOptions);
+            this.scene.updateState();
+            this.ui.updateStatusBar();
           }
         },
         action(this: Penciltest) {
           if (this.scene) {
             this.scene.framerate = this.options.framerate;
+            this.scene.updateState();
           }
           if (this.scene) {
             this.scene.current.singleFrameDuration = 1 / this.scene.framerate;
@@ -407,7 +453,15 @@ class PenciltestUI extends PenciltestUIComponent {
       frameHold: {
         label: "Default Frame Hold",
         async listener(this: Penciltest) {
-          const hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
+          let hold
+          try {
+            hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (hold) {
             const oldHold = this.options.frameHold;
             this.setOptions({frameHold: Number(hold)});
@@ -436,6 +490,7 @@ class PenciltestUI extends PenciltestUIComponent {
         title: "show previous and next frames in red and blue",
         listener(this: Penciltest) {
           this.setOptions({onionSkin: !this.options.onionSkin});
+          this.ui.showFeedback({text: `Onion skin: ${this.options.onionSkin ? 'ON' : 'OFF'}`})
           this.resize(); // FIXME: should either not redraw, or redraw fine without this
         }
       },
@@ -455,7 +510,7 @@ class PenciltestUI extends PenciltestUIComponent {
         cancelComplementKeyEvent: true,
         listener(this: Penciltest) {
           const [ frames, start ] = this.dropFrames();
-          this.ui.showFeedback(`Dropped ${frames.length} frame${frames.length !== 1 ? 's' : ''}`);
+          this.ui.showFeedback({text:`Dropped ${frames.length} frame${frames.length !== 1 ? 's' : ''}`});
         }
       },
 
@@ -467,7 +522,7 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkeyModifiers: ['Control'],
         listener(this: Penciltest) {
           const [ frames ] = this.cutFrames();
-          this.ui.showFeedback(`Cut ${frames.length} frame${frames.length !== 1 ? 's' : ''}`);
+          this.ui.showFeedback({text:`Cut ${frames.length} frame${frames.length !== 1 ? 's' : ''}`});
         }
       },
 
@@ -476,7 +531,22 @@ class PenciltestUI extends PenciltestUIComponent {
         title: "How much your lines will be smoothed as you draw",
         hotkey: ['Shift+S'],
         async listener(this: Penciltest) {
-          const smoothing = await Utils.prompt('Smoothing', this.options.smoothing);
+          const promptOptions = {
+            input: 'range', 
+            inputAttrs: {
+              min: 0,
+              max: 3
+            },
+          };
+          let smoothing;
+          try {
+            smoothing = await Utils.prompt('Smoothing', this.options.smoothing, promptOptions);
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (typeof smoothing === 'number') {
             this.setOptions({smoothing})
           }
@@ -503,7 +573,12 @@ class PenciltestUI extends PenciltestUIComponent {
             console.log(`Penciltest is: ${startMode}`);
             return;
           }
-          const amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
+          let amount;
+          try {
+            amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
+          } catch(ignore) {
+            return;
+          }
           if (amount < 1) {
             return;
           }
@@ -540,10 +615,15 @@ class PenciltestUI extends PenciltestUIComponent {
       },
 
       showStatus: {
-        label: "Show Status",
+        label: "Toggle Status",
+        hotkey: ['Tab'],
+        cancelComplementKeyEvent: true,
         title: "Show/hide the scene status bar",
         listener(this: Penciltest) { this.setOptions({showStatus: !this.options.showStatus}); },
-        action(this: Penciltest) { Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus); },
+        action(this: Penciltest) {
+          Utils.toggleClass(this.ui.components.statusBar.getElement(), 'hidden', !this.options.showStatus);
+          this.resize();
+        },
       },
 
       loop: {
@@ -552,7 +632,7 @@ class PenciltestUI extends PenciltestUIComponent {
         gesture: /2 up from center (bottom|middle)/,
         listener(this: Penciltest) {
           this.setOptions({ loop: !this.options.loop });
-          this.ui.showFeedback(`Loop: ${this.options.loop ? 'ON' : 'OFF'}`);
+          this.ui.showFeedback({text:`Loop: ${this.options.loop ? 'ON' : 'OFF'}`});
         }
       },
 
@@ -562,7 +642,7 @@ class PenciltestUI extends PenciltestUIComponent {
         title: "Play audio at the current frame when changing frames, other than regular playback.",
         listener(this: Penciltest) {
           this.setOptions({ scrubAudio: !this.options.scrubAudio });
-          this.ui.showFeedback(`Scrub audio: ${this.options.scrubAudio ? 'ON' : 'OFF'}`);
+          this.ui.showFeedback({text:`Scrub audio: ${this.options.scrubAudio ? 'ON' : 'OFF'}`});
         }
       },
 
@@ -571,12 +651,10 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['M'],
         listener(this: Penciltest) {
           this.setPlayback({ muteAudio: !this.playback.muteAudio });
-          this.ui.showFeedback(`Mute: ${this.playback.muteAudio ? 'ON' : 'OFF'}`);
+          this.ui.showFeedback({text:`Mute: ${this.playback.muteAudio ? 'ON' : 'OFF'}`});
         },
         action(this: Penciltest) {
-          if (this.audioElement) {
-            this.audioElement.volume = this.playback.muteAudio ? 0 : this.scene.audio.volume / 100;
-          }
+          this.ui.handleAppReaction('volume');
         }
       },
 
@@ -587,20 +665,27 @@ class PenciltestUI extends PenciltestUIComponent {
         async listener(this: Penciltest) {
           const startingFrameHold = this.scene.getFrameHold();
           if (startingFrameHold < 2) {
-            this.ui.showFeedback('Frame must be held for 2 or more exposures to split.');
+            this.ui.showFeedback({text:'Frame must be held for 2 or more exposures to split'});
             return;
           }
           let splitOffset = Math.floor(startingFrameHold/2);
           if (startingFrameHold > 2) {
             const promptOptions = {
-              'input':'range',
-              'inputAttrs': {
-                'min':1,
-                'max':startingFrameHold - 1
+              input: 'range',
+              inputAttrs: {
+                min: 1,
+                max: startingFrameHold - 1
               },
               'labelLogic': (offset:string) => offset
             };
-            splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions))
+            try {
+              splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions))
+            } catch(reason) {
+              if (reason !== Utils.promptCanceled) {
+                console.error(reason);
+                return;
+              }
+            }
           }
           if (splitOffset) {
             this.splitFrame(this.scene.current.frameNumber, splitOffset);
@@ -620,10 +705,10 @@ class PenciltestUI extends PenciltestUIComponent {
               await this.ui.triggerAppAction('renameScene')
             }
             await this.saveScene()
-            this.ui.showFeedback(`Saved scene '${this.scene.name}' to browser local storage`);
+            this.ui.showFeedback({text:`Saved scene '${this.scene.name}' to browser local storage`});
           } catch(e) {
             console.error(e);
-            this.ui.showFeedback(`Unable to save scene: ${e.message}`);
+            this.ui.showFeedback({text:`Unable to save scene: ${e.message}`});
           }
         }
       },
@@ -631,10 +716,18 @@ class PenciltestUI extends PenciltestUIComponent {
       renameScene: {
         label: "Rename Scene",
         async listener(this: Penciltest) {
-          const newName = await Utils.prompt("Scene name:", this.scene.name);
+          let newName;
+          try {
+            newName = await Utils.prompt("Scene name:", this.scene.name);
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (newName) {
             this.scene.name = newName;
-            this.ui.updateStatus();
+            this.ui.updateStatusBar();
           }
         }
       },
@@ -646,8 +739,15 @@ class PenciltestUI extends PenciltestUIComponent {
         async listener(this: Penciltest) {
           const sceneName = await this.ui.selectSceneName('Choose a scene to load');
           if (sceneName) {
-            if (await this.loadScene(sceneName as string)) {
-              this.ui.showFeedback(`Loaded scene: ${this.scene.name}`);
+            try {
+              if (await this.loadScene(sceneName as string)) {
+                this.ui.showFeedback({text:`Loaded scene: ${this.scene.name}`});
+              }
+            } catch(reason) {
+              if (reason !== Utils.promptCanceled) {
+                console.error(reason);
+              }
+              return;
             }
           }
         }
@@ -667,9 +767,84 @@ class PenciltestUI extends PenciltestUIComponent {
       },
 
       renderGif: {
-        label: "Render GIF",
-        hotkey: ['G'],
-        listener(this: Penciltest) { this.renderGif(); }
+        label: "Render GIF (FIXME)",
+        hotkey: ['Shift+G'],
+        async listener(this: Penciltest) {
+          const exporter = new PenciltestRenderExporter(this);
+          const gifURL = await exporter.renderGif();
+          console.log({gifURL});
+
+          const gifInstructions = PenciltestUIComponent.restore({
+            key: 'gifInstructions',
+            html: "Click/touch image to download.<br>Click/touch outside GIF to close.",
+            style: {
+              position: 'relative',
+              color: 'white',
+              textAlign: 'center',
+              backgroundColor: 'rgba(0,0,0,0.5)'
+            }
+          }, this.ui.components);
+
+          const gifImage = PenciltestUIComponent.restore({
+            key: 'gifImage',
+            attr: {
+              src: gifURL
+            },
+            style: {
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translateX(-50%) translateY(-50%)',
+              maxWidth: '80%',
+              maxHeight: '80%'
+            }
+          }, this.ui.components);
+
+          const gifLink = PenciltestUIComponent.restore({
+            key: 'gifLink',
+            attr: {
+              href: gifURL,
+              download: `${this.scene.name || 'untitled'}.penciltest.gif`,
+            },
+            children: [
+              gifImage
+            ]
+          }, this.ui.components);
+
+          const gifContainer = PenciltestUIComponent.restore({
+            key: 'gifContainer',
+            attr: {
+              id: 'rendered_gif'
+            },
+            parent: this.ui,
+            children: [
+              gifInstructions,
+              gifLink
+            ],
+            style: {
+              position: 'absolute',
+              top: '0px',
+              left: '0px',
+              bottom: '0px',
+              right: '0px',
+              backgroundColor: 'rgba(0,0,0,0.5)'
+            }
+          }, this.ui.components);
+
+          const gifCloseHandler = function(event: AnyPointerEvent | KeyboardEvent) {
+            if ((event.target !== gifImage.getElement()) || ( event.type === 'keydown' && ((event as KeyboardEvent).key === 'escape') )) {
+              gifContainer.getElement().removeEventListener('click', gifCloseHandler);
+              gifContainer.getElement().removeEventListener('touchend', gifCloseHandler);
+              globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
+              return gifContainer.getElement().remove();
+            }
+          };
+
+          gifContainer.getElement().addEventListener('click', gifCloseHandler);
+          gifContainer.getElement().addEventListener('touchend', gifCloseHandler);
+          globalThis.document.body.addEventListener('keydown', gifCloseHandler);
+
+        }
       },
 
       resizeScene: {
@@ -677,62 +852,61 @@ class PenciltestUI extends PenciltestUIComponent {
         title: "Set the width and height of the canvas in this scene",
         hotkey: ['Alt+R'],
         async listener(this: Penciltest) {
-          const dimensionsResponse = await Utils.prompt('Scene width & aspect (W/H)', `${this.scene.width} ${this.scene.aspectRatio}`)
+          const sceneDimensions = this.scene.getDimensions();
+          let dimensionsResponse;
+          try {
+            dimensionsResponse = await Utils.prompt('Scene height & aspect (W/H)', `${sceneDimensions.height} ${sceneDimensions.aspectRatio}`)
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
+            return;
+          }
           if (!dimensionsResponse) {
             return;
           }
           const dimensions = dimensionsResponse.split(' ');
-          this.scene.width = Number(dimensions[0])
+          this.scene.height = Number(dimensions[0])
           this.scene.aspectRatio = dimensions[1]
           this.resize()
         }
       },
 
+      panFrame: {
+        label: "Pan Frame",
+        title: "Move the contents of the selected/current frame(s).",
+        hotkey: ['P'],
+        async listener(this: Penciltest) {
+          const offset:Point = await this.ui.interactivePan();
+          this.ui.showFeedback({text:`Panned this frame: ${Utils.getDecimal(offset.x, 0, true)}, ${Utils.getDecimal(offset.y, 0, true)}`});
+        }
+      },
+
+      rescueFrame: {
+        label: "Rescue Frames",
+        title: "Move the contents of the selected frames to the center of the canvas. Useful after resizing or panning them out of view.",
+        async listener(this: Penciltest) {
+          const [ frames ] = this.getSelectedFrames();
+
+          const selectionBounds = this.getFrameBounds(frames);
+
+          const fieldCenter = Utils.boundsCenter(this.scene.getDimensions());
+          const contentCenter = Utils.boundsCenter(selectionBounds);
+          const deltaPoint = Utils.diffPoints(fieldCenter, contentCenter);
+
+          this.pan(deltaPoint, frames);
+
+          this.drawCurrentFrame();
+        }
+      },
+
       panScene: {
         label: "Pan Scene",
-        title: "Drag to reposition all frames in this scene. Useful after resizing.",
-        hotkey: ['P'],
-        listener(this: Penciltest) {
-          const self = this;
-          const oldMode = this.state.mode;
-          this.state.mode = PenciltestModes.WORKING;
-
-          let startPoint:Point, endPoint:Point, deltaPoint:Point;
-          startPoint = endPoint = deltaPoint = {x:0,y:0};
-          let frameScale = this.width / this.scene.width;
-
-          const dragStart = (event: PointerEvent | TouchEvent) => {
-            if (event.type === 'touchstart') {
-              const touchEvent = event as TouchEvent;
-              startPoint = {x:touchEvent.touches[0].clientX, y:touchEvent.touches[0].clientY};
-            } else {
-              const pointerEvent = event as PointerEvent;
-              startPoint = {x:pointerEvent.clientX, y:pointerEvent.clientY};
-            }
-            endPoint = startPoint;
-            deltaPoint = {x:0,y:0}
-            self.fieldElement.addEventListener('mousemove', dragStep);
-            self.fieldElement.addEventListener('mouseup', dragEnd);
-          };
-
-          const dragStep = (event: PointerEvent | TouchEvent) => {
-            deltaPoint = Utils.diffPoints(endPoint, startPoint);
-            const nowPoint = Utils.eventPoint(event);
-            const immediateDeltaPoint =  Utils.diffPoints(nowPoint, endPoint);
-            endPoint = nowPoint;
-            self.pan(Utils.scalePoint(immediateDeltaPoint, frameScale));
-            self.drawCurrentFrame();
-          };
-
-          const dragEnd = (event: PointerEvent | TouchEvent) => {
-            self.fieldElement.removeEventListener('mouseup', dragEnd);
-            self.fieldElement.removeEventListener('mousedown', dragStart);
-            self.fieldElement.removeEventListener('mousemove', dragStep);
-            self.state.mode = oldMode;
-          };
-
-          this.fieldElement.addEventListener('mousedown', dragStart);
-          this.resize();
+        title: "Move the contents of all the frames in the scene. Useful after resizing.",
+        hotkey: ['Shift+P'],
+        async listener(this: Penciltest) {
+          const offset:Point = await this.ui.interactivePan(this.scene.frames);
+          this.ui.showFeedback({text:`Panned whole scene: ${Utils.getDecimal(offset.x, 0, true)}, ${Utils.getDecimal(offset.y, 0, true)}`});
         }
       },
 
@@ -743,7 +917,7 @@ class PenciltestUI extends PenciltestUIComponent {
           const sceneName = await this.ui.selectSceneName('Choose a scene to delete from local browser storage:');
           if (typeof sceneName === 'string' && sceneName) {
             if (await this.deleteScene(sceneName)) {
-              this.ui.showFeedback(`Deleted scene: ${sceneName}`);
+              this.ui.showFeedback({text:`Deleted scene: ${sceneName}`});
             }
           }
         }
@@ -780,17 +954,18 @@ class PenciltestUI extends PenciltestUIComponent {
           const [sceneJSON, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
           try {
             await this.setScene(JSON.parse(sceneJSON), true);
-          } catch(e) {
-            console.error(e);
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+            }
           }
-          //this.saveScene(false);
         }
       },
 
       linkAudio: {
         label: "Load Audio",
-        hotkey: ['Alt+A'],
-        async listener(this: Penciltest, notice:string = '') {
+        hotkey: ['Shift+A'],
+        async listener(this: Penciltest, event:any, notice:string = '') {
           const promptMessage = `Audio file${notice ? ' ('+notice+')' : ''}: `;
           const promptOptions:FilePromptOptions = {
             accept:'audio/*',
@@ -809,6 +984,50 @@ class PenciltestUI extends PenciltestUIComponent {
         listener(this: Penciltest) { this.destroyAudio(); }
       },
 
+      volume: {
+        label: "Volume",
+        hotkey: ['v','9','0'],
+        async listener(this: Penciltest, event:any) {
+          const combo = Utils.describeKeyCombo(event as KeyboardEvent);
+          const promptOptions:FilePromptOptions = {
+            input: 'range',
+            inputAttrs: {
+              min: 0,
+              max: 100
+            }
+          };
+          try {
+            this.scene.audio.volume = Number(await Utils.prompt(`Audio volume`, promptOptions));
+          } catch(reason) {
+            if (reason !== Utils.promptCanceled) {
+              console.error(reason);
+              return;
+            }
+          }
+        },
+        action(this: Penciltest) {
+          if (this.audioElement) {
+            this.audioElement.volume = this.playback.muteAudio ? 0 : this.scene.audio.volume / 100;
+          }
+        }
+      },
+
+      volumeStep: {
+        hotkey: ['9','0'],
+        async listener(this: Penciltest, event:any) {
+          const combo = Utils.describeKeyCombo(event as KeyboardEvent);
+          let change = 0;
+          if (combo === '9') {
+            change -= 5;
+          } else if (combo === '0') {
+            change += 5;
+          }
+
+          this.scene.setVolume(change, true);
+          this.ui.showFeedback({text:`Volume: ${this.scene.audio.volume}%`});
+        }
+      },
+
       shiftAudioEarlier: {
         label: "Shift Audio Earlier",
         hotkey: ['['],
@@ -818,8 +1037,8 @@ class PenciltestUI extends PenciltestUIComponent {
             this.scene.audio = {offset:0};
           }
           this.scene.audio.offset--;
-          this.ui.updateStatus();
-          this.ui.showFeedback(`Audio shift: ${this.scene.audio.offset} s`);
+          this.ui.updateStatusBar();
+          this.ui.showFeedback({text:`Audio shift: ${this.scene.audio.offset} s`});
         }
       },
 
@@ -832,8 +1051,8 @@ class PenciltestUI extends PenciltestUIComponent {
             this.scene.audio = {offset:0};
           }
           this.scene.audio.offset++;
-          this.ui.updateStatus();
-          this.ui.showFeedback(`Audio shift: ${this.scene.audio.offset} s`);
+          this.ui.updateStatusBar();
+          this.ui.showFeedback({text:`Audio shift: ${this.scene.audio.offset} s`});
         }
       },
 
@@ -857,90 +1076,103 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Eraser",
         hotkey: ['E'],
         listener(this: Penciltest) {
-          this.useTool(
-            this.state.toolStack[0] == PenciltestTools.ERASER
-              ? this.state.toolStack[1]
-              : PenciltestTools.ERASER
-          );
+          this.useTool(PenciltestTools.ERASER);
+        }
+      },
+
+      hideMenu: {
+        hotkey: ['Esc'],
+        listener(this: Penciltest) {
+          this.ui.hideMenu();
+          this.ui.clearSelection();
         }
       },
     };
 
-    this.markupDOMElements();
+    this.defaultDragOptions = {
+      startTarget: document.body,
+      moveTarget: document.body,
+      endTarget: document.body,
+      coordinateScope: 'client',
+      touchLimit: 5,
+    };
 
-    this.addInputListeners();
-    this.addMenuListeners();
-    this.addKeyboardListeners();
-    this.addOtherListeners();
-  }
-
-  markupDOMElements() {
-    this.components = {};
-
-    const componentInfo = {
-      toolbar: {
+    const startingComponents: Array<PenciltestUIComponentOptions> = [
+      {
+        key: 'toolbar',
         className: 'toolbar',
         parent: this
       },
-      statusBar: {
+      {
+        key: 'statusBar',
         className: 'status',
         parent: 'toolbar'
       },
-      statusLeft: {
+      {
+        key: 'statusLeft',
         className: 'status-left',
         parent: 'statusBar'
       },
-      statusRight: {
+      {
+        key: 'statusRight',
         className: 'status-right',
         parent: 'statusBar'
       },
-      appStatus: {
+      {
+        key: 'appStatus',
         className: 'app-status',
         parent: 'statusLeft'
       },
-      sceneStatus: {
+      {
+        key: 'sceneStatus',
         className: 'scene-status',
         parent: 'statusRight'
       },
-      toggleTool: {
+      {
+        key: 'toggleTool',
         tagName: 'button',
         className: 'toggle-tool',
         text: '\u1F589',
         parent: 'statusRight'
       },
-      toggleMenu: {
+      {
+        key: 'toggleMenu',
         tagName: 'button',
         className: 'toggle-menu',
         parent: 'statusRight',
         text: '\u2699'
       },
-      toggleHelp: {
+      {
+        key: 'toggleHelp',
         tagName: 'button',
         text: '🯄',
         className: 'toggle-help',
         parent: 'statusRight'
       },
-      menu: {
+      {
+        key: 'contextMenu',
         tagName: 'ul',
         className: 'menu',
         parent: this
       },
-      help: {
+      {
+        key: 'help',
         tagName: 'div',
         className: 'help',
         parent: 'toolbar'
       }
-    };
+    ];
 
-    for (let name in componentInfo) {
-      const options = componentInfo[name];
-      if (typeof options.parent === 'string') {
-        options.parent = this.components[options.parent];
-      }
-      this.components[name] = new PenciltestUIComponent(options);
-    }
+    startingComponents.forEach((config) => {
+      new PenciltestUIComponent(config, this.components);
+    });
 
-    return this.components.menu.setHTML(this.menuWalker(this.menuOptions));
+    this.menuWalker(this.menuOptions, this.components.contextMenu);
+
+    this.addInputListeners();
+    this.addMenuListeners();
+    this.addKeyboardListeners();
+    this.addOtherListeners();
   }
 
   async triggerAppAction(optionName: string, ...args: Array<any>): Promise<any> {
@@ -957,165 +1189,181 @@ class PenciltestUI extends PenciltestUIComponent {
     return null;
   }
 
-  menuWalker(level:Array<any>) {
-    let markup = '';
-    for (let key of level) {
-      if (typeof key === 'string') {
+  menuWalker(level:Array<any>, parent:PenciltestUIComponent): void {
+    for (let entry of level) {
+      if (typeof entry === 'string') {
+        const entryConfig:PenciltestUIComponentOptions = {
+          parent,
+          tagName: 'li',
+          key: entry,
+          attr: {
+            rel: entry
+          }
+        }
+
         const { label, text, title } = {
-          label: '',
-          text: '',
-          title: '',
-          ...this.appActions[key]
+          ...this.appActions[entry]
         };
 
-        markup += `<li rel=\"${key}\"`;
-
         if (title) {
-          markup += ` title=\"${title}\"`;
+          entryConfig.attr.title = title;
         }
 
-        markup += `>${text}`;
+        if (text) {
+          entryConfig.text = text;
+        }
 
         if (label) {
-          markup += `<label>${label}</label>`;
+          entryConfig.children = [{key: `${entry}_label`, tagName: 'label', text: label}];
         }
-
-        markup += `</li>`;
+        new PenciltestUIComponent(entryConfig, this.components);
       } else {
-        for (let groupName in key as object) {
-          const group = key[groupName];
+        for (let groupName in entry as object) {
+          const group = entry[groupName];
+          const groupHeadConfig:PenciltestUIComponentOptions = {
+            tagName: 'li',
+            key: `menuGroup_${groupName}`,
+            children: [],
+            parent,
+          };
           if (groupName === '_icons') {
-            markup += "<li class=\"icons\"><ul>";
+            groupHeadConfig.className = 'icons';
           } else {
-            markup += `<li class=\"group collapsed\"><label>${groupName}</label><ul>`;
+            groupHeadConfig.className = 'group collapsed';
+            groupHeadConfig.children.push({ tagName: 'label', text: groupName });
           }
-          markup += this.menuWalker(group);
-          markup += '</ul></li>';
+          const groupHeadComponent = new PenciltestUIComponent(groupHeadConfig, this.components);
+
+          const groupMenuConfig:PenciltestUIComponentOptions = {
+            key: `menuGroup_${groupName}_list`,
+            tagName: 'ul',
+            parent: groupHeadComponent
+          };
+          const groupMenuComponent = new PenciltestUIComponent(groupMenuConfig, this.components);
+          this.menuWalker(group, groupMenuComponent);
         }
       }
     }
-
-    return markup;
   }
 
   addInputListeners() {
-    const self = this;
-
     this.previousEvent = null;
 
-    this.pointer = {coords:{x:0,y:0}};
+    this.pointer = {x: 0, y: 0}; // FIXME Smoothing may make this origin evident.
 
-    const getEventPageXY = function(event: PointerEvent | TouchEvent):Point {
-      let eventLocation: { pageX: any; pageY: any; };
-      if (/^touch/.test(event.type)) {
-        eventLocation = (event as TouchEvent).touches[0];
-      } else {
-        eventLocation = event as PointerEvent;
-      }
-
-      return {x: eventLocation.pageX, y: eventLocation.pageY} as Point;
+    //const trackFromEvent = (pageCoords: any) => Object.assign(this.pointer, pageCoords); // DELME: unused @1785514531
+    
+    let fieldBounds;
+    const updateFieldBounds = () => {
+      fieldBounds = {
+        x: 0,
+        y: 0,
+        width: this.controller.width,
+        height: this.controller.height
+      };
     };
 
-    //const trackFromEvent = (pageCoords: any) => self.pointer.coords = pageCoords; // DELME: unused @1785514531
-
-    const fieldMouseDownListener = function(event: PointerEvent | TouchEvent) {
+    const fieldMouseDownListener = (event: AnyPointerEvent) => {
       this.previousEvent = event;
       if (this.controller.state.mode !== PenciltestModes.DRAWING) { return; }
       event.preventDefault();
       if ((event.type === 'touchstart') && ((event as TouchEvent).touches.length > 1)) {
         this.controller.cancelStroke();
-        this.fieldBounds = {
-          x: 0,
-          y: 0,
-          width: this.controller.width,
-          height: this.controller.height
-        };
+        updateFieldBounds();
         if (!this.currentGesture) {
           this.triggerAppAction('undo');
         }
         this.clearGesture();
-        this.recordGesture(event as TouchEvent, this.fieldBounds);
+        this.recordGesture(event as TouchEvent, fieldBounds);
         this.currentGesture.startFrameNumber = this.controller.scene.current.frameNumber;
       } else {
-        const pointerEvent = event as PointerEvent
-        if (pointerEvent.button === 2) {
+        const mouseEvent = event as PointerEvent
+        if (mouseEvent.button === 2) {
           return true; // allow context menu
         } else {
           this.hideMenu();
         }
 
-        if (pointerEvent.button === 1) { this.controller.useTool(PenciltestTools.ERASER); } // mouse middle button; can map stylus eraser to this
+        if (mouseEvent.button === 1) { // middle click
+          if (event.shiftKey) {
+            this.controller.useTool(PenciltestTools.ERASER);
+          } else {
+            this.interactivePan([], event);
+          }
+          return;
+        }
 
-        const pagePoint = getEventPageXY(pointerEvent);
-        self.controller.track(
-          pagePoint.x - self.controller.fieldContainer.offsetLeft,
-          pagePoint.y - self.controller.fieldContainer.offsetTop
+        const pagePoint = Utils.eventPoint(mouseEvent);
+        this.controller.track(
+          pagePoint.x - this.controller.fieldContainer.offsetLeft,
+          pagePoint.y - this.controller.fieldContainer.offsetTop
         );
-        this.uiListeners.move = mouseMoveListener.bind(this);
-        this.uiListeners.up = mouseUpListener.bind(this);
 
-        document.body.addEventListener('mousemove', this.uiListeners.move);
-        document.body.addEventListener('touchmove', this.uiListeners.move);
-        document.body.addEventListener('mouseup', this.uiListeners.up);
-        document.body.addEventListener('touchend', this.uiListeners.up);
+        document.body.addEventListener('mousemove', mouseMoveListener);
+        document.body.addEventListener('touchmove', mouseMoveListener);
+        document.body.addEventListener('mouseup', mouseUpListener);
+        document.body.addEventListener('touchend', mouseUpListener);
       }
     };
 
-    var mouseMoveListener = function(event: PointerEvent | TouchEvent) {
+    const mouseMoveListener = (event: AnyPointerEvent) => {
       // this.previousEvent = event
       event.preventDefault();
       if ((event.type === 'touchmove') && ((event as TouchEvent).touches.length > 2)) {
-        this.recordGesture(event as TouchEvent, this.fieldBounds);
-        return this.progressGesture(this.describeGesture(this.fieldBounds));
+        this.recordGesture(event as TouchEvent, fieldBounds);
+        return this.progressGesture(this.describeGesture(fieldBounds));
       } else {
-        const pagePoint = getEventPageXY(event as PointerEvent);
-        Object.assign(this.pointer.coords, pagePoint);
+        const pagePoint = Utils.eventPoint(event, 'page');
+        Object.assign(this.pointer, pagePoint);
         if (this.controller.state.mode === PenciltestModes.DRAWING) {
-          return self.controller.track(
-            pagePoint.x - self.controller.fieldContainer.offsetLeft,
-            pagePoint.y - self.controller.fieldContainer.offsetTop
+          return this.controller.track(
+            pagePoint.x - this.controller.fieldContainer.offsetLeft,
+            pagePoint.y - this.controller.fieldContainer.offsetTop
           );
         }
       }
     };
 
-    var mouseUpListener = function(event: { type: string; button: number; }) {
+    const mouseUpListener = (event: AnyPointerEvent) => {
+      const mouseEvent = event as MouseEvent;
       this.previousEvent = event;
-      if ((event.type === 'mouseup') && (event.button === 2)) {
+      if ((event.type === 'mouseup') && ((mouseEvent).button === 2)) {
         return true; // allow context menu
       } else {
         if ((event.type === 'touchend') && this.currentGesture) {
-          this.doGesture(this.describeGesture(this.fieldBounds, 'final'));
-          this.clearGesture(event);
+          this.doGesture(this.describeGesture(fieldBounds, 'final'));
+          this.clearGesture();
         }
-        if (event.button === 1) { this.controller.useTool(PenciltestTools.PENCIL); }
-        document.body.removeEventListener('mousemove', this.uiListeners.move);
-        document.body.removeEventListener('touchmove', this.uiListeners.move);
-        document.body.removeEventListener('mouseup', this.uiListeners.up);
-        document.body.removeEventListener('touchend', this.uiListeners.up);
+        if (mouseEvent.button === 1) {
+          this.controller.usePreviousTool();
+        }
+        document.body.removeEventListener('mousemove', mouseMoveListener);
+        document.body.removeEventListener('touchmove', mouseMoveListener);
+        document.body.removeEventListener('mouseup', mouseUpListener);
+        document.body.removeEventListener('touchend', mouseUpListener);
         return this.controller.lift();
       }
     };
 
-    const toggleToolListener = function(event: PointerEvent | TouchEvent) {
+    const toggleToolListener = (event: AnyPointerEvent) => {
       event.preventDefault();
       return this.triggerAppAction('eraser');
     };
 
-    const contextMenuListener = function(event: PointerEvent | TouchEvent) {
+    const contextMenuListener = (event: AnyPointerEvent) => {
       event.preventDefault();
       if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
-        return this.toggleMenu(getEventPageXY(event));
+        return this.toggleMenu(Utils.eventPoint(event));
       }
     };
 
-    const globalMouseDownListener = function(event: PointerEvent | TouchEvent) {
-      if (this.menuIsVisible && !this.components.menu.getElement().contains(event.target)) {
+    const globalMouseDownListener = (event: AnyPointerEvent) => {
+      if (this.menuIsVisible && !this.components.contextMenu.getElement().contains(event.target as Node)) {
         this.hideMenu();
       }
     };
 
-    const statusClickListener = function(event: PointerEvent | TouchEvent) {
+    const statusClickListener = (event: AnyPointerEvent) => {
       const targetElement = event.target as HTMLElement
       if (typeof targetElement?.hasAttribute !== 'function' || !targetElement.hasAttribute('rel')) { return; }
       const statusRel = targetElement.getAttribute('rel');
@@ -1141,36 +1389,29 @@ class PenciltestUI extends PenciltestUIComponent {
     // globalThis.addEventListener 'touchmove', preventPinchZoomHandler, true
     // document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
 
-    this.uiListeners = {
-      globalDown: globalMouseDownListener.bind(this),
-      statusClick: statusClickListener.bind(this),
-      fieldDown: fieldMouseDownListener.bind(this),
-      context: contextMenuListener.bind(this),
-      tool: toggleToolListener.bind(this),
-      help() { self.triggerAppAction('toggleInterfaceHelp'); }
-    };
+    const helpListener = () => this.triggerAppAction('toggleInterfaceHelp')
 
-    this.components.appStatus.getElement().addEventListener('click', this.uiListeners.statusClick);
-    this.components.sceneStatus.getElement().addEventListener('click', this.uiListeners.statusClick);
-    this.controller.fieldElement.addEventListener('mousedown', this.uiListeners.fieldDown);
-    this.controller.fieldElement.addEventListener('touchstart', this.uiListeners.fieldDown);
-    this.controller.fieldElement.addEventListener('contextmenu', this.uiListeners.context);
-    this.controller.container.addEventListener('mousedown', this.uiListeners.globalDown);
-    this.controller.container.addEventListener('touchstart', this.uiListeners.globalDown);
-    this.components.toggleTool.getElement().addEventListener('click', this.uiListeners.tool);
-    this.components.toggleMenu.getElement().addEventListener('click', this.uiListeners.context);
-    return this.components.toggleHelp.getElement().addEventListener('click', this.uiListeners.help);
+    this.components.appStatus.getElement().addEventListener('click', statusClickListener);
+    this.components.sceneStatus.getElement().addEventListener('click', statusClickListener);
+    this.controller.fieldElement.addEventListener('mousedown', fieldMouseDownListener);
+    this.controller.fieldElement.addEventListener('touchstart', fieldMouseDownListener);
+    this.controller.fieldElement.addEventListener('contextmenu', contextMenuListener);
+    this.controller.container.addEventListener('mousedown', globalMouseDownListener);
+    this.controller.container.addEventListener('touchstart', globalMouseDownListener);
+    this.components.toggleTool.getElement().addEventListener('click', toggleToolListener);
+    this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
+    return this.components.toggleHelp.getElement().addEventListener('click', helpListener);
   }
 
   recordGesture(event: TouchEvent, bounds: Bounds) {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
-        origin: Utils.eventPoint(event)
+        origin: Utils.eventPoint(event, "client", 5)
       };
     }
 
-    this.currentGesture.last = Utils.eventPoint(event);
+    this.currentGesture.last = Utils.eventPoint(event, "client", 5);
     this.currentGesture.delta = Utils.diffPoints(this.currentGesture.last, this.currentGesture.origin);
     return this.currentGesture.deltaNormalized = {
       x: this.currentGesture.delta.x / bounds.width,
@@ -1178,7 +1419,7 @@ class PenciltestUI extends PenciltestUIComponent {
     };
   }
 
-  clearGesture(event: any) {
+  clearGesture() {
     return this.currentGesture = null;
   }
 
@@ -1192,7 +1433,7 @@ class PenciltestUI extends PenciltestUIComponent {
     }
   }
 
-  describePosition(coordinates: Point, bounds: Rect) {
+  describePosition(coordinates: Point, bounds: Bounds) {
     const positionDescriptors = {
       '0.00': { x: 'left'   , y: 'top'
     },
@@ -1240,8 +1481,7 @@ class PenciltestUI extends PenciltestUIComponent {
     return description;
   }
 
-  describeGesture(gestureBounds: any, extra: string) {
-    if (extra == null) { extra = ''; }
+  describeGesture(gestureBounds: any, extra: string = '') {
     let description = String(this.currentGesture.touches);
     description += ' ' + this.describeMotion( this.currentGesture.origin, this.currentGesture.last );
     description += ' from ' + this.describePosition( this.currentGesture.origin, gestureBounds );
@@ -1264,7 +1504,7 @@ class PenciltestUI extends PenciltestUIComponent {
     const sceneNames = this.controller.getSceneNames();
     if (sceneNames.length) {
       if (message == null) { message = 'Choose a scene'; }
-      const selectedSceneName = await Utils.select(message, sceneNames, this.controller.scene.name );
+      const selectedSceneName = await Utils.promptSelect(message, sceneNames, this.controller.scene.name );
       if (selectedSceneName) {
         return selectedSceneName;
       } else {
@@ -1286,9 +1526,9 @@ class PenciltestUI extends PenciltestUIComponent {
 
   addMenuListeners() {
     const ui = this;
-    this.menuItemElements = this.components.menu.getElement().querySelectorAll('LI');
+    this.menuItemElements = Array.from(this.components.contextMenu.getElement().querySelectorAll('li'));
 
-    const menuOptionListener = function(this:HTMLElement, event:KeyboardEvent | PointerEvent | TouchEvent) {
+    const menuOptionListener = function(this:HTMLElement, event:KeyboardEvent | AnyPointerEvent) {
       event.stopImmediatePropagation();
       if (this.classList.contains('group')) {
         Utils.toggleClass(this, 'collapsed');
@@ -1354,7 +1594,12 @@ class PenciltestUI extends PenciltestUIComponent {
     }
 
     const keyboardListener = function(event: KeyboardEvent) {
-      if (!globalThis.pauseKeyboardListeners) {
+      const htmlTarget = event.target as HTMLElement;
+      if (htmlTarget.hasAttribute('contenteditable')) {
+        if (event.key === 'Escape' || event.key === 'Enter') {
+          htmlTarget.blur();
+        }
+      } else if (!htmlTarget.matches('input')) {
         const combo = Utils.describeKeyCombo(event);
         const actionName = self.keyBindings[event.type][combo];
 
@@ -1362,6 +1607,8 @@ class PenciltestUI extends PenciltestUIComponent {
           event.preventDefault();
 
           if (actionName) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
             self.triggerAppAction(actionName, event);
           }
         }
@@ -1371,25 +1618,24 @@ class PenciltestUI extends PenciltestUIComponent {
     // console.log "#{event.type}-#{combo} (#{event.keyCode})" if event.keyCode isnt 0
 
     document.body.addEventListener('keydown', (event: any) => keyboardListener(event));
-    return document.body.addEventListener('keyup', (event: any) => keyboardListener(event));
+    document.body.addEventListener('keyup', (event: any) => keyboardListener(event));
   }
 
   addOtherListeners() {
-    const self = this;
-    document.body.addEventListener('wheel', function(event: WheelEvent) {
-      if (self.menuIsVisible) {
+    this.controller.fieldContainer.addEventListener('wheel', (event: WheelEvent) => {
+      if (this.menuIsVisible) {
         return;
       }
       if (event.deltaY > 0) {
-        return self.triggerAppAction('nextFrame');
+        return this.triggerAppAction('nextFrame');
       } else {
-        return self.triggerAppAction('prevFrame');
+        return this.triggerAppAction('prevFrame');
       }
     });
-    return globalThis.addEventListener('beforeunload', function(event: BeforeUnloadEvent) {
-      self.controller.putStoredData('app', 'options', self.controller.options);
-      self.controller.putStoredData('app', 'state', self.controller.state);
-      if (self.controller.hasUnsavedChanges) { return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save."; }
+    return globalThis.addEventListener('beforeunload', (event: BeforeUnloadEvent) => {
+      this.controller.putStoredData('app', 'options', this.controller.options);
+      this.controller.putStoredData('app', 'state', this.controller.state);
+      if (this.controller.hasUnsavedChanges) { return event.returnValue = "You have unsaved changes. Ctrl+Alt+S to save."; }
     });
   }
 
@@ -1402,18 +1648,18 @@ class PenciltestUI extends PenciltestUIComponent {
     //  helpElement.removeChild(child)
 
     if (open) {
-      const gesturesHeadingElement = document.createElement('H3');
+      const gesturesHeadingElement = document.createElement('h3');
       gesturesHeadingElement.innerText = 'Gestures:';
-      const gesturesDocElement = document.createElement('DL');
-      const keyboardHeadingElement = document.createElement('H3');
+      const gesturesDocElement = document.createElement('dl');
+      const keyboardHeadingElement = document.createElement('h3');
       keyboardHeadingElement.innerText = 'Keyboard Shortcuts:';
-      const keyboardDocElement = document.createElement('DL');
+      const keyboardDocElement = document.createElement('dl');
 
       for (let name in this.appActions) {
         const action = this.appActions[name];
         if (action.hotkey) {
-          const keyboardActionTermElement = document.createElement('DT');
-          const keyboardActionDefElement = document.createElement('DD');
+          const keyboardActionTermElement = document.createElement('dt');
+          const keyboardActionDefElement = document.createElement('dd');
           keyboardActionTermElement.innerText = action.label || name;
           if (action.hotkey) {
             keyboardActionDefElement.innerText = action.hotkey.join(' or ');
@@ -1426,8 +1672,8 @@ class PenciltestUI extends PenciltestUIComponent {
         }
 
         if (action.gesture) {
-          const gesturesActionTermElement = document.createElement('DT');
-          const gesturesActionDefElement = document.createElement('DD');
+          const gesturesActionTermElement = document.createElement('dt');
+          const gesturesActionDefElement = document.createElement('dd');
           gesturesActionTermElement.innerText = action.label || name;
           const gestureTerms = String(action.gesture).match(/([0-9]+)(.*)\/$/);
           const fingerCount = Number(gestureTerms[1]);
@@ -1445,47 +1691,171 @@ class PenciltestUI extends PenciltestUIComponent {
     }
   }
 
-  updateStatus() {
+  updateStatusBar() {
     if (this.controller.options.showStatus) {
-      const appStatuses = [];
 
-      let versionStatus = `v${Penciltest.version}`
-      if (this.controller?.scene?.version && this.controller.version !== this.controller.scene.version) {
-        versionStatus += ` (@v${this.controller.scene.version})`
-      }
-      appStatuses.push(`<span rel="upgrade">${versionStatus}</span>`);
-
-      appStatuses.push(`<span title="Current mode. If you're stuck, try the Reset option in Settings.">${this.controller.state.mode}</span>`);
-
-      appStatuses.push(`<span title="Drawing smoothing factor (click to change)" rel="smoothing">~${this.controller.options.smoothing}</span>`);
-
-      appStatuses.push(`<span title="Current scene name (click to rename)" rel="renameScene"><small>SCN:</small>${this.controller.scene.name || 'untitled'}</span>`);
-
-      this.components.appStatus.setHTML(`${appStatuses.join(' | ')}`);
-
-      const sceneStatuses = [];
-
-      const framerate = this.controller?.scene?.framerate;
-      if (framerate) {
-        let rateInfo = `<small>FPS:</small>${framerate}`;
-
-        const hold = this.controller.getCurrentFrame()?.hold;
-        if (hold) {
-          rateInfo+=`/<span title="Holding this frame for ${hold} exposures.">${hold}</span>`
+      debugger;
+      const statusComponentDefinitions: Array<PenciltestUIComponentOptions> = [
+        {
+          key: "statusVersion",
+          tagName: 'span',
+          text: `v${Penciltest.version}${this.controller.scene.instrument?.version && Penciltest.version !== this.controller.scene.instrument.version ? ` (@v${this.controller.scene.instrument.version})` : ''}`,
+          parent: 'appStatus'
+        },
+        {
+          key: "statusMode",
+          tagName: 'span',
+          attr: {
+            title: "Current mode."
+          },
+          text: this.controller.state.mode,
+          parent: 'appStatus'
+        },
+        {
+          key: "statusTool",
+          tagName: 'span',
+          attr: {
+            title: lc(this.controller.state.toolStack[0]),
+            className: `tool-icon-${this.controller.state.toolStack[0]}`,
+            text: lc(this.controller.state.toolStack[0])
+          },
+          text: this.controller.state.mode,
+          parent: 'appStatus'
+        },
+        {
+          key: "statusSmoothing",
+          tagName: 'span',
+          attr: {
+            title: lc('statusSmoothingTooltip')
+          },
+          text: String(this.controller.options.smoothing),
+          parent: 'appStatus'
+        },
+        {
+          key: "statusSceneName",
+          tagName: 'span',
+          attr: {
+            title: lc('statusSceneNameTooltip')
+          },
+          children: [
+            {
+              key: "statusSceneNameLabel",
+              tagName: 'label',
+              html: '<small>SCN: </small>',
+              attr: {'for': 'statusSceneNameEditable'}
+            },
+            {
+              tagName: 'span',
+              key: "statusSceneNameEditable",
+              text: this.controller.scene.name || lc('untitled'),
+              attr: {'contenteditable': 'true'}
+            },
+          ],
+          on: {
+            input: (e) => this.controller.scene.name = (e.target as HTMLElement).innerText,
+            change: (e) => this.updateStatusBar()
+          },
+          parent: 'appStatus'
+        },
+        {
+          key: "statusFrameRate",
+          tagName: 'span',
+          children: [
+            {
+              key: 'statusFramerateLabel',
+              tagName: 'small',
+              text: 'FPS:'
+            },
+            {
+              key: 'statusFramerate',
+              tagName: 'span',
+              text: `${this.controller.scene?.framerate || '…'}`
+            },
+            {
+              key: 'statusFrameHold',
+              tagName: 'span',
+              text: `/${this.controller.scene.getFrameHold()}`,
+              attr: {
+                title: 'Number of exposures this frame is holding for.'
+              }
+            }
+          ],
+          attr: {
+            title: "Frame rate (FPS) and current frame's hold duration. Click to change FPS.",
+          },
+          parent: 'sceneStatus'
+        },
+        {
+          key: "statusFrames",
+          tagName: 'span',
+          children: [
+            {
+              key: 'statusFramesLabel',
+              tagName: 'small',
+              text: 'frame:'
+            },
+            {
+              key: 'statusFrameNumber',
+              tagName: 'span',
+              text: String((this.controller.scene.current?.frameNumber || 0) + 1),
+              attr: {
+                title: 'Current frame number'
+              }
+            },
+            {
+              tagName: 'span',
+              text: `/${this.controller.scene.frames?.length || 1}`,
+              attr: {
+                title: 'Total number of frames'
+              }
+            }
+          ],
+          parent: 'sceneStatus'
+        },
+        {
+          key: "statusTime",
+          tagName: 'span',
+          children: [
+            {
+              key: 'statusTimeLabel',
+              tagName: 'small',
+              text: 'frame:'
+            },
+            {
+              key: 'statusCurrentTime',
+              tagName: 'span',
+              text: Utils.getTimecode(this.controller.scene.current.frames[this.controller.scene.current.frameNumber]?.time || 0, 3),
+              attr: {
+                title: "Current frame's start time"
+              }
+            },
+            {
+              key: 'statusTotalTime',
+              tagName: 'span',
+              text: '/'+Utils.getTimecode((this.controller.scene.current.frames.length > 0 ? this.controller.scene.current.frames[this.controller.scene.current.frames.length - 1].time : 0) + (this.controller.scene.current.singleFrameDuration || 0), 3),
+              attr: {
+                title: 'Total duration'
+              }
+            }
+          ],
+          parent: 'sceneStatus'
+        },
+        {
+          key: 'statusAudioOffset',
+          tagName: 'span',
+          parent: 'sceneStatus',
+          text: this.controller.scene.audio?.offset ? `${this.controller.scene.audio.offset >= 0 ? '+' : ''}${this.controller.scene.audio.offset}` : '0'
+        },
+        {
+          key: 'toggleTool', // Already exists, just setting className
+          className: `toggle-tool tool-icon-${this.controller.state.toolStack[0]}`
         }
+      ];
 
-        sceneStatuses.push(`<span rel="framerate" title="Frame rate (FPS) and current frame's hold duration. Click to change FPS.">${rateInfo}</span>`);
-      }
+      statusComponentDefinitions.forEach((config) => {
+        const component = PenciltestUIComponent.restore(config, this.components);
+      });
 
-      sceneStatuses.push(`<small>frame:</small>${this.controller.scene.current.frameNumber + 1}/${this.controller.scene.frames.length}`);
-
-      sceneStatuses.push(`<span title="The time position of the START of the current frame, as HH:MM:SS. Click to insert many frames." rel="insertSeconds"><small>time:</small>${Utils.getTimecode(this.controller.scene.current.frames[this.controller.scene.current.frameNumber].time)}</span>`);
-      if (this.controller.scene.audio?.offset) {
-        sceneStatuses.push(`${this.controller.scene.audio.offset >= 0 ? '+' : ''}${this.controller.scene.audio.offset}`);
-      }
-
-      this.components.sceneStatus.setHTML(`<div class="frame">${sceneStatuses.join(' | ')}</div>`);
-      this.components.toggleTool.getElement().className = `toggle-tool fa fa-${this.controller.state.toolStack[0]}`;// FIXME: use a helper to do this
     }
     // ELSE, hide status? @1785792939
   }
@@ -1493,14 +1863,14 @@ class PenciltestUI extends PenciltestUIComponent {
   showMenu(coords: Point) {
     if (!this.menuIsVisible) {
       if (!coords) {
-        coords = this.pointer.coords || {x: 10, y: 10};
+        coords = {x: 10, y: 10, ...this.pointer};
       }
 
       this.menuIsVisible = true;
-      const menuElement = this.components.menu.getElement();
+      const menuElement = this.components.contextMenu.getElement();
       Utils.toggleClass(menuElement, 'active', true);
 
-      const maxRight = this.components.menu.getElement().offsetWidth;
+      const maxRight = this.components.contextMenu.getElement().offsetWidth;
       const maxBottom = 0;
 
       if (coords.x > (document.body.offsetWidth - maxRight - menuElement.offsetWidth)) {
@@ -1513,7 +1883,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
       if (coords.y > (document.body.offsetHeight - maxBottom - menuElement.offsetHeight)) {
         menuElement.style.top = "auto";
-        menuElement.style.bottom = maxBottom;
+        menuElement.style.bottom = `${maxBottom}px`;
       } else {
         menuElement.style.top = `${coords.y}px`;
         menuElement.style.bottom = "auto";
@@ -1528,10 +1898,9 @@ class PenciltestUI extends PenciltestUIComponent {
   }
 
   hideMenu() {
-    //console.info(`called hideMenu`); // XXX
     if (this.menuIsVisible) {
       this.menuIsVisible = false;
-      return Utils.toggleClass(this.components.menu.getElement(), 'active', false);
+      return Utils.toggleClass(this.components.contextMenu.getElement(), 'active', false);
     }
   }
 
@@ -1539,15 +1908,17 @@ class PenciltestUI extends PenciltestUIComponent {
     if (this.menuIsVisible) { return this.hideMenu(); } else { return this.showMenu(coords); }
   }
 
-  showFeedback(message: any, duration: number = 2000) {
-    if (!this.feedbackElement) {
-      this.feedbackElement = new PenciltestUIComponent({id: 'pt-feedback', parent: this});
-    }
-    this.feedbackElement.setHTML(message);
-    this.feedbackElement.getElement().style.opacity = 1;
+  showFeedback(config:PenciltestUIComponentOptions, duration: number = 2000) {
+    const feedbackComponent = PenciltestUIComponent.restore({
+      ...config,
+      style: { opacity: '1',  ...config.style },
+      attr: { ...config.attr, id: 'pt-feedback'},
+      key: 'showFeedback',
+      parent: this
+    }, this.components);
 
     clearTimeout(this.feedbackTimeout);
-    const hideFeedback = () => this.feedbackElement.getElement().style.opacity = 0;
+    const hideFeedback = () => feedbackComponent.setContent({ style: { opacity: '0' } });
     return this.feedbackTimeout = setTimeout(hideFeedback, duration);
   }
 
@@ -1565,10 +1936,122 @@ class PenciltestUI extends PenciltestUIComponent {
     }
     this.controller.state.frameSelection.end = to;
     const selectionCount = Math.abs(this.controller.state.frameSelection.end - this.controller.state.frameSelection.start) + 1;
-    this.showFeedback(`Selecting ${selectionCount} frame${selectionCount !== 1 ? 's' : ''}`);
+    this.showFeedback({text:`Selecting ${selectionCount} frame${selectionCount !== 1 ? 's' : ''}`});
   }
 
   clearSelection() {
-    delete this.controller.state.frameSelection;
+    if (this.controller.state.frameSelection) {
+      delete this.controller.state.frameSelection;
+      this.showFeedback({text:`Cleared selection`});
+    }
+  }
+
+  useTool(toolName: PenciltestTools, uiState: string = '') {
+    this.controller.useTool(toolName);
+  }
+
+  handleDrag(options: PenciltestDragOptions) {
+    const {
+      startTarget,
+      moveTarget,
+      endTarget,
+      onstart,
+      onmove,
+      onend,
+      alreadyStartedEvent,
+      coordinateScope,
+      touchLimit,
+    } = {
+      ...this.defaultDragOptions,
+      ...options
+    };
+
+    let startPoint:Point, endPoint:Point;
+    startPoint = endPoint = {x:0,y:0};
+
+    const dragStart = (event: AnyPointerEvent) => {
+      //event.preventDefault();
+      //event.stopImmediatePropagation();
+      startPoint = Utils.eventPoint(event, coordinateScope, touchLimit);
+      endPoint = startPoint;
+      moveTarget.addEventListener('mousemove', dragMove);
+      endTarget.addEventListener('mouseup', dragEnd);
+      this.controller.container.classList.add('dragging');
+      if (typeof onstart === 'function') {
+        onstart.apply(this, [event]);
+      }
+    };
+
+    const dragMove = (event: AnyPointerEvent) => {
+      event.stopPropagation();
+      const nowPoint = Utils.eventPoint(event, coordinateScope, touchLimit);
+      if (typeof onmove === 'function') {
+        const immediateDeltaPoint =  Utils.diffPoints(nowPoint, endPoint);
+        const totalDeltaPoint = Utils.diffPoints(endPoint, startPoint);
+        onmove.apply(this, [event, immediateDeltaPoint, totalDeltaPoint]);
+        endPoint = nowPoint;
+      }
+    };
+
+    const dragEnd = (event: AnyPointerEvent) => {
+      //event.preventDefault();
+      event.stopImmediatePropagation();
+      this.controller.container.classList.remove('dragging');
+      endTarget.removeEventListener('mouseup', dragEnd);
+      if (!alreadyStartedEvent) {
+        startTarget.removeEventListener('mousedown', dragStart);
+      }
+      moveTarget.removeEventListener('mousemove', dragMove);
+      const totalDeltaPoint = Utils.diffPoints(endPoint, startPoint);
+      if (typeof onend === 'function') {
+        onend.apply(this, [event, totalDeltaPoint]);
+      }
+    };
+
+    if (alreadyStartedEvent) {
+      dragStart(alreadyStartedEvent);
+    } else {
+      startTarget.addEventListener('mousedown', dragStart);
+    }
+  }
+
+  async interactivePan(selection:Array<PenciltestFrame> = [], alreadyStartedEvent:AnyPointerEvent | null = null): Promise<Point> {
+    return new Promise((resolve, reject) => {
+      this.useTool(PenciltestTools.PAN);
+
+      this.controller.resize();
+      let frameScale = this.controller.width / this.controller.scene.getDimensions().width;
+      if (selection.length === 0) {
+        [ selection ] = this.controller.getSelectedFrames();
+      }
+      const previewSelection = Utils.getIntersection(this.controller.getVisibleFrames(), selection);
+      if (previewSelection.length === 0) {
+        previewSelection.push(selection[0]);
+      }
+
+      this.handleDrag({
+        alreadyStartedEvent,
+        coordinateScope: 'page',
+        startTarget: this.controller.fieldElement,
+        onstart: () => {
+          this.controller.setMode(PenciltestModes.WORKING);
+        },
+        onmove: (event:AnyPointerEvent, immediateDeltaPoint:Point, totalDeltaPoint:Point) => {
+          const scaledDelta = Utils.scalePoint(immediateDeltaPoint, 1/frameScale)
+          this.controller.pan(scaledDelta, previewSelection);
+          this.controller.drawCurrentFrame();
+        },
+        onend: (event:AnyPointerEvent, totalDeltaPoint:Point) => {
+          this.controller.setPreviousMode();
+          this.controller.usePreviousTool();
+          const scaledTotalDelta = Utils.scalePoint(totalDeltaPoint, 1/frameScale);
+          if (previewSelection !== selection) {
+            this.controller.pan(Utils.negatePoint(scaledTotalDelta), previewSelection);
+            this.controller.pan(scaledTotalDelta, selection);
+          }
+          resolve(scaledTotalDelta);
+        }
+      });
+    });
   }
 }

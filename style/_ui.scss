@@ -1,3 +1,5 @@
+@use "colors";
+
 .penciltest-ui {
   .toolbar {
     $toolbarMinHeight: 2em;
@@ -8,7 +10,7 @@
 
     .status {
       font-family: monospace;
-      color: $white;
+      color: colors.$white;
       line-height: $toolbarMinHeight;
 
       &.hidden {
@@ -30,8 +32,10 @@
         }
       }
 
-      .app-status, .film-status {
-        margin: 0 0.5em;
+      .app-status, .scene-status {
+        > * {
+          margin: 0 0.5em;
+        }
       }
 
       button {
@@ -94,7 +98,7 @@
         display: block;
         padding: 0 0.5em 0 1.5em;
         line-height: 2.0em;
-        color: $gray;
+        color: colors.$gray;
         cursor: pointer;
       }
 
@@ -132,14 +136,14 @@
             height: 2.0rem;
             line-height: 2.0rem;
             text-align: center;
-            @include transition-property(all);
-            @include transition-duration(0.1s);
+            transition-property: opacity;
+            transition-duration: 0.1s;
           }
         }
 
         &.collapsed {
           label::after {
-            @include transform(rotate(-90deg));
+            transform: rotate(-90deg);
           }
 
           > ul {
@@ -204,8 +208,8 @@
     border: none;
     font-size: 0.9em;
     line-height: 1.7em;
-    @include transition-property(right);
-    @include transition-duration(0.3s);
+    transition-property: right;
+    transition-duration: 0.3s;
 
     &.active {
       right: 0%;

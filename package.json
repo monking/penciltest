@@ -7,13 +7,11 @@
     "debug": ">&2 echo -n \"ENTER to run and paginate \\`tsc --pretty --noEmit\\`. Ctrl+D to end. > \"; i=0; while [[ $i == 0 ]] || read -s; do let i++; tsc --pretty --noEmit | less -R; done; >&2 echo DONE;"
   },
   "devDependencies": {
-    "grunt": "^0.4.4",
-    "grunt-cli": "^1.5.0",
-    "grunt-contrib-coffee": "^0.10.1",
-    "grunt-contrib-compass": "^0.7.2",
-    "grunt-contrib-concat": "^0.3.0",
-    "grunt-contrib-watch": "^0.6.0",
-    "grunt-typescript": "^0.8.0",
-    "matchdep": "^0.3.0"
+    "grunt": "^1.6.3",
+    "grunt-contrib-concat": "^2.1.0",
+    "grunt-sass": "^4.1.0",
+    "matchdep": "^2.0.0",
+    "sass": "^1.102.0",
+    "typescript": "^7.0.2"
   }
 }

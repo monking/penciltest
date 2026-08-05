@@ -11,16 +11,17 @@
     "allowJs": true
   },
   "files": [
+    "src/penciltest-localization.ts",
     "src/structure.ts",
     "src/utils.ts",
     "src/penciltest-ui-component.ts",
     "src/renderer-base.ts",
     "src/renderer-canvas.ts",
     "src/renderer-svg.ts",
+    "src/penciltest-scene.ts",
     "src/penciltest-versions.ts",
-    "src/penciltest-menu.ts",
-    "src/penciltest-timeline.ts",
     "src/penciltest-ui.ts",
+    "src/penciltest-render-exporter.ts",
     "src/penciltest.ts",
     "src/app.ts"
   ]

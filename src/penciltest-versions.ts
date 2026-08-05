@@ -5,7 +5,7 @@ interface PenciltestVersionMunger {
   migrate?:Function;
   packScene?:Function;
   unpackScene?:Function;
-  sep?:{stroke:string, point:string, coord:string};
+  packSeparators?:{stroke:string, point:string, coord:string};
 };
 
 const PenciltestVersionMungerV0_0_4 = {
@@ -110,10 +110,10 @@ const PenciltestVersionMungerV0_3_0 = {
       scene.current.singleFrameDuration *= 1000;
     }
   },
-  sep: {
+  packSeparators: {
     stroke: "|",
-    point: ',',
-    coord: ' '
+    point: ';',
+    coord: ','
   },
   packScene(scene:PenciltestScene):PenciltestSceneData {
     const packStroke = (stroke:Stroke, scene:PenciltestScene):string => {
@@ -121,9 +121,9 @@ const PenciltestVersionMungerV0_3_0 = {
       delete packedStrokeObject.path
       let packedStrokeString = stroke.path
         .map((point) => {
-          return Utils.getDecimal(point.x, 2) + this.sep.coord + Utils.getDecimal(point.y, 2) 
+          return Utils.getDecimal(point.x, 2) + this.packSeparators.coord + Utils.getDecimal(point.y, 2) 
         })
-        .join(this.sep.point)
+        .join(this.packSeparators.point)
       if (Object.keys(packedStrokeObject).length > 0) {
         packedStrokeString += JSON.stringify(packedStrokeObject);
       }
@@ -137,7 +137,7 @@ const PenciltestVersionMungerV0_3_0 = {
       if (frame.strokes?.length > 0) {
         packedFrame.packedStrokes = frame.strokes
           .map((stroke) => packStroke(stroke, scene))
-          .join(this.sep.stroke);
+          .join(this.packSeparators.stroke);
       }
       if (packedFrame.hold === scene.frameHold) {
         delete packedFrame.hold;
@@ -164,9 +164,9 @@ const PenciltestVersionMungerV0_3_0 = {
         }
       }
       stroke.path = (jsonIndex > -1 ? packedStroke.substr(0, jsonIndex) : packedStroke)
-        .split(this.sep.point)
+        .split(this.packSeparators.point)
         .map((packedPoint) => {
-          const coords = packedPoint.split(this.sep.coord).map(Number);
+          const coords = packedPoint.split(this.packSeparators.coord).map(Number);
           return {x:coords[0], y:coords[1]};
         });
       return stroke;
@@ -179,7 +179,7 @@ const PenciltestVersionMungerV0_3_0 = {
         hold: scene.frameHold,
         ...frame,
         strokes: frame.packedStrokes
-          .split(this.sep.stroke)
+          .split(this.packSeparators.stroke)
           .map((stroke) => unpackStroke(stroke))
       };
       delete unpackedFrame.packedStrokes;
@@ -271,7 +271,17 @@ class PenciltestVersions {
       const munger = PenciltestVersions.getMunger(scene.instrument.version);
       if (typeof munger?.packScene === 'function') {
         try {
-          resolve(munger.packScene.apply(munger, [scene]));
+          const packedScene = munger.packScene.apply(munger, [Utils.clone(scene)]);
+          if (packedScene.current?.frames) {
+            delete packedScene.current.frames;
+          }
+          if (packedScene.current?.singleFrameDuration) {
+            packedScene.current.singleFrameDuration = Utils.getDecimal(packedScene.current.singleFrameDuration, 3);
+          }
+          if (packedScene.current?.duration) {
+            packedScene.current.duration = Utils.getDecimal(packedScene.current.duration, 3);
+          }
+          resolve(packedScene);
           return;
         } catch(e) {
           console.error(e);

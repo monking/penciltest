@@ -5,12 +5,15 @@ enum Renderers {
 
 enum PenciltestModes {
   DRAWING = "drawing",
-  ERASING = "erasing",
   WORKING = "working",
   PLAYING = "playing"
 };
 
-enum PenciltestTools { PENCIL, ERASER };
+enum PenciltestTools {
+  PENCIL = "pencil",
+  ERASER = "eraser",
+  PAN = "pan"
+};
 
 type Color = [number, number, number, number] | [number, number, number];
 
@@ -49,6 +52,21 @@ interface PenciltestGesture {
   last?: Point;
   startFrameNumber?: number;
 }
+
+type AnyPointerEvent = PointerEvent | MouseEvent | TouchEvent;
+type AnyPointerScope = "screen" | "page" | "client" | "layer" | "offset" | "movement";
+
+interface PenciltestDragOptions {
+  startTarget?: EventTarget;
+  moveTarget?: EventTarget;
+  endTarget?: EventTarget;
+  onstart?: Function;
+  onmove?: Function;
+  onend?: Function;
+  alreadyStartedEvent?: AnyPointerEvent;
+  coordinateScope?: AnyPointerScope;
+  touchLimit?: number;
+};
 
 interface PenciltestInsrument {
   id: string;
@@ -158,19 +176,15 @@ interface Stroke extends PenciltestLineOptions {
   path: Array<Point>;
 }
 
-interface PositionDescription { x: string; y: string; }
+interface PositionDescription { x: string; y: string; };
 
 interface Bounds {
+  x?: number;
+  y?: number; 
   width?: number;
   height?: number;
   aspect?: number;
   aspectRatio?: string;
-}
-
-interface Rect extends Point, Bounds {};
-
-interface PenciltestUIOptions extends PenciltestUIComponentOptions {
-  controller?: Penciltest;
 }
 
 interface PenciltestAppAction {
@@ -192,12 +206,21 @@ type AppActionsList = {
 }
 
 interface PenciltestUIComponentOptions {
+  key?: string;
   tagName?: string;
-  className?: string | null;
-  text?: string | null;
-  id?: string | null;
-  parent: HTMLElement;
+  id?: string;
+  html?: string;
+  text?: string;
+  attr?: {[key:string]: string};
+  on?: {[key:string]: Function};
+  className?: string;
+  style?: {[key:string]: string};
+  parent?: PenciltestUIComponent | string;
+  parentElement?: HTMLElement;
+  children?: Array<PenciltestUIComponentOptions>;
 };
+
+type PenciltestUIComponentDict = { [key: string]: PenciltestUIComponent; };
 
 interface PenciltestStatusMessageOptions {
   messageTimeout: number;

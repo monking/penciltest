@@ -1,7 +1,6 @@
-@import 'compass/css3/transition';
-@import 'compass/css3/transform';
-@import 'config';
-@import 'colors';
-@import 'panels';
-@import 'layout';
-@import 'ui';
+/*@import 'compass/css3/transition', 'compass/css3/transform';*/
+@use 'config';
+@use 'colors';
+@use 'panels';
+@use 'layout';
+@use 'ui';
