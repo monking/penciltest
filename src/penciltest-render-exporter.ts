@@ -1,3 +1,23 @@
+/// <reference path="vendor/GIFEncoder.js">
+declare function GIFEncoder():GIFEncoderInterface;
+
+interface GIFEncoderInterface {
+  setDelay(ms: number): void;
+  setDispose(code: number): void;
+  setRepeat(iter: number): void;
+  setTransparent(c: number | null): void;
+  setComment(c:string): void;
+  addFrame(im:CanvasRenderingContext2D | null, ...is_imageData: boolean[]): boolean;
+  finish(): void;
+  setFrameRate(fps:number): void;
+  setQuality(quality:number): void;
+  setSize(w:number, h:number): void;
+  start(): boolean;
+  cont(): boolean;
+  stream(): { bin:Array<number> } | null;
+  setProperties(has_start:boolean, is_first:boolean): null;
+};
+
 class PenciltestRenderExporter {
 
   controller: Penciltest;

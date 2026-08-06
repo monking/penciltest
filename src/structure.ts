@@ -3,19 +3,32 @@ enum Renderers {
   SVG = "svg"
 };
 
-enum PenciltestModes {
+enum PenciltestMode {
   DRAWING = "drawing",
   WORKING = "working",
   PLAYING = "playing"
 };
 
-enum PenciltestTools {
+enum PenciltestTool {
   PENCIL = "pencil",
   ERASER = "eraser",
-  PAN = "pan"
+  PAN = "pan",
+  /**
+   * Not yet implemented. TODO 2026-08-05
+  SCALE = "scale",
+  ROTATE = "rotate",
+   */
+};
+
+enum PointerMode {
+  PRESS = "press",
+  HOVER = "hover",
+  AWAY = "away",
 };
 
 type Color = [number, number, number, number] | [number, number, number];
+
+interface Dictionary {[key:string]:string};
 
 interface PenciltestLineOptions { /* Redundant member names for blending with other option sets. */
   lineColor?: Color | string;
@@ -96,11 +109,11 @@ interface PenciltestSceneAudio {
 
 interface PenciltestSceneState {
   frames?: Array<PenciltestFrameMeta>;
-  //exposures?: Array<PenciltestFrameMeta>; // DELME exposures not used @1785520725
   duration?: number; // milliseconds
   exposureCount?: number;
   exposureNumber?: number;
   frameNumber?: number;
+  strokeNumber?: number;
   singleFrameDuration?: number; // milliseconds
 }
 
@@ -113,7 +126,8 @@ interface PenciltestSceneData extends PenciltestSceneOptions {
   instrument?: PenciltestInsrument;
   name?: string;
   uuid?: string;
-  getDimensions?():Bounds;
+  getDimensions?(): Bounds;
+  packedScale?: number;
 };
 
 interface PlaybackState {
@@ -128,10 +142,10 @@ type PenciltestRange = { start?: number; end?: number; }
 
 interface PenciltestState {
   frameSelection?: PenciltestRange;
-  mode: PenciltestModes;
-  previousMode?: PenciltestModes;
-  smoothDrawInterval?: number;
-  toolStack: Array<PenciltestTools>;
+  mode: PenciltestMode;
+  pointerMode: PointerMode;
+  previousMode?: PenciltestMode;
+  toolStack: Array<PenciltestTool>;
   version: string;
 };
 
@@ -169,23 +183,13 @@ interface PenciltestRenderer {
 }
 
 
-
-interface Point { x: number; y: number; }
+interface Mark extends Vector { weight?: number; }
 
 interface Stroke extends PenciltestLineOptions {
   path: Array<Point>;
 }
 
 interface PositionDescription { x: string; y: string; };
-
-interface Bounds {
-  x?: number;
-  y?: number; 
-  width?: number;
-  height?: number;
-  aspect?: number;
-  aspectRatio?: string;
-}
 
 interface PenciltestAppAction {
   action?: Function;
@@ -211,10 +215,10 @@ interface PenciltestUIComponentOptions {
   id?: string;
   html?: string;
   text?: string;
-  attr?: {[key:string]: string};
+  attr?: Dictionary;
   on?: {[key:string]: Function};
   className?: string;
-  style?: {[key:string]: string};
+  style?: Dictionary;
   parent?: PenciltestUIComponent | string;
   parentElement?: HTMLElement;
   children?: Array<PenciltestUIComponentOptions>;
@@ -224,41 +228,4 @@ type PenciltestUIComponentDict = { [key: string]: PenciltestUIComponent; };
 
 interface PenciltestStatusMessageOptions {
   messageTimeout: number;
-};
-
-interface GIFEncoderInterface {
-  setDelay(ms: number): void;
-  setDispose(code: number): void;
-  setRepeat(iter: number): void;
-  setTransparent(c: number | null): void;
-  setComment(c:string): void;
-  addFrame(im:CanvasRenderingContext2D | null, ...is_imageData: boolean[]): boolean;
-  finish(): void;
-  setFrameRate(fps:number): void;
-  setQuality(quality:number): void;
-  setSize(w:number, h:number): void;
-  start(): boolean;
-  cont(): boolean;
-  stream(): { bin:Array<number> } | null;
-  setProperties(has_start:boolean, is_first:boolean): null;
-};
-
-interface RaphaelInterface {
-  version: string;
-  eve(name:string, scope:any, ...varargs:any): Array<any>;
-  // eve._events: Array<any>
-  // eve.listeners(name:string): Array<Function>
-  // eve.on(name:string, f:Function): (z:number) => any
-  // eve.f(event:string, ...args:any): Function
-  // eve.stop(): void
-  // eve.nt(subname:string): string | boolean
-  _ISURL: RegExp;
-  _availableAttrs: any;
-  _availableAnimAttrs: any;
-  _radial_gradient: RegExp;
-  _rectPath(x, y, w, h, r): Array<Array<any>>
-  _getPath: any;
-  clear(): void;
-  remove(): void;
-  path(pathString:string): HTMLElement
 };

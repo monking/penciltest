@@ -1,6 +1,26 @@
 /// <reference path="vendor/raphael.js">
 declare function Raphael(first:HTMLElement | Function | null):void;
 
+interface RaphaelInterface {
+  version: string;
+  eve(name:string, scope:any, ...varargs:any): Array<any>;
+  // eve._events: Array<any>
+  // eve.listeners(name:string): Array<Function>
+  // eve.on(name:string, f:Function): (z:number) => any
+  // eve.f(event:string, ...args:any): Function
+  // eve.stop(): void
+  // eve.nt(subname:string): string | boolean
+  _ISURL: RegExp;
+  _availableAttrs: any;
+  _availableAnimAttrs: any;
+  _radial_gradient: RegExp;
+  _rectPath(x, y, w, h, r): Array<Array<any>>
+  _getPath: any;
+  clear(): void;
+  remove(): void;
+  path(pathString:string): HTMLElement
+};
+
 class SVGRenderer extends BaseRenderer {
   field: RaphaelInterface;
   //container: HTMLElement;

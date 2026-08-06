@@ -1,11 +1,41 @@
-(A) 2026-04-24 +FIXME +NEEDS_REPLICATION_STEPS First time toggling onion skin will reset line & bg color.  uuid:4daf3ff3-7c68-459f-909a-8fd9be6db111
-(B) 2026-04-22 (canvas) Render line uniform darkness first and always. Fixes faint line appearing darker on subsequent renders.  uuid:610aa833-5351-4014-8fd2-edd12ddb6118
-(B) 2026-04-22 Save unnamed draft automatically, and load automatically if it exists at app start.  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1
-(B) 2026-08-03 Key combos in context menu.
-(C) 2026-07-30 +FIXME +NEEDS_REPLICATION_STEPS `state.mode` can become stuck in WORKING. WORKAROUND:Settings>Reset  uuid:8db91e0b-f80a-4482-84c3-a3fa53c1adea  | Confusing. Seems only `smoothScene` and `panScene` set `state.mode`.  WORKAOROUND: Settings > reset.
-(C) 2026-07-30 More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb
-(D) 2026-07-30 LAYERS.  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
-2026-08-03 Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>
-2026-08-04 FIXME GIF export is in pieces.
+(A) 2026-08-06 Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c
+(B) 2026-08-03 Key combos in context menu. +UX  uuid:0b91ecd3-83ae-4957-8545-9f7ba97f8870
+(B) 2026-08-05 Stroke selection tool, 'S'  uuid:e5850700-c29c-463f-ad46-e22c9420893d
+(C) 2026-04-22 (canvas) Render line uniform darkness first and always. Fixes faint line appearing darker on subsequent renders.  uuid:610aa833-5351-4014-8fd2-edd12ddb6118 +quality
+(C) 2026-08-04 +BUG GIF export is in pieces.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c
+(C) 2026-08-06 +BUG Start audio again if looping after it's stopped.  uuid:262f1925-4ae7-45e9-8c2f-ad622acd5d96
+(D) 2026-08-06 Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
+2026-04-22 Save unnamed draft automatically, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)
+2026-07-30 LAYERS.  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
+2026-07-30 More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb
+2026-08-01 SVG render engine? This copy of Raphael is porting badly.
+2026-08-03 Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>  |  2026-08-05 Instead of making it more standard, I've hacked filters into its string substitution. That'll lock me in down the line. But it was fun.
+2026-08-05 Adjustable eraser size.  uuid:092764d8-9676-4f40-8fde-c206ce6024b9
+2026-08-05 Rename 'PAN' to 'MOVE'.  uuid:aea750cb-b0c5-471f-87aa-6f6817f24f01
+2026-08-05 Select specific strokes to move.  dependsOn:e5850700-c29c-463f-ad46-e22c9420893d uuid:f063eb1f-b09a-44c1-8582-83711b2d10e8
+2026-08-06 After pasting multiple frames, go to last frame, so that the action can be repeated.  uuid:69e6449f-810f-400c-92d3-08383a443b28  +UX
+2026-08-06 Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gabs between frames on the timeline.
+2026-08-06 ROTATE tool.  uuid:3f275aee-90de-445d-90c3-d40a72364227 +feature
+2026-08-06 SCALE tool.  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023 +feature
+2026-08-06 Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
+2026-08-06 Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
+2026-08-06 TIMELINE.  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c +feature
+x 2026-06-05 2026-07-30 +BUG FIX(preferred other tools when toggling/resetting)  |  `state.mode` can become stuck in WORKING. (WORKAROUND Settings>Reset)  uuid:8db91e0b-f80a-4482-84c3-a3fa53c1adea  |  Confusing. Seems only `smoothScene` and `panScene` set `state.mode`.  WORKAROUND(Settings > reset.)
+x 2026-08-03 2026-08-01 Pack and unpack scene data: strings encoding stroke paths. isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb uuid:248ddc5d-7079-400c-b515-a08bdae1b76e
 x 2026-08-04 2026-04-22 Port from CoffeeScript to TypeScript  uuid:265aea6e-2e7e-4946-960f-00f733691231 (Still buggy, but it's all TS, now)
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 +WONTFIX src/coffee/video-encoder.coffee  | Unused. Re-implement.
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/app.coffee pri:A
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/canvas-renderer.coffee  pri:B
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-legacy.coffee 
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-menu.coffee  pri:B
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-timeline.coffee  pri:B
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-ui-component.coffee  pri:A
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest.coffee  pri:A
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/renderer-interface.coffee  pri:B
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/svg-renderer.coffee  pri:B
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/utils.coffee  pri:A
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 When .ts ports are functional, move them from src/coffee/ to src/
+x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 src/coffee/penciltest-ui.coffee  uuid:060ce763-274d-49e8-8c0e-7a03ebf4c16e  |  VSCode.toTypeScript() ERROR: "Debug Failure. False expression: Token end is is child end" | SOLUTION: Manually transcode appActions. pri:A
 x 2026-08-04 2026-07-30 Pick audio file, and create blob.  uuid:1ecb31f3-898d-483e-8ac8-87dabfb13797 branch:feature/load-audio-file  pri:A
+x 2026-08-05 2026-08-05 Show eraser size always, not juse during mouseDown.  uuid:4e294534-dff1-4a73-95f1-95924b9d7ba9  +UX pri:A
+x 2026-08-06 2026-04-24 +BUG FIX(0.3.0, TS port) +CANT_REPLICATE  First time toggling onion skin will reset line & bg color.  uuid:4daf3ff3-7c68-459f-909a-8fd9be6db111

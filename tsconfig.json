@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "lib": [
-      "es2018",
+      "es2021",
       "dom"
     ],
     "strict": false,
@@ -11,17 +11,18 @@
     "allowJs": true
   },
   "files": [
-    "src/penciltest-localization.ts",
     "src/structure.ts",
-    "src/utils.ts",
+    "src/penciltest-localization.ts",
+    "src/penciltest-migrations.ts",
+    "src/penciltest-utils.ts",
+    "src/penciltest-space.ts",
     "src/penciltest-ui-component.ts",
-    "src/renderer-base.ts",
-    "src/renderer-canvas.ts",
-    "src/renderer-svg.ts",
-    "src/penciltest-scene.ts",
-    "src/penciltest-versions.ts",
-    "src/penciltest-ui.ts",
+    "src/penciltest-renderer-base.ts",
+    "src/penciltest-renderer-canvas.ts",
+    "src/penciltest-renderer-svg.ts",
     "src/penciltest-render-exporter.ts",
+    "src/penciltest-scene.ts",
+    "src/penciltest-ui.ts",
     "src/penciltest.ts",
     "src/app.ts"
   ]

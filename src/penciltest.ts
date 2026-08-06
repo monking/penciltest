@@ -1,25 +1,41 @@
-/// <reference path="vendor/GIFEncoder.js">
-declare function GIFEncoder():GIFEncoderInterface;
-
-class SceneState implements PenciltestSceneState {
-  constructor(overrides: PenciltestSceneState = {}) {
-    Object.assign(this, {
-      frames: [],
-      exposureCount: 0,
-      exposureNumber: 0,
-      frameNumber: 0,
-      ...overrides
-    });
-  }
-}
-
 class Penciltest {
 
   static version = '0.3.0';
+  static debugVersion = '0.3.1';
   static instrumentIdentifier = 'io.lovejoy.penciltest';
+
+  // components
+  renderer: CanvasRenderer | SVGRenderer;
+  scene: PenciltestScene | null;
+  ui: PenciltestUI;
+  migrator: PenciltestMigrator;
+
+  // global config/state
+  forceDimensions: Bounds | null;
+  hasUnsavedChanges: boolean;
+  height: number;
+  options: PenciltestOptions;
+  playback: PlaybackState;
+  state: PenciltestState;
+  width: number;
+  zoomFactor: number;
+
+  // elements
+  audioElement: HTMLMediaElement;
+  container: HTMLElement;
+  fieldContainer: HTMLElement;
+  fieldElement: HTMLElement;
+
+  // operation buffers
+  copyBuffer: Array<PenciltestFrame>;
+  markBuffer: Array<Mark>;
+  redoQueue: Array<Stroke>;
+  workingOn: Array<Promise<any>>;
+
 
   static defaultOptions: PenciltestOptions = {
     background: 'gray',
+    lineColor: 'black',
     container: 'body',
     hideCursor: false,
     onionSkin: true,
@@ -41,61 +57,36 @@ class Penciltest {
 
   static defaultState: PenciltestState = {
     version: Penciltest.version,
-    mode: PenciltestModes.DRAWING,
+    mode: PenciltestMode.DRAWING,
     toolStack: [
-      PenciltestTools.PENCIL,
-      PenciltestTools.ERASER,
-      PenciltestTools.PAN
+      PenciltestTool.PENCIL,
+      PenciltestTool.ERASER,
     ],
+    pointerMode: PointerMode.AWAY,
     previousMode: null
   };
 
-  // components
-  renderer: CanvasRenderer | SVGRenderer;
-  scene: PenciltestScene | null;
-  ui: PenciltestUI;
-
-  // global config/state
-  forceDimensions: Bounds | null;
-  hasUnsavedChanges: boolean;
-  height: number;
-  options: PenciltestOptions;
-  playback: PlaybackState;
-  state: PenciltestState;
-  width: number;
-  zoomFactor: number;
-
-  // elements
-  audioElement: HTMLMediaElement;
-  container: HTMLElement;
-  fieldContainer: HTMLElement;
-  fieldElement: HTMLElement;
-
-  // operation buffers
-  copyBuffer: Array<PenciltestFrame>;
-  currentStrokeIndex: number;
-  markBuffer: Array<Point>;
-  markPoint: Point;
-  redoQueue: Array<Stroke>;
-  workingOn: Array<Promise<any>>;
-
 
   constructor(options: PenciltestOptions) {
+    const [ storedOptions ] = this.getStoredData('app', 'options');
     this.options = {
       ...PenciltestScene.defaultOptions,
       ...Penciltest.defaultOptions,
-      ...this.getStoredData('app', 'options') as PenciltestOptions,
+      ...storedOptions,
     };
   
+    const [ storedState ] = this.getStoredData('app', 'state');
     this.state = {
       ...Penciltest.defaultState,
-      ...this.getStoredData('app', 'state') as PenciltestState,
+      ...storedState,
     };
-    this.currentStrokeIndex = -1;
+		this.markBuffer = []
   
     this.workingOn = [];
 
     this.playback = { ...Penciltest.defaultPlayback };
+
+    this.migrator = new PenciltestMigrator();
 
     this.container = globalThis.document.querySelector(this.options.container);
     this.container.className = 'penciltest-app';
@@ -108,25 +99,24 @@ class Penciltest {
 
     this.setOptions(this.options); // do all the option actions
 
-    if (this.state.version !== Penciltest.version) {
-      (async () => {
-        // User is not prompted about migration on launch, only on loading a scene.
-        // The app won't work without compatible state data.
-        this.state.version = await PenciltestVersions.migrate(this, this.state.version, Penciltest.version);
-      })();
-    }
+    //if (this.state.version !== Penciltest.version) {
+    //  console.info(`Resetting options and state, %%from a to b%%`, {a:`version ${this.state.version}`, b:Penciltest.version});
+    //  this.resetOptionsAndState();
+    //}
 
     this.resize();
   };
 
   setOptions(newOptions: PenciltestOptions) {
     Object.assign(this.options, newOptions);
+    if (newOptions.debug && Penciltest.debugVersion && Penciltest.debugVersion !== Penciltest.version) {
+      this.state.version = Penciltest.debugVersion;
+    }
     for (let key in newOptions) {
       if (key in this.ui.appActions && typeof this.ui.appActions[key].action === 'function') {
         this.ui.handleAppReaction(key);
       }
     }
-    //this.ui.updateStatusBar();
   }
 
 
@@ -134,7 +124,7 @@ class Penciltest {
     this.state = { ...Penciltest.defaultState };
     this.setOptions(Penciltest.defaultOptions);
 
-    this.currentStrokeIndex = -1;
+    this.scene.current.strokeNumber = -1;
     if (this.scene) {
       this.scene.updateState();
     }
@@ -162,11 +152,14 @@ class Penciltest {
     return this.fieldElement = this.container.querySelector('.field');
   }
 
-  setMode(mode:PenciltestModes): boolean {
+  setMode(mode:PenciltestMode): boolean {
     if (mode !== this.state.mode) {
       this.state.previousMode = this.state.mode;
       this.state.mode = mode;
       this.container.setAttribute('x-mode', mode);
+      if (this.state.previousMode === PenciltestMode.PLAYING) {
+        this.stop();
+      }
       this.ui.updateStatusBar();
       return true;
     }
@@ -174,7 +167,7 @@ class Penciltest {
   }
 
   setPreviousMode(): boolean {
-    return this.setMode(this.state.previousMode || PenciltestModes.DRAWING);
+    return this.setMode(this.state.previousMode || PenciltestMode.DRAWING);
   }
 
   getVisibleFrameRange(): PenciltestRange {
@@ -190,16 +183,8 @@ class Penciltest {
     return Utils.getRange(this.getVisibleFrameRange(), this.scene.frames)[0];
   }
 
-  getCurrentFrame() {
-    return this.scene.frames[this.scene.current.frameNumber || 0];
-  }
-
-  getCurrentStroke() {
-    return this.getCurrentFrame().strokes[this.currentStrokeIndex > -1 ? this.currentStrokeIndex : 0];
-  }
-
   getFrameBounds(frames:Array<PenciltestFrame> = []): Bounds {
-    if (frames.length === 0) { frames = [this.getCurrentFrame()]; }
+    if (frames.length === 0) { frames = [this.scene.getCurrentFrame()]; }
 
     const frameBounds = {};
 
@@ -207,7 +192,7 @@ class Penciltest {
       if (!frame.strokes) { return; }
       frame.strokes.forEach((stroke) => {
         if (stroke.path) {
-          Utils.unionBounds(stroke.path, frameBounds);
+          PTSpace.unionBounds(stroke.path, frameBounds);
         }
       });
     });
@@ -215,72 +200,71 @@ class Penciltest {
     return frameBounds;
   }
 
-  mark(point: Point) {
-    if (this.currentStrokeIndex < 0) {
-      let frame = this.getCurrentFrame();
-      if (!frame.strokes) { frame.strokes = []; }
-      this.currentStrokeIndex = frame.strokes.length;
-      const stroke = {path: []} as Stroke;
-      frame.strokes.push(stroke);
-      this.renderer.moveTo(point.x, point.y);
+  mark(mark: Mark) {
+    const isNewStroke = this.scene.current.strokeNumber < 0;
+    const stroke = this.scene.getCurrentStroke(true);
+    if (isNewStroke) {
+      this.renderer.moveTo(mark.x, mark.y);
     } else {
-      this.renderer.lineTo(point.x, point.y);
+      this.renderer.lineTo(mark.x, mark.y);
     }
 
-    const stroke = this.getCurrentStroke();
-    if (!stroke) { return; } // FIXME This shouldn't happen, right?
-    stroke.path.push(Utils.scalePoint(point, 1 / this.zoomFactor));
-    if (this.state.mode === PenciltestModes.DRAWING) {
+    stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
+    if (this.state.mode === PenciltestMode.DRAWING) {
       this.renderer.render();
     }
 
     this.clearRedo();
-    return this.hasUnsavedChanges = true;
+    this.hasUnsavedChanges = true;
   }
 
-  track(x: number,y: number) {
-    const trackPoint = {x,y};
-    if (this.state.toolStack[0] === PenciltestTools.ERASER) {
-      const screenPoint = Utils.scalePoint(trackPoint, 1 / this.zoomFactor);
-      let done = false;
-      const currentFrame = this.getCurrentFrame();
-      const screenEraseRadius = 10;
-      this.drawCurrentFrame();
-      for (let strokeIndex = 0; strokeIndex < Number(currentFrame.strokes?.length); strokeIndex++) {
-        const stroke = currentFrame.strokes[strokeIndex];
-        for (let segment of stroke.path) {
-          const realEraseRadius = screenEraseRadius / this.zoomFactor;
-          if ((Math.abs(screenPoint.x - segment.x) < realEraseRadius) && (Math.abs(screenPoint.y - segment.y) < realEraseRadius)) {
-            currentFrame.strokes.splice(strokeIndex, 1);
-            this.drawCurrentFrame();
-            done = true;
-          }
-          if (done) { break; }
-        }
-        if (done) { break; }
+  track(trackMark: Mark) {
+    const isDown = this.state.pointerMode === PointerMode.PRESS;
+
+    if (isDown && this.options.smoothing > 0) {
+      this.markBuffer.unshift(trackMark);
+      if (this.markBuffer.length > this.options.smoothing) {
+        this.markBuffer.pop();
       }
-      return this.renderer.rect(screenPoint[0] - screenEraseRadius, screenPoint[1] - screenEraseRadius, screenEraseRadius * 2, screenEraseRadius * 2, null, 'red');
-    } else if (this.options.smoothing > 0) {
-      if ((this.currentStrokeIndex < 0)) {
-        this.markPoint = trackPoint;
-        this.markBuffer = [];
-      }
-
-      this.markBuffer.push(trackPoint);
-
-      // TODO  Mark multiple points per @options.smoothing
-      this.markPoint.x = ((this.markPoint.x * this.options.smoothing) + x) / (this.options.smoothing + 1);
-      this.markPoint.y = ((this.markPoint.y * this.options.smoothing) + y) / (this.options.smoothing + 1);
-
-      // TODO  Use previous mark for velocity, to interpolate `smoothing`×
-      if (this.markBuffer.length > this.state.smoothDrawInterval) {
-        this.markBuffer = [];
-      }
-
-      return this.mark(this.markPoint);
-    } else {
-      return this.mark(trackPoint);
     }
+
+    if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
+      if (isDown) {
+        this.mark(trackMark);
+      }
+    } else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
+      const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
+      const eraserRadius = 20;
+      if (isDown) {
+        const currentFrame = this.scene.getCurrentFrame();
+        if (currentFrame.strokes?.length > 0) {
+          const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, eraserRadius);
+          if (erasingStrokeIndexes.length > 0) {
+            erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
+              currentFrame.strokes.splice(strokeIndex, 1);
+            });
+          }
+        }
+      }
+      this.drawCurrentFrame();
+      const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
+      this.renderer.rectBounds(toolBounds, null, 'red');
+    }
+  }
+
+  findIntersectingStrokes(strokes:Array<Stroke>, scenePoint:Point, radius:number, findAll:boolean = true): Array<number> {
+    const matches = [];
+    let doneCheckingStrokes = false;
+    for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
+      for (let segment of strokes[strokeIndex].path) {
+        if (Math.abs(scenePoint.x - segment.x) < radius && Math.abs(scenePoint.y - segment.y) < radius) {
+          matches.push(strokeIndex);
+          if (!findAll) return matches;
+          break;
+        }
+      }
+    }
+    return matches;
   }
 
   resolveFrameNumber(inputIndex: number) {
@@ -298,7 +282,7 @@ class Penciltest {
 
     this.scene.current.frameNumber = selectedFrameNumber;
 
-    if (this.state.mode !== PenciltestModes.PLAYING) {
+    if (this.state.mode !== PenciltestMode.PLAYING) {
       this.lift();
       this.seekAudioToFrame(selectedFrameNumber);
     }
@@ -308,7 +292,14 @@ class Penciltest {
 
   seekAudioToFrame(frameNumber: number, exposureOffset:number = 0) {
     if (this.scene.audio) {
-      const seekTime = (this.scene.current.frames[frameNumber].time + exposureOffset * this.scene.current.singleFrameDuration - this.scene.audio.offset) / 1000;
+      const frame = this.scene.current.frames[frameNumber]
+      if (!frame || !("time" in frame)) { return; }
+
+      let offset = typeof this.scene.audio?.offset === 'number' ? -this.scene.audio.offset : 0;
+      if (exposureOffset !== 0) {
+        offset += exposureOffset * this.scene.current.singleFrameDuration;
+      }
+      const seekTime = (frame.time + offset) / 1000;
       return this.seekAudio(seekTime);
     }
   }
@@ -345,24 +336,27 @@ class Penciltest {
     };
 
     this.stop();
+    if (this.playback.scrubAudioId) {
+      clearTimeout(this.playback.scrubAudioId);
+    }
     stepListener(true);
     this.playback.stepId = setInterval(stepListener, 1000 / this.scene.framerate);
     this.lift();
-    this.setMode(PenciltestModes.PLAYING);
-    return this.playAudio();
+    this.setMode(PenciltestMode.PLAYING);
+    return this.playAudio(); // FIXME: if audio offset is positive, it should not begin playing on the first frame, but later.
   }
 
   stop() {
     if (this.audioElement) { this.pauseAudio(); }
     clearInterval(this.playback.stepId);
-    if (this.state.mode === PenciltestModes.PLAYING) {
+    if (this.state.mode === PenciltestMode.PLAYING) {
       this.setPreviousMode();
     }
   }
 
   togglePlay() {
-    if (this.state.mode !== PenciltestModes.WORKING) {
-      if (this.state.mode === PenciltestModes.PLAYING) {
+    if (this.state.mode !== PenciltestMode.WORKING) {
+      if (this.state.mode === PenciltestMode.PLAYING) {
         return this.stop();
       } else {
         return this.play();
@@ -432,41 +426,54 @@ class Penciltest {
     return {
       ...stroke,
       // TODO: scale stroke weight, too?
-      path: stroke.path.map((point: Point) => Utils.scalePoint(point, factor))
+      path: stroke.path.map((point: Point) => PTSpace.scalePoint(point, factor))
     };
   }
 
-  useTool(toolName: PenciltestTools) {
+  useTool(toolName: PenciltestTool) {
     const index = this.state.toolStack.indexOf(toolName);
-    const isChanging = index !== 0
+    const isChanging = index !== 0;
     if (isChanging) {
       if (index > -1) {
         this.state.toolStack.splice(index, 1);
       }
       this.state.toolStack.unshift(toolName);
       this.container.setAttribute('x-tool', toolName);
+      this.ui.updateStatusBar();
     }
-
     return isChanging;
   }
 
-  usePreviousTool(): [ PenciltestTools, boolean ] {
-    return [ this.state.toolStack[1], this.useTool(this.state.toolStack[1]) ];
+  usePreviousTool() {
+    this.useTool(this.state.toolStack[1]);
+  }
+
+  toggleTool(toolName: PenciltestTool, complementTools:Array<PenciltestTool> = []) {
+    const index = this.state.toolStack.indexOf(toolName);
+    if (index === 0) {
+      if (complementTools.length > 0) {
+        this.useTool(complementTools[0]);
+      } else {
+        this.usePreviousTool();
+      }
+    } else {
+      this.useTool(toolName);
+    }
   }
 
   cancelStroke() {
     this.markBuffer = [];
-    return this.currentStrokeIndex = -1;
+    return this.scene.current.strokeNumber = -1;
   }
 
   lift() {
-    if (this.markBuffer && this.markBuffer.length) {
-      const last = this.markBuffer.pop();
-      this.mark(last);
+    if (this.markBuffer && this.markBuffer.length > 0) {
+      const lastMark = this.markBuffer.shift()
+      this.track(lastMark);
       this.markBuffer = [];
     }
-    this.currentStrokeIndex = -1;
-    if (this.state.toolStack[0] === PenciltestTools.ERASER) {
+    this.scene.current.strokeNumber = -1;
+    if (this.state.toolStack[0] === PenciltestTool.ERASER) {
       return this.drawCurrentFrame();
     }
   }
@@ -482,7 +489,7 @@ class Penciltest {
       } else if (cut) {
         return [ this.scene.frames.splice(this.scene.current.frameNumber, 1), this.scene.current.frameNumber ];
       } else {
-        return [ [this.getCurrentFrame()], this.scene.current.frameNumber];
+        return [ [this.scene.getCurrentFrame()], this.scene.current.frameNumber];
       }
     }
   }
@@ -517,8 +524,10 @@ class Penciltest {
   }
 
   pasteStrokes() {
-    if (this.copyBuffer?.length > 0) {
-      this.scene.frames[this.scene.current.frameNumber].strokes = this.scene.frames[this.scene.current.frameNumber].strokes.concat(Utils.clone(this.copyBuffer[0].strokes));
+    if (this.copyBuffer?.length > 0 && this.copyBuffer[0].strokes) {
+      const currentFrame = this.scene.getCurrentFrame(true);
+      if (!("strokes" in currentFrame)) { currentFrame.strokes = []; }
+      Array.prototype.push.apply(currentFrame.strokes, Utils.clone(this.copyBuffer[0].strokes));
       return this.drawCurrentFrame();
     }
   }
@@ -568,7 +577,8 @@ class Penciltest {
       const result = [];
       for (let stroke of oldStrokes) {
         for (let segment of stroke.path) {
-          this.track.apply(this, [segment.x, segment.y]);
+          const fieldScalePoint = PTSpace.scalePoint(segment, this.height / this.scene.height);
+          this.track.apply(this, [fieldScalePoint.x, fieldScalePoint.y]);
         }
         result.push(this.lift());
       }
@@ -588,7 +598,8 @@ class Penciltest {
         return;
       }
     }
-    return smooth(amount);
+    smooth(amount);
+		this.drawCurrentFrame();
   }
 
   async smoothScene(amount: number = 1) {
@@ -603,7 +614,7 @@ class Penciltest {
           return;
         }
       }
-      this.setMode(PenciltestModes.WORKING);
+      this.setMode(PenciltestMode.WORKING);
       this.queueWork(() => {
         this.scene.frames.forEach((frame, i) => this.smoothFrame(i, amount))
         this.setPreviousMode();
@@ -612,8 +623,8 @@ class Penciltest {
   }
 
   undo() {
-    if (this.getCurrentFrame().strokes && this.getCurrentFrame().strokes.length) {
-      this.redoQueue.push(this.getCurrentFrame().strokes.pop());
+    if (this.scene.getCurrentFrame().strokes && this.scene.getCurrentFrame().strokes.length) {
+      this.redoQueue.push(this.scene.getCurrentFrame().strokes.pop());
       this.hasUnsavedChanges = true;
       return this.drawCurrentFrame();
     }
@@ -621,7 +632,7 @@ class Penciltest {
 
   redo() {
     if (this.redoQueue && this.redoQueue.length) {
-      this.getCurrentFrame().strokes.push(this.redoQueue.pop());
+      this.scene.getCurrentFrame().strokes.push(this.redoQueue.pop());
       this.hasUnsavedChanges = true;
       return this.drawCurrentFrame();
     }
@@ -673,14 +684,15 @@ class Penciltest {
     }
   }
 
-  getStoredData(namespace: string, name: string): any {
+  getStoredData(namespace: string, name: string): [ any, Dictionary ] {
+    const context = { errorMessage: '' };
     const storageName = this.encodeStorageReference(namespace, name);
     try {
-      return JSON.parse(globalThis.localStorage.getItem(storageName));
+      return [ JSON.parse(globalThis.localStorage.getItem(storageName)), context ];
     } catch(e) {
       console.error(e);
-      this.ui.showFeedback({text:`Failed to parse stored data at name '${storageName}'.`});
-      return null;
+      context.errorMessage = `Failed to parse stored data at name '${storageName}'.`
+      return [ null, context ];
     }
   }
 
@@ -698,23 +710,33 @@ class Penciltest {
 
   async saveScene(update: boolean = true): Promise<boolean> {
     const sceneName = this.scene.name || 'Untitled';
-    const scenePack = await PenciltestVersions.packScene(this.scene);
-    if (scenePack && this.putStoredData('scene', sceneName, scenePack)) {
+    let sceneToStore = this.scene;
+    try {
+      sceneToStore = await this.migrator.packScene(this.scene);
+    } catch(e) {
+      console.error(e);
+    }
+    if (sceneToStore && this.putStoredData('scene', sceneName, sceneToStore)) {
       this.hasUnsavedChanges = false;
       return true;
     }
     return false;
   }
 
-  async setScene(scene: PenciltestSceneData, shouldUnpack:boolean = false): Promise<PenciltestScene> {
-    if (shouldUnpack) {
-      this.scene = await PenciltestVersions.unpackScene(scene);
-    } else {
-      this.scene = new PenciltestScene(scene);
-    }
-
-    if (this.scene.instrument?.version && PenciltestVersions.compareVersions(this.scene.instrument.version, Penciltest.version) === -1) {
-      this.scene.instrument.version = await PenciltestVersions.migrate(this, this.scene.instrument.version, Penciltest.version);
+  async setScene(sceneData: PenciltestSceneData): Promise<[ PenciltestScene, Dictionary ]> {
+    const context:Dictionary = {};
+    try {
+      this.migrator
+        .unpackScene(sceneData)
+        .then(async (unpackedSceneData) => {
+          const [ migratedSceneData, migrationContext ] = await this.migrator.migrateScene(unpackedSceneData, this.state.version);
+          Object.assign(context, migrationContext);
+          this.scene = new PenciltestScene(migratedSceneData);
+        });
+    } catch(e) {
+      console.error(e);
+      context.errorMessage = e.message;
+      this.scene = new PenciltestScene(sceneData);
     }
 
     if (this.scene.audio?.url) {
@@ -732,13 +754,14 @@ class Penciltest {
     this.goToFrame(this.scene.current.frameNumber || 0);
     this.hasUnsavedChanges = false;
     this.resize();
-    return this.scene;
+    return [ this.scene, context ];
   }
 
-  async loadScene(sceneName:string): Promise<PenciltestScene | boolean> {
-    const storedScene:PenciltestSceneData | null = this.getStoredData('scene', sceneName);
-    if (!storedScene) { return false; }
-    return await this.setScene(storedScene, true);
+  async loadScene(sceneName:string): Promise<[ PenciltestScene | boolean, Dictionary ]> {
+    const [ storedScene, storageContext ] = this.getStoredData('scene', sceneName);
+    if (!storedScene) { return [ false, storageContext ]; }
+    const [ scene, sceneContext ] = await this.setScene(storedScene);
+    return [ scene, { ...storageContext, ...sceneContext } ];
   }
 
   async deleteScene(sceneName:string): Promise<boolean> {
@@ -786,11 +809,18 @@ class Penciltest {
   }
 
   pauseAudio() {
-    if (this.audioElement && !this.audioElement.paused) { return this.audioElement.pause(); }
+    if (this.audioElement && !this.audioElement.paused) {
+      this.audioElement.pause();
+    }
+    if (this.playback.scrubAudioId) {
+      clearTimeout(this.playback.scrubAudioId);
+    }
   }
 
   playAudio() {
-    if (this.audioElement && this.audioElement.paused) { return this.audioElement.play(); }
+    if (this.audioElement && this.audioElement.paused) {
+      this.audioElement.play();
+    }
   }
 
   seekAudio(time: number) {
@@ -798,6 +828,8 @@ class Penciltest {
   }
 
   scrubAudio(exposureOffset:number = 0) {
+    // If negative, plays that many exposures at the end of the current frame hold.
+    // This is useful for quickly previewing frame hold changes relative to audio.
     if (!this.options.scrubAudio || !this.audioElement) { return; }
     const frameExposures = this.scene.getFrameHold();
     if (exposureOffset < 0) {

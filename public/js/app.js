@@ -6,20 +6,36 @@ Object.assign(globalThis, {
                 "TODO 2026-08-03 Migrate to a more standard locale format."
             ],
             "content": {
+                "_plural": "s",
+                "_singular": "",
+                "audioOffset": "audio timing offset",
+                "chooseSceneDelete": "choose a scene to %%delete%% from %%localStorage%%",
                 "clickToChange": "click to change",
                 "clickToRename": "click to rename",
-                "eraser": "eraser",
-                "framerate": "framerate",
-                "pan": "pan",
-                "pencil": "pencil",
-                "playing": "playing",
-                "promptSetFramerate": "Set the %%framerate%% of the scene",
-                "smoothing": "Drawing smoothing factor",
-                "statusSceneName": "Current scene name",
-                "statusSceneNameTooltip": "%%statusSceneName%% (%%clickToRename%%)",
-                "statusSmoothingTooltip": "%%smoothing%% (%%clickToChange%%)",
-                "untitled": "untitled",
-                "working": "working"
+                "currentFrameNumber": "current %%frameNumber%%",
+                "current": "current",
+                "currentMode": "current %%frameNumber%%",
+                "currentFrameTime": "current frame's start time",
+                "duration": "duration",
+                "exposureHoldTitle": "number of %%exposures%% this frame is holding for",
+                "frameNumber": "frame number",
+                "import": "import",
+                "jsonFile": "JSON file",
+                "localStorage": "local browser storage",
+                "name": "name",
+                "promptSetFramerate": "set the %%framerate%% of the scene",
+                "scene": "scene",
+                "sceneFrameCount": "total number of frames in this scene",
+                "selectAllFrames": "%%\\uselect%% all the frames in this scene",
+                "smoothing": "drawing smoothing factor",
+                "statusFrameRate": "frame rate (FPS) and current frame's hold duration. %%\\uclickToChange%% FPS",
+                "statusSceneName": "current scene name",
+                "statusSceneNameTooltip": "%%statusSceneName%% (%%\\uclickToRename%%)",
+                "statusSmoothingTooltip": "%%smoothing%% (%%\\uclickToChange%%)",
+                "toolExplain_eraser": "",
+                "toolExplain_pan": "move the contents of the selected/current frame(s)",
+                "from a to b": "from %%a%% to %%b%%",
+                "toolExplain_pencil": ""
             }
         }
     }
@@ -34,29 +50,68 @@ class Locale {
             ...options
         };
     }
+    // NOTE: Using '.substr(0, 1)' where a string output is a must, and `[0]` where `undefined` is OK.
     makeEngine(localeKey) {
         if (!(localeKey in LOCALES)) {
             throw new Error(`Missing locale '${localeKey}' in global LOCALES object.`);
         }
         this.dict = LOCALES[localeKey].content;
-        const engine = (key, substitution, subDepth = 0) => {
-            const dict = subDepth === 0 ? { ...this.dict, ...substitution } : substitution;
-            const keyExists = key in dict;
-            const message = keyExists ? dict[key] : key;
-            if (substitution) {
-                return message.replace(this.options.subPattern, (match, groups) => engine(groups.key, substitution ? dict : substitution, subDepth + 1));
+        if (typeof this.options.plural === 'function') {
+            this.pluralOperation = this.options.plural;
+        }
+        else {
+            this.pluralOperation = (message, engine) => Number(message) === 1 ? engine('_singular') : engine('_plural');
+        }
+        const engine = (key, innerDict = {}, recursionLimit = Locale.recursionLimit) => {
+            const filters = [];
+            // NOTE: Filters are run inside out.
+            // e.g. "\\U\\p5" will first run the 'p' (plural) filter, then 'U' (uppercase) on the output of 'p'.
+            while (key[0] === "\\") {
+                const filterMatch = this.getFilter(key[1]);
+                if (typeof filterMatch === 'function') {
+                    key = key.substr(2);
+                    filters.unshift(filterMatch);
+                }
+                else {
+                    break;
+                }
             }
-            if (keyExists || subDepth === 0) {
-                return message;
+            let message = key;
+            if (key in innerDict) {
+                message = innerDict[key];
             }
-            return '(?)';
+            else if (key in this.dict) {
+                message = this.dict[key];
+            }
+            if (recursionLimit > 0) {
+                message = message.replaceAll(this.options.subPattern, (match, key) => engine(key, innerDict, recursionLimit - 1));
+            }
+            if (filters.length > 0) {
+                return filters.reduce((m, f) => f(m), message);
+            }
+            return message;
+        };
+        this.getFilter = (filterId) => {
+            switch (filterId) {
+                case 'u':
+                    return (message) => message.substr(0, 1).toUpperCase() + message.substr(1);
+                case 'U':
+                    return (message) => message.toUpperCase();
+                case 'l':
+                    return (message) => message.substr(0, 1).toLowerCase() + message.substr(1);
+                case 'L':
+                    return (message) => message.toLowerCase();
+                case 'p':
+                    return (message) => this.pluralOperation(message, engine);
+            }
+            return null;
         };
         return engine;
     }
 }
 Locale.recursionLimit = 3;
 Locale.defaultOptions = {
-    subPattern: /%%(?<key>[^%]{1,128})%%/,
+    subPattern: /%%([^%]{1,128})%%/g,
 };
 const thisLocale = new Locale();
 const lc = thisLocale.makeEngine('en-US');

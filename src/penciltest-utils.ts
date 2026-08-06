@@ -12,6 +12,10 @@ interface FilePromptOptions extends PromptOptions {
   loadAs?: "text" | "uri" | "files";
 }
 
+enum GlobalPromiseGroup {
+  MODAL = "modal",
+};
+
 class Utils {
 
   static clone(object: any) {
@@ -131,8 +135,8 @@ class Utils {
 
     promptForm.appendChild(inputRow);
 
-    return new Promise((resolve, reject) => {
-      const promptKeyListener = function(event: KeyboardEvent):any {
+    const promptPromise:Promise<string> = new Promise((resolve, reject) => {
+      const promptKeyListener = function(event: KeyboardEvent): any {
         const keysDescription = Utils.describeKeyCombo(event);
         if (keysDescription === 'Esc') {
           cancelPrompt();
@@ -146,12 +150,12 @@ class Utils {
         document.removeEventListener('keydown', promptKeyListener);
       };
 
-      const cancelPrompt = ():void => {
+      const cancelPrompt = (): void => {
         closePromptModal();
         reject(Utils.promptCanceled);
       };
 
-      const submitPrompt = ():void => {
+      const submitPrompt = (): void => {
         closePromptModal();
         resolve(promptInput.value);
       };
@@ -188,6 +192,10 @@ class Utils {
         promptInput.focus();
       }
     });
+
+    Utils.registerGlobalPromise(promptPromise);
+
+    return promptPromise;
   };
 
 
@@ -298,7 +306,7 @@ class Utils {
     '?': 191
   };
 
-  static getKeyCodeName(keyCode: number, shiftKey: boolean = false, key: string = ''):string {
+  static getKeyCodeName(keyCode: number, shiftKey: boolean = false, key: string = ''): string {
     let keyCodeName: any;
     if (shiftKey && Utils.shiftKeyCodeNames.hasOwnProperty(keyCode)) {
       keyCodeName = Utils.shiftKeyCodeNames[keyCode];
@@ -311,7 +319,7 @@ class Utils {
     return keyCodeName;
   };
 
-  static describeKeyCombo(event: KeyboardEvent):string {
+  static describeKeyCombo(event: KeyboardEvent): string {
     const keyName = Utils.getKeyCodeName(event.keyCode, event.shiftKey);
 
     const combo = [];
@@ -327,18 +335,7 @@ class Utils {
     return combo.join('+');
   };
 
-  static averagePoints(points: Array<Point>):Point {
-    const sumPoints:Point = {x: 0, y: 0};
-    for (let point of points) {
-      sumPoints.x += point.x;
-      sumPoints.y += point.y;
-    }
-
-    sumPoints.x /= points.length;
-    sumPoints.y /= points.length;
-
-    return sumPoints;
-  };
+  static normalize(x:number, m:number = 1) { return x < m ? (x * x) / (m * m * 2) : 1 - (m / x / 2); }
 
   static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: AnyPointerScope = "client"):Point {
     const points = Array.from(event.touches)
@@ -352,7 +349,7 @@ class Utils {
     if (touchLimit === 1) {
       return points[0];
     } else {
-      return Utils.averagePoints(points);
+      return PTSpace.averagePoints(points);
     }
   };
 
@@ -366,78 +363,18 @@ class Utils {
     };
   };
 
-  static scalePoint(point: Point, factor: number) {
-    return {
-      x: point.x * factor,
-      y: point.y * factor
-    }
-  };
-
-  static unionBounds(points:Array<Point | Bounds>, bounds:Bounds = {}): Bounds {
-    if (points.length === 0) { return bounds; }
-
-    points.forEach((point) => {
-      if (!("x" in bounds)) {
-        bounds.x = point.x;
-        bounds.width = 0; // Ignoring if bounds had width without x.
-      } else if (point.x < bounds.x) {
-        bounds.x = point.x;
-      } else if (point.x > bounds.x + bounds.width) {
-        bounds.width = point.x - bounds.x;
-      } else if ("width" in point && point.x + point.width > bounds.x + bounds.width) {
-        bounds.width = point.x + point.width - bounds.x;
-      }
-
-      if (!("y" in bounds)) {
-        bounds.y = point.y;
-        bounds.height = 0; // Ignoring if bounds had height without y.
-      } else if (point.y < bounds.y) {
-        bounds.y = point.y;
-      } else if (point.y > bounds.y + bounds.height) {
-        bounds.height = point.y - bounds.y;
-      } else if ("height" in point && point.y + point.height > bounds.y + bounds.height) {
-        bounds.height = point.y + point.height - bounds.y;
-      }
-    });
-
-    return bounds;
-  }
-
-  static boundsCenter(bounds:Bounds): Point {
-    const positionBounds = {
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      ...bounds
-    };
-
-    return {
-      x:positionBounds.x + positionBounds.width / 2,
-      y:positionBounds.y + positionBounds.height / 2
-    };
-  }
-
-  static diffPoints(point1: Point, point2: Point):Point {
-    return {
-      x: point1.x - point2.x,
-      y: point1.y - point2.y
-    };
-  };
-
-  static negatePoint(point):Point {
-    return {
-      x: -point.x,
-      y: -point.y
-    };
-  };
-
-  static getDecimal(input: number, precision: number, toString: boolean = false, leftPad:number = 0): string | number {
+  static toDecimal(input:number, precision:number, options:{string?:boolean, pad?:number, prefix?:boolean} = {string: false, pad: 0, prefix: false}): string | number {
+    const {
+      string: toString,
+      pad: leftPad,
+      prefix: literalPositive
+    } = options;
     const factor = Math.pow(10, precision);
     const value = Math.round(input * factor) / factor;
 
     if (toString) {
       const parts = String(value).split('.');
+      const prefix = literalPositive && value > 0 ? '+' : '';
       if (precision > 0) {
         if (parts.length === 1) {
           parts.push('0');
@@ -446,16 +383,16 @@ class Utils {
       }
       while (parts[0].length < leftPad) { parts[0] = `0${parts[0]}`; }
       if (precision > 0) {
-        return parts.join('.');
+        return prefix + parts.join('.');
       } else {
-        return parts[0];
+        return prefix + parts[0];
       }
     }
 
     return value;
   };
 
-  static getTimecode(milliseconds: number, precision: number = 2): string {
+  static toTimecode(milliseconds:number, precision:number = 2, minimumUnits:number = 2): string {
     const factors = [1000, 60, 60];
     let remainderMs = milliseconds;
     let cumulativeFactor = 1;
@@ -463,12 +400,14 @@ class Utils {
       .map((factor, index) => {
         cumulativeFactor *= factor;
         let segment = (remainderMs / cumulativeFactor)
+        if (index >= minimumUnits && segment < 1) { return null; }
         if (index < factors.length - 1) {
           segment %= factors[index + 1];
         }
         remainderMs -= segment * cumulativeFactor;
-        return Utils.getDecimal(segment, index === 0 ? precision : 0, true, 2);
+        return Utils.toDecimal(segment, index === 0 ? precision : 0, {string:true, pad:2});
       })
+      .filter((x) => typeof x === 'string')
       .reverse()
       .join(':');
   };
@@ -507,4 +446,32 @@ class Utils {
     link.href = url;
     return link.click();
   };
+
+  static registerGlobalPromise(promise:Promise<any>, group:GlobalPromiseGroup = GlobalPromiseGroup.MODAL) {
+    if (!("penciltestGlobalPromises" in globalThis)) {
+      globalThis.penciltestGlobalPromises = {};
+    }
+    const set = globalThis.penciltestGlobalPromises;
+    if (!(group in set)) {
+      set[group] = [];
+    }
+    set[group].push(promise);
+    promise.finally(() => {
+      const promiseIndex = set[group].indexOf(promise);
+      if (promiseIndex !== -1) {
+        set[group].splice(promiseIndex, 1);
+      }
+    });
+  }
+
+  static getGlobalPromises(group:GlobalPromiseGroup = GlobalPromiseGroup.MODAL) {
+    const set = globalThis.penciltestGlobalPromises;
+    if (set && set[group]) { return set[group]; }
+    return [];
+  }
+
+  static anyGlobalPromises(group:GlobalPromiseGroup = GlobalPromiseGroup.MODAL) {
+    return Boolean(globalThis.penciltestGlobalPromises && globalThis.penciltestGlobalPromises[group]?.length > 0);
+  }
+
 };

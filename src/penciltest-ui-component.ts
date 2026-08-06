@@ -102,6 +102,8 @@ class PenciltestUIComponent {
   }
 
   setContent(inputConfig:PenciltestUIComponentOptions, force:boolean = false): boolean {
+    // NOTE: The 'key' property is necessary for children components to also have their content updated.
+
     // Shallow clone to enable deleting members without affecting input object.
     const config:PenciltestUIComponentOptions = {...inputConfig};
 
@@ -122,7 +124,7 @@ class PenciltestUIComponent {
       }
     } else if (config.children) {
       config.children.forEach((childConfig) => {
-        if (!childConfig.key) { return; }
+        if (!childConfig.key) { return; } // Avoiding assumptions of persistent child node order.
         const childComponent = PenciltestUIComponent.restore(childConfig, this.components);
         if (typeof childComponent.setContent !== 'function') { return; }
         childComponent.setContent(childConfig);
@@ -160,13 +162,6 @@ class PenciltestUIComponent {
 
     return changed;
   }
-
-  //refresh() {
-  //  [this].concat(this.children)
-  //    .forEach((component) => {
-  //      component.refreshHandlers.forEach((r) => r());
-  //    });
-  //}
 
   attachChild(child:PenciltestUIComponent) {
     this.getElement().appendChild(child.getElement());

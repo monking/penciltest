@@ -1,3 +1,16 @@
+class SceneState implements PenciltestSceneState {
+  constructor(overrides: PenciltestSceneState = {}) {
+    Object.assign(this, {
+      frames: [],
+      exposureCount: 0,
+      exposureNumber: 0,
+      frameNumber: 0,
+      strokeNumber: -1,
+      ...overrides
+    });
+  }
+}
+
 class PenciltestScene implements PenciltestSceneData {
 
   static defaultOptions: PenciltestSceneOptions = {
@@ -72,7 +85,7 @@ class PenciltestScene implements PenciltestSceneData {
       }
     });
 
-    if (!this.frames || this.frames.length === 0) {
+    if (this.frames.length === 0) {
       this.newFrame();
     }
 
@@ -81,6 +94,8 @@ class PenciltestScene implements PenciltestSceneData {
         crypto.randomUUID();
       }
     }
+
+    this.updateState();
   }
 
   getDimensions(): Bounds {
@@ -160,27 +175,52 @@ class PenciltestScene implements PenciltestSceneData {
     this.audio.volume = Math.max(0, Math.min(100, newVolume));
   }
 
-  async newFrame(insertAtIndex = null, count:number = 1, options:PenciltestFrame = {}): Promise<Array<PenciltestFrame>> {
-    return new Promise((resolve, reject) => {
-      const newFrames = []
-      for (let i = 0; i < count; i++) {
-        const newFrame:PenciltestFrame = {
-          hold: this.getFrameHold(),
-          strokes: [],
-          ...options
-        };
-        newFrames.push(newFrame);
-      }
-      if (insertAtIndex === null) {
-        insertAtIndex = this.frames.length;
-      }
-      const insertSpliceParams = [insertAtIndex, 0]
-      Array.prototype.splice.apply(this.frames, insertSpliceParams.concat(newFrames));
+  newFrame(insertAtIndex:number = -1, count:number = 1, options:PenciltestFrame = {}): Array<PenciltestFrame> {
+    const newFrames = []
+    for (let i = 0; i < count; i++) {
+      const frame:PenciltestFrame = {
+        hold: this.getFrameHold(),
+        strokes: [],
+        ...options
+      };
+      newFrames.push(frame);
+    }
+    if (insertAtIndex === -1) {
+      insertAtIndex = this.frames.length;
+    }
+    Array.prototype.splice.apply(this.frames, [insertAtIndex, 0].concat(newFrames));
 
-      this.updateState();
+    this.updateState();
 
-      resolve(newFrames);
-    });
+    return newFrames;
+  }
+
+  getCurrentFrame(makeIfEmpty = false): PenciltestFrame {
+    if (makeIfEmpty) {
+      if (this.frames.length === 0) {
+        this.current.frameNumber = 0;
+        return this.newFrame()[0];
+      }
+    }
+    return this.frames[this.current.frameNumber || 0];
+  }
+
+  getCurrentStroke(makeNewIfEmpty:boolean = false): Stroke {
+    const frame = this.getCurrentFrame(makeNewIfEmpty);
+    const isNewStroke = this.current.strokeNumber === -1;
+    if (isNewStroke || makeNewIfEmpty) {
+      if (!("strokes" in frame)) {
+        frame.strokes = []
+      }
+      if (isNewStroke || (makeNewIfEmpty && frame.strokes.length === 0)) {
+        this.current.strokeNumber = frame.strokes.length;
+        const stroke = {path: []} as Stroke;
+        frame.strokes.push(stroke);
+        return stroke;
+      }
+    }
+    if (!frame?.strokes) { throw new Error('Missing strokes on current frame in scene.'); }
+    return frame.strokes[this.current.strokeNumber > -1 ? this.current.strokeNumber : frame.strokes.length - 1];
   }
 
 }

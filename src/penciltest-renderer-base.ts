@@ -109,11 +109,7 @@ class BaseRenderer implements PenciltestRenderer {
 
   destroy(): void {}
 
-  arc(inputConfig:Arc): void {
-    let config:Arc = {
-      ...PTSpace.defaultArc,
-      ...inputConfig,
-    };
+  arc(config:Arc): void {
   }
 
   circle(center:Point, radius:number): void {
