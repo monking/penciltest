@@ -152,7 +152,7 @@ class Utils {
 
       const cancelPrompt = (): void => {
         closePromptModal();
-        reject(Utils.promptCanceled);
+        resolve(null);
       };
 
       const submitPrompt = (): void => {
@@ -168,7 +168,7 @@ class Utils {
       promptCancelButton.addEventListener('click', function(event: { preventDefault: () => void; }) {
         event.preventDefault();
         closePromptModal();
-        reject(Utils.promptCanceled);
+        resolve(null);
       });
       promptForm.appendChild(promptCancelButton);
 
@@ -218,30 +218,34 @@ class Utils {
     const fileInput = document.createElement('input') as HTMLInputElement;
     fileInput.setAttribute('type', 'file');
     if (accept) { fileInput.setAttribute('accept', accept); }
-    const filePath = await Utils.prompt(
-      message,
-      null,
-      {
-        onOpen: () => fileInput.click(),
-        ...options,
-        input: fileInput
-      }
-    );
-    if (filePath) {
-      const files = Array.from(fileInput.files);
-      if (loadAs === 'text') {
-        return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
-          const fileReader = new FileReader();
-          fileReader.addEventListener('load', (event: ProgressEvent<FileReader>) => resolve(event.target.result));
-          fileReader.addEventListener('error', (event: ProgressEvent<FileReader>) => reject(event));
-          fileReader.readAsText(file);
-        })));
-      } else if (loadAs === 'uri') {
-        return files.map((file) => URL.createObjectURL(file));
-      } else {
-        return files;
-      }
-    };
+    try {
+      const filePath = await Utils.prompt(
+        message,
+        null,
+        {
+          onOpen: () => fileInput.click(),
+          ...options,
+          input: fileInput
+        }
+      );
+      if (filePath) {
+        const files = Array.from(fileInput.files);
+        if (loadAs === 'text') {
+          return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+            const fileReader = new FileReader();
+            fileReader.addEventListener('load', (event: ProgressEvent<FileReader>) => resolve(event.target.result));
+            fileReader.addEventListener('error', (event: ProgressEvent<FileReader>) => reject(event));
+            fileReader.readAsText(file);
+          })));
+        } else if (loadAs === 'uri') {
+          return files.map((file) => URL.createObjectURL(file));
+        } else {
+          return files;
+        }
+      };
+    } catch(ignore) {
+      return [];
+    }
   };
 
   static keyCodeNames = {
@@ -336,6 +340,8 @@ class Utils {
   };
 
   static normalize(x:number, m:number = 1) { return x < m ? (x * x) / (m * m * 2) : 1 - (m / x / 2); }
+
+  static lerp(a:number, b:number, weight:number = 0.5): number { return a + weight * (b - a); };
 
   static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: AnyPointerScope = "client"):Point {
     const points = Array.from(event.touches)

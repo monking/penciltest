@@ -40,6 +40,7 @@ var PointerMode;
 ;
 ;
 ;
+;
 
 "use strict";
 var GlobalPromiseGroup;
@@ -176,7 +177,7 @@ class Utils {
             };
             const cancelPrompt = () => {
                 closePromptModal();
-                reject(Utils.promptCanceled);
+                resolve(null);
             };
             const submitPrompt = () => {
                 closePromptModal();
@@ -189,7 +190,7 @@ class Utils {
             promptCancelButton.addEventListener('click', function (event) {
                 event.preventDefault();
                 closePromptModal();
-                reject(Utils.promptCanceled);
+                resolve(null);
             });
             promptForm.appendChild(promptCancelButton);
             if (shouldSubmitOnChange) {
@@ -240,29 +241,34 @@ class Utils {
         if (accept) {
             fileInput.setAttribute('accept', accept);
         }
-        const filePath = await Utils.prompt(message, null, {
-            onOpen: () => fileInput.click(),
-            ...options,
-            input: fileInput
-        });
-        if (filePath) {
-            const files = Array.from(fileInput.files);
-            if (loadAs === 'text') {
-                return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
-                    const fileReader = new FileReader();
-                    fileReader.addEventListener('load', (event) => resolve(event.target.result));
-                    fileReader.addEventListener('error', (event) => reject(event));
-                    fileReader.readAsText(file);
-                })));
+        try {
+            const filePath = await Utils.prompt(message, null, {
+                onOpen: () => fileInput.click(),
+                ...options,
+                input: fileInput
+            });
+            if (filePath) {
+                const files = Array.from(fileInput.files);
+                if (loadAs === 'text') {
+                    return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+                        const fileReader = new FileReader();
+                        fileReader.addEventListener('load', (event) => resolve(event.target.result));
+                        fileReader.addEventListener('error', (event) => reject(event));
+                        fileReader.readAsText(file);
+                    })));
+                }
+                else if (loadAs === 'uri') {
+                    return files.map((file) => URL.createObjectURL(file));
+                }
+                else {
+                    return files;
+                }
             }
-            else if (loadAs === 'uri') {
-                return files.map((file) => URL.createObjectURL(file));
-            }
-            else {
-                return files;
-            }
+            ;
         }
-        ;
+        catch (ignore) {
+            return [];
+        }
     }
     ;
     static getKeyCodeName(keyCode, shiftKey = false, key = '') {
@@ -302,6 +308,8 @@ class Utils {
     }
     ;
     static normalize(x, m = 1) { return x < m ? (x * x) / (m * m * 2) : 1 - (m / x / 2); }
+    static lerp(a, b, weight = 0.5) { return a + weight * (b - a); }
+    ;
     static touchPoint(event, touchLimit = 1, scope = "client") {
         const points = Array.from(event.touches)
             .slice(0, touchLimit)
@@ -506,37 +514,30 @@ Utils.shiftKeyNameCodes = {
 "use strict";
 ;
 class PTSpace {
-    static toPoint(coords) {
-        if ("width" in coords) {
-            return PTSpace.boundsCenter(coords);
+    static boundsAroundPoint(point, radiusX, radiusY = NaN) {
+        if (isNaN(radiusY)) {
+            radiusY = radiusX;
         }
         return {
-            x: coords.x || 0,
-            y: coords.y || 0
+            x: point.x - radiusX,
+            y: point.y - radiusY,
+            width: radiusX * 2,
+            height: radiusY * 2,
         };
     }
-    static averagePoints(points) {
-        const sumPoints = PTSpace.zeroPoint;
-        for (let point of points) {
-            sumPoints.x += point.x;
-            sumPoints.y += point.y;
-        }
-        sumPoints.x /= points.length;
-        sumPoints.y /= points.length;
-        return sumPoints;
-    }
-    ;
-    static scalePoint(point, factor) {
+    static rectCenter(bounds) {
+        const positionBounds = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            ...bounds
+        };
         return {
-            x: point.x * factor,
-            y: point.y * factor
+            x: positionBounds.x + positionBounds.width / 2,
+            y: positionBounds.y + positionBounds.height / 2
         };
     }
-    ;
-    static magnitude(point) {
-        return Math.sqrt(point.x * point.x + point.y + point.y);
-    }
-    ;
     static unionBounds(points, bounds = {}) {
         if (points.length === 0) {
             return bounds;
@@ -571,34 +572,69 @@ class PTSpace {
         });
         return bounds;
     }
-    static boundsCenter(bounds) {
-        const positionBounds = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-            ...bounds
-        };
+    static arcPoint(config, position) {
         return {
-            x: positionBounds.x + positionBounds.width / 2,
-            y: positionBounds.y + positionBounds.height / 2
+            x: Math.cos(Math.PI * 2 * position) * config.radius,
+            y: Math.sin(Math.PI * 2 * position) * config.radius,
         };
     }
-    static lerp(a, b, weight = 0.5) {
-        return {
-            x: a.x + (b.x - a.x) * weight,
-            y: a.y + (b.y - a.y) * weight
-        };
+    static traceArc(config) {
+        debugger;
+        const arc = { ...PTSpace.defaultArc, ...config };
+        const points = [];
+        const arcStep = 1 / arc.resolution;
+        let position = arc.start;
+        while (position <= arc.end) {
+            if (position > arc.end) {
+                debugger;
+                position = arc.end;
+            }
+            points.push(PTSpace.arcPoint(arc, position));
+            if (position === arc.end) {
+                break;
+            }
+            position += arcStep;
+            if (position > arc.end) {
+                position = arc.end;
+            }
+        }
+        return points;
     }
-    static boundsAroundPoint(point, radiusX, radiusY = NaN) {
-        if (isNaN(radiusY)) {
-            radiusY = radiusX;
+    static toPoint(coords) {
+        if ("width" in coords) {
+            return PTSpace.rectCenter(coords);
         }
         return {
-            x: point.x - radiusX,
-            y: point.y - radiusY,
-            width: radiusX * 2,
-            height: radiusY * 2,
+            x: coords.x || 0,
+            y: coords.y || 0
+        };
+    }
+    static averagePoints(points) {
+        const sumPoints = PTSpace.zeroPoint;
+        for (let point of points) {
+            sumPoints.x += point.x;
+            sumPoints.y += point.y;
+        }
+        sumPoints.x /= points.length;
+        sumPoints.y /= points.length;
+        return sumPoints;
+    }
+    ;
+    static scalePoint(point, factor) {
+        return {
+            x: point.x * factor,
+            y: point.y * factor
+        };
+    }
+    ;
+    static magnitude(point) {
+        return Math.sqrt(point.x * point.x + point.y + point.y);
+    }
+    ;
+    static lerpPoint(a, b, weight = 0.5) {
+        return {
+            x: Utils.lerp(a.x, b.x, weight),
+            y: Utils.lerp(a.y, b.y, weight)
         };
     }
     static sumPoints(point1, point2) {
@@ -625,7 +661,7 @@ class PTSpace {
 }
 PTSpace.zeroPoint = { x: 0, y: 0 };
 PTSpace.defaultArc = {
-    center: { x: 0, y: 0 },
+    center: PTSpace.zeroPoint,
     radius: 10,
     start: 0,
     end: 1,
@@ -662,8 +698,8 @@ class PenciltestScene {
         this.framerate = 24;
         this.frameHold = 2;
         this.background = 'gray';
-        this.lineColor = 'black';
-        this.lineWeight = 1;
+        this.strokeColor = 'black';
+        this.strokeWeight = 1;
         this.frames = [];
         this.current = new SceneState(sceneData.current || {});
         // Restrict assignment to existing keys in new scene.
@@ -723,6 +759,55 @@ class PenciltestScene {
         this.current.duration = this.current.exposureCount * this.current.singleFrameDuration;
         return this.current;
     }
+    resolveFrameNumber(inputIndex, loop = false) {
+        let realIndex = inputIndex;
+        if (loop) {
+            while ((realIndex < 0) || (realIndex >= this.frames.length)) {
+                realIndex = (realIndex + this.frames.length) % this.frames.length;
+            }
+        }
+        else {
+            realIndex = Math.max(0, Math.min(this.frames.length - 1, realIndex));
+        }
+        return realIndex;
+    }
+    newFrame(insertAtIndex = -1, count = 1, options = {}) {
+        const newFrames = [];
+        for (let i = 0; i < count; i++) {
+            const frame = {
+                hold: this.getFrameHold(),
+                strokes: [],
+                ...options
+            };
+            newFrames.push(frame);
+        }
+        if (insertAtIndex === -1) {
+            insertAtIndex = this.frames.length;
+        }
+        Array.prototype.splice.apply(this.frames, [insertAtIndex, 0].concat(newFrames));
+        this.updateState();
+        return newFrames;
+    }
+    getCurrentFrame(makeIfEmpty = false) {
+        if (makeIfEmpty) {
+            if (this.frames.length === 0) {
+                this.current.frameNumber = 0;
+                return this.newFrame()[0];
+            }
+        }
+        return this.frames[this.current.frameNumber || 0];
+    }
+    setCurrentFrameNumber(frameNumber, loop = true) {
+        return this.current.frameNumber = this.resolveFrameNumber(frameNumber, loop);
+    }
+    ;
+    insertFrames(frames, insertFrameNumber, jumpToOffset = -1) {
+        Array.prototype.splice.apply(this.frames, [insertFrameNumber, 0].concat(frames));
+        this.updateState();
+        this.setCurrentFrameNumber(insertFrameNumber + (jumpToOffset < 0
+            ? frames.length - jumpToOffset
+            : jumpToOffset));
+    }
     setModified(date = null) {
         if (date === null) {
             date = new Date();
@@ -754,32 +839,6 @@ class PenciltestScene {
         const newVolume = relative ? volume + this.audio.volume : volume;
         this.audio.volume = Math.max(0, Math.min(100, newVolume));
     }
-    newFrame(insertAtIndex = -1, count = 1, options = {}) {
-        const newFrames = [];
-        for (let i = 0; i < count; i++) {
-            const frame = {
-                hold: this.getFrameHold(),
-                strokes: [],
-                ...options
-            };
-            newFrames.push(frame);
-        }
-        if (insertAtIndex === -1) {
-            insertAtIndex = this.frames.length;
-        }
-        Array.prototype.splice.apply(this.frames, [insertAtIndex, 0].concat(newFrames));
-        this.updateState();
-        return newFrames;
-    }
-    getCurrentFrame(makeIfEmpty = false) {
-        if (makeIfEmpty) {
-            if (this.frames.length === 0) {
-                this.current.frameNumber = 0;
-                return this.newFrame()[0];
-            }
-        }
-        return this.frames[this.current.frameNumber || 0];
-    }
     getCurrentStroke(makeNewIfEmpty = false) {
         const frame = this.getCurrentFrame(makeNewIfEmpty);
         const isNewStroke = this.current.strokeNumber === -1;
@@ -804,10 +863,10 @@ PenciltestScene.defaultOptions = {
     frameHold: 2,
     framerate: 24,
     loop: false,
-    lineColor: 'black',
-    lineCorner: 'round',
-    lineOpacity: 1,
-    lineWeight: 1,
+    strokeColor: 'black',
+    strokeCorner: 'round',
+    strokeOpacity: 1,
+    strokeWeight: 1,
     aspectRatio: '1:1',
     height: 1024
 };
@@ -821,6 +880,10 @@ PenciltestScene.defaultAudioOptions = {
 ;
 ;
 class PenciltestMigrationBase {
+    constructor() {
+        this.fromVersion = '0.0.0';
+        this.toVersion = '0.0.0';
+    }
 }
 class PTMigration_v0_to_v0_0_4 extends PenciltestMigrationBase {
     constructor() {
@@ -865,6 +928,8 @@ class PTMigration_v0_to_v0_0_4 extends PenciltestMigrationBase {
         return this.migrateScene(film);
     }
 }
+PTMigration_v0_to_v0_0_4.fromVersion = '0.0.0';
+PTMigration_v0_to_v0_0_4.toVersion = '0.0.4';
 ;
 class PTMigration_v0_2_0_to_v0_3_0 extends PenciltestMigrationBase {
     constructor() {
@@ -920,6 +985,28 @@ class PTMigration_v0_2_0_to_v0_3_0 extends PenciltestMigrationBase {
         if ((_c = scene === null || scene === void 0 ? void 0 : scene.current) === null || _c === void 0 ? void 0 : _c.singleFrameDuration) {
             scene.current.singleFrameDuration *= 1000;
         }
+        return scene;
+    }
+}
+;
+class PTMigration_v0_3_0_to_v0_3_1 extends PenciltestMigrationBase {
+    constructor() {
+        super();
+        this.fromVersion = '0.3.0';
+        this.toVersion = '0.3.1';
+    }
+    migrateScene(scene) {
+        // BEGIN: `line-` prefix changed to `stroke-`
+        Object.assign(scene.options, {
+            strokeColor: scene.options.lineColor,
+            strokeWeight: scene.options.lineWeight,
+            strokeOpacity: scene.options.lineOpacity,
+            strokeCorner: scene.options.lineCorner,
+        });
+        delete scene.options.lineColor;
+        delete scene.options.lineWeight;
+        delete scene.options.lineOpacity;
+        delete scene.options.lineCorner;
         return scene;
     }
 }
@@ -1048,7 +1135,7 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
 class PTMigration_debug extends PenciltestMigrationBase {
     constructor() {
         super();
-        this.fromVersion = '0.3.0';
+        this.fromVersion = Penciltest.version;
         this.toVersion = Penciltest.debugVersion;
     }
     migrateScene(scene) { return scene; }
@@ -1058,7 +1145,7 @@ class PenciltestMigrator {
     constructor() {
         this.mungers = [
             new PTMunger_V0_3_0(),
-            new PTMunger_V0_3_1(),
+            //new PTMunger_V0_3_1(), // not ready yet to test this iteration of pack/unpack
         ];
         this.migrations = [
             new PTMigration_v0_to_v0_0_4(),
@@ -1386,24 +1473,13 @@ class PenciltestUIComponent {
 
 "use strict";
 class BaseRenderer {
-    getColorString(color) {
-        if (Array.isArray(color)) {
-            if (color.length > 3) {
-                return `rgba(${color.join(',')})`;
-            }
-            else {
-                return `rgb(${color.join(',')})`;
-            }
-        }
-        else {
-            return String(color);
-        }
-    }
     constructor(options) {
         this.options = {
             ...BaseRenderer.defaultOptions,
             ...options
         };
+        this.renderOperationQueue = [];
+        this.renderWaitId = NaN;
         if (typeof this.options.container === 'string') {
             this.container = document.querySelector(this.options.container);
         }
@@ -1412,70 +1488,151 @@ class BaseRenderer {
         }
         this.overrides = {};
         this.composeOptions();
-        //this.resize(this.options.width, this.options.height);
+        //this.resize(this.options.width, this.options.height); // Let descendants do this. It might not be ready yet.
+    }
+    setOptions(options) {
+        console.log('   setOptions'); // XXX
+        Object.assign(this.options, options);
+    }
+    getColorString(color, opacity = -1) {
+        if (!color) {
+            return '';
+        }
+        let rgb;
+        let opacityValue = '';
+        if (opacity !== -1) {
+            opacityValue = String(opacity);
+        }
+        if (Array.isArray(color)) {
+            rgb = color.slice(0, 3).join(' ');
+            if (opacityValue.length === 0 && color.length === 4) {
+                opacityValue = String(color[3]);
+            }
+        }
+        else if (opacityValue) {
+            rgb = `from ${rgb} r g b`;
+        }
+        else {
+            return String(color);
+        }
+        return `rgb(${rgb}${opacityValue ? ' / ' + opacityValue : ''})`;
     }
     resize(width, height) {
+        console.log('  resize'); // XXX
         this.width = width;
         this.height = height;
     }
-    composeOptions(overrides = {}, persist = null) {
+    composeOptions(options = {}, persist = null) {
         const composedOptions = {
             ...this.options
         };
         if (persist === true) {
-            Object.assign(this.overrides, overrides);
+            Object.assign(this.overrides, options);
         }
         if (persist !== false) {
             Object.assign(composedOptions, this.overrides);
         }
         if (persist !== true) {
-            Object.assign(composedOptions, overrides);
+            Object.assign(composedOptions, options);
         }
-        this.currentLineOptions = {
-            lineColor: composedOptions.lineColor,
-            lineWeight: composedOptions.lineWeight,
-            lineCorner: composedOptions.lineCorner,
-            lineOpacity: composedOptions.lineOpacity
-        };
+        return composedOptions;
     }
-    path(stroke) {
-        // TODO apply stroke options
-        stroke.path.forEach((segment, index) => {
+    subpath(path) {
+        console.log(' subpath'); // XXX
+        path.forEach((segment, index) => {
+            const { x, y } = segment;
             if (index === 0) {
-                this.moveTo(segment.x, segment.y);
+                this.moveTo(x, y);
             }
             else {
-                this.lineTo(segment.x, segment.y);
+                this.lineTo(x, y);
             }
         });
-        return this.render();
     }
-    moveTo(x, y) { }
+    moveTo(x, y) {
+        console.log('moveTo: %s, %s', x, y); // XXX
+    }
     moveToPoint(point) {
         this.moveTo(point.x, point.y);
     }
-    lineTo(x, y) { }
+    lineTo(x, y) {
+        console.log('lineTo: %s, %s', x, y); // XXX
+    }
     lineToPoint(point) {
         this.lineTo(point.x, point.y);
     }
-    rect(x, y, width, height, backgroundColor, strokeColor = '') { }
-    rectBounds(bounds, backgroundColor, strokeColor = '') {
-        this.rect(bounds.x, bounds.y, bounds.width, bounds.height, backgroundColor, strokeColor);
+    rect(rect, options) {
+        console.log('rect'); // XXX
     }
-    render() { }
-    clear() { }
-    destroy() { }
-    arc(config) {
+    requestRender(...enqueueWork) {
+        console.log('   render: REQ'); // XXX
+        if (enqueueWork.length > 0) {
+            Array.prototype.push.apply(this.renderOperationQueue, enqueueWork);
+        }
+        if (!isNaN(this.renderWaitId)) {
+            return;
+        } // Already pending request.
+        this.renderWaitId = globalThis.requestAnimationFrame((timestamp) => {
+            this.renderWaitId = NaN;
+            this.render();
+        });
     }
-    circle(center, radius) {
+    render() {
+        console.log('   render:     BEGIN'); // XXX
+        const queueLength = this.renderOperationQueue.length;
+        if (queueLength === 0) {
+            return;
+        }
+        const renderStart = performance.now();
+        this.renderOperationQueue.forEach((o) => o());
+        const renderElapsed = performance.now() - renderStart;
+        console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`);
+        this.renderOperationQueue = [];
+    }
+    getFieldRect() {
+        console.log('  getFieldRect'); // XXX
+        return { x: 0, y: 0, width: this.width, height: this.height };
+    }
+    beginPath() {
+        console.log('beginPath'); // XXX
+    }
+    endPath() {
+        console.log('endPath'); // XXX
+    }
+    clear(redrawBackground = true) {
+        console.log(` clear${redrawBackground ? ' BACK' : ''}`); // XXX
+        if (redrawBackground) {
+            const fieldRect = this.getFieldRect();
+            this.rect(fieldRect, { fillColor: this.options.backgroundColor });
+        }
+    }
+    destroy() {
+        console.log('   destroy'); // XXX
+    }
+    arc(arc, options) {
+        console.log(' arc'); // XXX
+        const arcPoints = PTSpace.traceArc(arc);
+        this.moveToPoint(arcPoints[0]);
+        arcPoints
+            .forEach((point, i) => {
+            this.lineToPoint(point);
+        });
+    }
+    circle(arc, options) {
+        console.log(' circle'); // XXX
+        this.arc(arc, options);
+        // Maybe other contexts will have diferent logic. For now, the default
+        // "arc" without arguments is a circle, so `arc` and `circle` are the same
+        // for now..
     }
 }
 BaseRenderer.defaultOptions = {
     container: 'body',
-    lineColor: 'black',
-    lineWeight: 1,
-    lineOpacity: 1,
-    lineCorner: 'round',
+    strokeColor: 'black',
+    backgroundColor: 'lightgray',
+    strokeWeight: 1,
+    strokeOpacity: 1,
+    strokeCorner: 'round',
     width: 1920,
     height: 1080
 };
@@ -1489,52 +1646,62 @@ class CanvasRenderer extends BaseRenderer {
         this.context = this.field.getContext('2d', { alpha: false });
         this.resize(this.options.width, this.options.height);
         this.container.appendChild(this.field);
-        this.applyStrokeStyle();
+        this.applyStyle(); // Was skipped over in super's composeOptions, because this.context can't be set before super() is called.
+    }
+    beginPath() {
+        super.beginPath();
+        this.context.beginPath();
+    }
+    endPath() {
+        this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+        super.endPath();
+        this.context.stroke();
+    }
+    moveTo(x, y) {
+        super.moveTo(x, y);
+        this.context.moveTo(x, y);
     }
     lineTo(x, y) {
         super.lineTo(x, y);
         return this.context.lineTo(x, y);
     }
-    rect(x, y, width, height, backgroundColor, strokeColor = '') {
-        super.rect(x, y, width, height, backgroundColor, strokeColor);
-        this.context.beginPath();
-        this.context.rect(x, y, width, height);
-        if (backgroundColor) {
-            this.context.fillStyle = backgroundColor;
-            this.context.fill();
+    rect(rect, options) {
+        const { x, y, width, height } = rect;
+        //this.beginPath();
+        this.composeOptions(options);
+        if (options.fillColor && !options.strokeColor) {
+            this.context.fillStyle = this.currentLineOptions.fillStyle;
+            this.context.fillRect(x, y, width, height);
         }
-        if (strokeColor) {
-            this.context.strokeStyle = strokeColor;
+        else {
+            this.context.rect(x, y, width, height);
+        }
+        if (options.strokeColor) {
+            this.context.strokeStyle = this.currentLineOptions.strokeStyle;
             this.context.stroke();
         }
-        return this.applyStrokeStyle();
+        super.rect(rect, options);
     }
-    applyStrokeStyle() {
+    applyStyle() {
         if (this.context) {
-            this.context.fillStyle = null;
-            this.context.lineWidth = this.currentLineOptions.lineWeight;
-            this.context.lineJoin = this.currentLineOptions.lineCorner;
-            this.context.strokeStyle = super.getColorString(this.currentLineOptions.lineColor);
+            Object.assign(this.context, this.currentLineOptions);
         }
     }
     composeOptions(overrides = {}, persist = null) {
-        super.composeOptions(overrides);
-        this.applyStrokeStyle();
+        const composedOptions = super.composeOptions(overrides);
+        this.currentLineOptions = {
+            fillStyle: this.getColorString(composedOptions.fillColor, composedOptions.fillOpacity),
+            strokeStyle: this.getColorString(composedOptions.strokeColor, composedOptions.strokeOpacity),
+            lineJoin: composedOptions.strokeCorner,
+            lineWidth: composedOptions.strokeWeight,
+        };
+        this.applyStyle();
+        return composedOptions;
     }
-    moveTo(x, y) {
-        super.moveTo(x, y);
-        this.context.moveTo(x, y);
-        this.context.beginPath();
-    }
-    render() {
-        super.render();
-        if (this.context) {
-            this.context.stroke();
-        }
-    }
-    clear() {
-        this.context.clearRect(0, 0, this.width, this.height);
-        return super.clear();
+    clear(redrawBackground = true) {
+        const { x, y, width, height } = this.getFieldRect();
+        this.context.clearRect(x, y, width, height);
+        return super.clear(redrawBackground);
     }
     destroy() {
         this.field.remove();
@@ -1571,14 +1738,14 @@ class SVGRenderer extends BaseRenderer {
         if (this.drawingPath) {
             path = this.field.path(this.drawingPath);
             Object.assign(path.style, {
-                stroke: this.getColorString(this.currentLineOptions.lineColor)
+                stroke: this.getColorString(this.options.strokeColor)
             });
         }
         return super.render();
     }
-    clear() {
+    clear(redrawBackground = true) {
         this.field.clear();
-        return super.clear();
+        return super.clear(redrawBackground);
     }
     destroy() {
         this.field.remove();
@@ -1630,7 +1797,7 @@ class PenciltestUI extends PenciltestUIComponent {
                     'framerate',
                     'frameHold',
                     'background',
-                    'lineColor',
+                    'strokeColor',
                     'resizeScene',
                     'panScene',
                 ],
@@ -1691,8 +1858,9 @@ class PenciltestUI extends PenciltestUIComponent {
                         }
                         const sceneDimensions = this.scene.getDimensions();
                         const rendererOptions = {
-                            lineColor: this.scene.lineColor,
-                            lineWeight: this.scene.lineWeight,
+                            strokeColor: this.scene.strokeColor,
+                            strokeWeight: this.scene.strokeWeight,
+                            strokeOpacity: this.scene.strokeOpacity,
                             container: this.fieldElement,
                             width: this.forceDimensions ? this.forceDimensions.width : sceneDimensions.width,
                             height: this.forceDimensions ? this.forceDimensions.height : sceneDimensions.height
@@ -1870,16 +2038,11 @@ class PenciltestUI extends PenciltestUIComponent {
                 hotkey: ['Alt+Shift+I'],
                 async listener() {
                     const newIndex = this.scene.current.frameNumber + 1;
-                    let seconds;
-                    try {
-                        seconds = Number(await Utils.prompt('# of seconds to insert: ', 1));
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
+                    const secondsInput = await Utils.prompt('# of seconds to insert: ', 1);
+                    if (typeof secondsInput !== 'string') {
                         return;
                     }
+                    const seconds = Number(secondsInput);
                     const insertFrameCount = Math.floor(this.scene.framerate / (this.scene.getFrameHold() * seconds));
                     this.scene.newFrame(newIndex, insertFrameCount);
                     this.goToFrame(newIndex);
@@ -1908,12 +2071,12 @@ class PenciltestUI extends PenciltestUIComponent {
                     this.ui.showFeedback({ text: `redo` });
                 }
             },
-            lineColor: {
+            strokeColor: {
                 label: "Line Color",
                 async listener() {
-                    let lineColor;
+                    let strokeColor;
                     try {
-                        lineColor = await Utils.prompt('line color: ', this.scene.lineColor, { 'input': 'color' });
+                        strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, { 'input': 'color' });
                     }
                     catch (reason) {
                         if (reason !== Utils.promptCanceled) {
@@ -1921,16 +2084,16 @@ class PenciltestUI extends PenciltestUIComponent {
                         }
                         return;
                     }
-                    if (lineColor) {
-                        this.setOptions({ lineColor: lineColor });
+                    if (strokeColor) {
+                        this.setOptions({ strokeColor: strokeColor });
                     }
                 },
                 action() {
                     if (this.scene) {
-                        this.scene.lineColor = this.options.lineColor;
+                        this.scene.strokeColor = this.options.strokeColor;
                     }
                     if (this.renderer) {
-                        this.renderer.options.lineColor = this.options.lineColor;
+                        this.renderer.options.strokeColor = this.options.strokeColor;
                         this.drawCurrentFrame();
                     }
                 }
@@ -2119,7 +2282,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 async listener() {
                     const startMode = this.state.mode;
                     if (startMode === PenciltestMode.WORKING) {
-                        console.log(`Penciltest is: ${startMode}`);
+                        console.info(`Penciltest is: ${startMode}`);
                         return;
                     }
                     let amount;
@@ -2439,8 +2602,8 @@ class PenciltestUI extends PenciltestUIComponent {
                 async listener() {
                     const [frames] = this.getSelectedFrames();
                     const selectionBounds = this.getFrameBounds(frames);
-                    const fieldCenter = PTSpace.boundsCenter(this.scene.getDimensions());
-                    const contentCenter = PTSpace.boundsCenter(selectionBounds);
+                    const fieldCenter = PTSpace.rectCenter(this.scene.getDimensions());
+                    const contentCenter = PTSpace.rectCenter(selectionBounds);
                     const deltaPoint = PTSpace.diffPoints(fieldCenter, contentCenter);
                     this.pan(deltaPoint, frames);
                     this.drawCurrentFrame();
@@ -2516,9 +2679,15 @@ class PenciltestUI extends PenciltestUIComponent {
                         loadAs: 'uri',
                         submitOnChange: true
                     };
-                    const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
-                    if (uri) {
-                        this.loadAudio(uri, filePath);
+                    try {
+                        const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
+                        if (uri) {
+                            this.loadAudio(uri, filePath);
+                        }
+                    }
+                    catch (e) {
+                        console.error(e);
+                        this.ui.showFeedback({ text: `Audio file error: ${e.message}` });
                     }
                 }
             },
@@ -2538,14 +2707,9 @@ class PenciltestUI extends PenciltestUIComponent {
                             max: 100
                         }
                     };
-                    try {
-                        this.scene.audio.volume = Number(await Utils.prompt(`Audio volume`, promptOptions));
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                            return;
-                        }
+                    const inputVolume = await Utils.prompt(`Audio volume`, promptOptions);
+                    if (inputVolume !== null) {
+                        this.scene.audio.volume = Number(inputVolume);
                     }
                 },
                 action() {
@@ -3269,34 +3433,6 @@ class PenciltestUI extends PenciltestUIComponent {
                     parent: 'appStatus'
                 },
                 {
-                    key: "statusFrameRate",
-                    tagName: 'span',
-                    children: [
-                        {
-                            key: 'statusFramerateLabel',
-                            tagName: 'small',
-                            text: 'FPS:'
-                        },
-                        {
-                            key: 'statusFramerate',
-                            tagName: 'span',
-                            text: `${((_b = this.controller.scene) === null || _b === void 0 ? void 0 : _b.framerate) || '…'}`
-                        },
-                        {
-                            key: 'statusFrameHold',
-                            tagName: 'span',
-                            text: `/${this.controller.scene.getFrameHold()}`,
-                            attr: {
-                                title: lc('exposureHoldTitle')
-                            }
-                        }
-                    ],
-                    attr: {
-                        title: lc('statusFrameRate'),
-                    },
-                    parent: 'sceneStatus'
-                },
-                {
                     key: "statusFrames",
                     tagName: 'span',
                     children: [
@@ -3308,7 +3444,7 @@ class PenciltestUI extends PenciltestUIComponent {
                         {
                             key: 'statusFrameNumber',
                             tagName: 'span',
-                            text: String((((_c = this.controller.scene.current) === null || _c === void 0 ? void 0 : _c.frameNumber) || 0) + 1),
+                            text: String((((_b = this.controller.scene.current) === null || _b === void 0 ? void 0 : _b.frameNumber) || 0) + 1),
                             attr: {
                                 title: lc('currentFrameNumber')
                             }
@@ -3316,7 +3452,7 @@ class PenciltestUI extends PenciltestUIComponent {
                         {
                             key: 'statusFrameTotal',
                             tagName: 'span',
-                            text: `/${((_d = this.controller.scene.frames) === null || _d === void 0 ? void 0 : _d.length) || 1}`,
+                            text: `/${((_c = this.controller.scene.frames) === null || _c === void 0 ? void 0 : _c.length) || 1}`,
                             attr: {
                                 title: lc('sceneFrameCount')
                             }
@@ -3331,12 +3467,12 @@ class PenciltestUI extends PenciltestUIComponent {
                         {
                             key: 'statusTimeLabel',
                             tagName: 'small',
-                            text: 'frame:'
+                            text: 'time:'
                         },
                         {
                             key: 'statusCurrentTime',
                             tagName: 'span',
-                            text: Utils.toTimecode(((_e = this.controller.scene.current.frames[this.controller.scene.current.frameNumber]) === null || _e === void 0 ? void 0 : _e.time) || 0, 3),
+                            text: Utils.toTimecode(((_d = this.controller.scene.current.frames[this.controller.scene.current.frameNumber]) === null || _d === void 0 ? void 0 : _d.time) || 0, 3),
                             attr: {
                                 title: lc('currentFrameTime')
                             }
@@ -3350,6 +3486,34 @@ class PenciltestUI extends PenciltestUIComponent {
                             }
                         }
                     ],
+                    parent: 'sceneStatus'
+                },
+                {
+                    key: "statusFrameRate",
+                    tagName: 'span',
+                    children: [
+                        {
+                            key: 'statusFramerateLabel',
+                            tagName: 'small',
+                            text: 'FPS:'
+                        },
+                        {
+                            key: 'statusFramerate',
+                            tagName: 'span',
+                            text: `${((_e = this.controller.scene) === null || _e === void 0 ? void 0 : _e.framerate) || '…'}`
+                        },
+                        {
+                            key: 'statusFrameHold',
+                            tagName: 'span',
+                            text: `/${this.controller.scene.getFrameHold()}`,
+                            attr: {
+                                title: lc('exposureHoldTitle')
+                            }
+                        }
+                    ],
+                    attr: {
+                        title: lc('statusFrameRate'),
+                    },
                     parent: 'sceneStatus'
                 },
                 {
@@ -3428,7 +3592,6 @@ class PenciltestUI extends PenciltestUIComponent {
             if (length) {
                 duration += 8000 * Utils.normalize(length, 100);
             }
-            console.log({ duration, length }); // XXX
         }
         const feedbackComponent = PenciltestUIComponent.restore({
             ...config,
@@ -4054,10 +4217,10 @@ class PenciltestRenderExporter {
             ? this.controller.state.frameSelection
             : { start: 0, end: this.controller.scene.frames.length - 1 };
         const gifSize = Math.min(512, this.controller.scene.height);
-        const lineWeight = 1;
+        const strokeWeight = 1;
         let gifConfigurationString;
         try {
-            gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${lineWeight}`);
+            gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
         }
         catch (reason) {
             if (reason !== Utils.promptCanceled) {
@@ -4084,7 +4247,7 @@ class PenciltestRenderExporter {
         //this.controller.ui.appActions.renderer.action();
         this.controller.resize();
         //this.controller.ui.appActions.renderer.action();
-        const gifRenderOverrides = { lineWeight: gifLineWeight };
+        const gifRenderOverrides = { strokeWeight: gifLineWeight };
         const baseFrameDelay = 1000 / this.controller.scene.framerate;
         // prepare encoder
         const gifEncoder = GIFEncoder();
@@ -4131,28 +4294,29 @@ class Penciltest {
         this.buildContainer();
         this.ui = new PenciltestUI(this, { parentElement: this.container });
         this.newScene();
-        this.setOptions(this.options); // do all the option actions
-        //if (this.state.version !== Penciltest.version) {
-        //  console.info(`Resetting options and state, %%from a to b%%`, {a:`version ${this.state.version}`, b:Penciltest.version});
-        //  this.resetOptionsAndState();
-        //}
-        this.resize();
+        this.setOptions(this.options)
+            .then(() => {
+            this.resize();
+            this.drawCurrentFrame();
+        });
     }
     ;
-    setOptions(newOptions) {
+    async setOptions(newOptions) {
         Object.assign(this.options, newOptions);
         if (newOptions.debug && Penciltest.debugVersion && Penciltest.debugVersion !== Penciltest.version) {
             this.state.version = Penciltest.debugVersion;
         }
+        const reactions = [];
         for (let key in newOptions) {
             if (key in this.ui.appActions && typeof this.ui.appActions[key].action === 'function') {
-                this.ui.handleAppReaction(key);
+                reactions.push(this.ui.handleAppReaction(key));
             }
         }
+        await Promise.all(reactions);
     }
-    resetOptionsAndState() {
+    async resetOptionsAndState() {
         this.state = { ...Penciltest.defaultState };
-        this.setOptions(Penciltest.defaultOptions);
+        await this.setOptions(Penciltest.defaultOptions);
         this.scene.current.strokeNumber = -1;
         if (this.scene) {
             this.scene.updateState();
@@ -4221,20 +4385,30 @@ class Penciltest {
         return frameBounds;
     }
     mark(mark) {
-        const isNewStroke = this.scene.current.strokeNumber < 0;
+        var _a, _b;
         const stroke = this.scene.getCurrentStroke(true);
+        const isNewStroke = stroke.path.length === 0;
         if (isNewStroke) {
-            this.renderer.moveTo(mark.x, mark.y);
-        }
-        else {
-            this.renderer.lineTo(mark.x, mark.y);
+            delete this.previousMark;
         }
         stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
+        if (this.options.debug) {
+            console.log(`  mark ${((_a = this.previousMark) === null || _a === void 0 ? void 0 : _a.x) || '_'},${((_b = this.previousMark) === null || _b === void 0 ? void 0 : _b.y) || '_'}-->${mark.x},${mark.y}`);
+        }
         if (this.state.mode === PenciltestMode.DRAWING) {
-            this.renderer.render();
+            if (this.previousMark && this.previousMark !== mark) {
+                const previousMark = Utils.clone(this.previousMark); // to enable deferred rendering
+                this.renderer.requestRender(() => {
+                    this.renderer.beginPath();
+                    this.renderer.moveToPoint(previousMark);
+                    this.renderer.lineToPoint(mark);
+                    this.renderer.endPath();
+                });
+            }
         }
         this.clearRedo();
         this.hasUnsavedChanges = true;
+        this.previousMark = mark;
     }
     track(trackMark) {
         var _a;
@@ -4264,9 +4438,13 @@ class Penciltest {
                     }
                 }
             }
-            this.drawCurrentFrame();
-            const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
-            this.renderer.rectBounds(toolBounds, null, 'red');
+            //const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
+            this.renderer.requestRender(() => {
+                //console.log('  track(currentFrame + eraser bounds)');
+                this.drawCurrentFrame();
+                //this.renderer.rect(toolBounds, '', {strokeColor: 'red', strokeOpacity: 0.5});
+                this.renderer.circle({ center: trackMark, radius: eraserRadius }, { strokeColor: 'red', strokeOpacity: 0.5 });
+            });
         }
     }
     findIntersectingStrokes(strokes, scenePoint, radius, findAll = true) {
@@ -4282,24 +4460,13 @@ class Penciltest {
                 }
             }
         }
-        console.log(matches.join(',')); // XXX
         return matches;
     }
     resolveFrameNumber(inputIndex) {
-        let realIndex = inputIndex;
-        if (this.options.loop) {
-            while ((realIndex < 0) || (realIndex >= this.scene.frames.length)) {
-                realIndex = (realIndex + this.scene.frames.length) % this.scene.frames.length;
-            }
-        }
-        else {
-            realIndex = Math.max(0, Math.min(this.scene.frames.length - 1, realIndex));
-        }
-        return realIndex;
+        return this.scene.resolveFrameNumber(inputIndex, this.options.loop);
     }
     goToFrame(targetFrameNumber, overrides = {}) {
-        const selectedFrameNumber = this.resolveFrameNumber(targetFrameNumber);
-        this.scene.current.frameNumber = selectedFrameNumber;
+        const selectedFrameNumber = this.scene.setCurrentFrameNumber(targetFrameNumber, this.options.loop);
         if (this.state.mode !== PenciltestMode.PLAYING) {
             this.lift();
             this.seekAudioToFrame(selectedFrameNumber);
@@ -4387,45 +4554,57 @@ class Penciltest {
     }
     drawCurrentFrame(overrides = {}) {
         // NOTE: This draws the background, while drawFrame() does not.
+        // NOTE: This also calls drawFrame.
         if (!this.renderer || !this.scene.frames.length) {
             return;
         }
-        this.renderer.clear();
-        if (this.scene.background) {
-            this.renderer.rect(0, 0, this.width, this.height, this.scene.background);
-        }
-        if (this.options.onionSkin) {
-            for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
-                const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
-                const lineOpacity = Math.pow(this.options.onionSkinOpacity, i);
-                if (previousFrameNumber !== this.scene.current.frameNumber) {
-                    this.drawFrame(previousFrameNumber, Object.assign({}, overrides, {
-                        lineColor: [255, 0, 0, lineOpacity]
-                    }));
-                }
-                const nextFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber + i);
-                if (nextFrameNumber !== this.scene.current.frameNumber) {
-                    this.drawFrame(nextFrameNumber, Object.assign({}, overrides, {
-                        lineColor: [0, 255, 255, lineOpacity]
-                    }));
+        console.log('    drawCurrentFrame: REQ');
+        this.renderer.requestRender((timestamp) => {
+            console.log('    drawCurrentFrame:     HAP');
+            this.renderer.clear(true);
+            if (this.options.onionSkin) {
+                for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
+                    const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
+                    const strokeOpacity = Math.pow(this.options.onionSkinOpacity, i);
+                    if (previousFrameNumber !== this.scene.current.frameNumber) {
+                        this.drawFrame(previousFrameNumber, {
+                            ...overrides,
+                            strokeColor: [255, 0, 0, strokeOpacity]
+                        });
+                    }
+                    const nextFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber + i);
+                    if (nextFrameNumber !== this.scene.current.frameNumber) {
+                        this.drawFrame(nextFrameNumber, {
+                            ...overrides,
+                            strokeColor: [0, 255, 255, strokeOpacity]
+                        });
+                    }
                 }
             }
-        }
-        this.renderer.composeOptions();
-        this.drawFrame(this.scene.current.frameNumber, overrides);
+            this.renderer.composeOptions();
+            this.drawFrame(this.scene.current.frameNumber, overrides);
+            console.log('    drawCurrentFrame:         END');
+        });
     }
     drawFrame(frameNumber, overrides) {
         var _a;
         if (!this.width || !this.height) {
             return;
         }
+        console.log('   drawFrame: BEGIN'); // XXX
         if (overrides) {
             this.renderer.composeOptions(overrides);
         }
         const frame = this.scene.frames[frameNumber];
         if (((_a = frame === null || frame === void 0 ? void 0 : frame.strokes) === null || _a === void 0 ? void 0 : _a.length) > 0) {
-            frame.strokes.map((stroke) => this.renderer.path(this.scaleStroke(stroke, this.zoomFactor)));
+            this.renderer.beginPath();
+            frame.strokes.forEach((stroke) => {
+                const scaledStroke = this.scaleStroke(stroke, this.zoomFactor);
+                this.renderer.subpath(scaledStroke.path);
+            });
+            this.renderer.endPath();
         }
+        console.log('   drawFrame:       END'); // XXX
         return frame;
     }
     scaleStroke(stroke, factor) {
@@ -4507,15 +4686,10 @@ class Penciltest {
     }
     pasteFrames() {
         if (this.copyBuffer) {
-            const newFrameNumber = this.scene.current.frameNumber + 1;
-            this.insertFrames(Utils.clone(this.copyBuffer), newFrameNumber);
-            this.goToFrame(newFrameNumber);
+            const insertFrameNumber = this.scene.current.frameNumber + 1;
+            this.scene.insertFrames(Utils.clone(this.copyBuffer), insertFrameNumber);
+            this.ui.updateStatusBar();
         }
-    }
-    insertFrames(frames, position) {
-        Array.prototype.splice.apply(this.scene.frames, [position, 0].concat(frames));
-        this.scene.updateState();
-        this.ui.updateStatusBar();
     }
     splitFrame(frameNumber, splitOffset) {
         var _a;
@@ -4524,7 +4698,8 @@ class Penciltest {
         frame.hold = splitOffset;
         const newFrame = Utils.clone(frame);
         newFrame.hold = oldHold - splitOffset;
-        this.insertFrames([newFrame], frameNumber + 1);
+        this.scene.insertFrames([newFrame], frameNumber + 1);
+        this.ui.updateStatusBar();
     }
     pasteStrokes() {
         var _a;
@@ -4572,7 +4747,7 @@ class Penciltest {
             this.lift();
             frame.strokes = [];
             this.scene.current.frameNumber = index;
-            this.renderer.clear();
+            this.renderer.clear(true);
             const result = [];
             for (let stroke of oldStrokes) {
                 for (let segment of stroke.path) {
@@ -4737,11 +4912,14 @@ class Penciltest {
             if (this.scene.background) {
                 this.renderer.options.background = this.scene.background;
             }
-            if (this.scene.lineColor) {
-                this.renderer.options.lineColor = this.scene.lineColor;
+            if (this.scene.strokeColor) {
+                this.renderer.options.strokeColor = this.scene.strokeColor;
             }
-            if (this.scene.lineWeight) {
-                this.renderer.options.lineWeight = this.scene.lineWeight;
+            if (this.scene.strokeOpacity) {
+                this.renderer.options.strokeOpacity = this.scene.strokeOpacity;
+            }
+            if (this.scene.strokeWeight) {
+                this.renderer.options.strokeWeight = this.scene.strokeWeight;
             }
         }
         this.scene.updateState();
@@ -4785,7 +4963,7 @@ class Penciltest {
             this.pauseAudio();
         }
         this.audioElement.addEventListener('error', (e) => {
-            console.log('audio file error', e);
+            console.error('audio file error', e);
             const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
             return self.ui.triggerAppAction('linkAudio', [e, message]);
         });
@@ -4880,7 +5058,7 @@ class Penciltest {
         this.fieldContainer.style.height = `${this.height}px`;
         this.renderer.resize(this.width, this.height);
         this.zoomFactor = this.height / sceneDimensions.height;
-        this.renderer.options.lineWeight = this.zoomFactor * this.scene.lineWeight;
+        this.renderer.options.strokeWeight = this.zoomFactor * this.scene.strokeWeight;
         return this.drawCurrentFrame();
     }
     queueWork(work, afterAll = false) {
@@ -4913,7 +5091,8 @@ Penciltest.debugVersion = '0.3.1';
 Penciltest.instrumentIdentifier = 'io.lovejoy.penciltest';
 Penciltest.defaultOptions = {
     background: 'gray',
-    lineColor: 'black',
+    strokeColor: 'black',
+    strokeOpacity: -1,
     container: 'body',
     hideCursor: false,
     onionSkin: true,

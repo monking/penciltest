@@ -1,73 +1,87 @@
 class CanvasRenderer extends BaseRenderer {
-  field: HTMLElement;
+  field: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
+  currentLineOptions: {
+      fillStyle:string;
+      strokeStyle:string;
+      lineJoin:string;
+      lineWidth:number;
+    };
   //container: HTMLElement;
 
   constructor(options: PenciltestRendererOptions) {
     super(options);
 
-    this.field = document.createElement('canvas');
-    this.context = (this.field as HTMLCanvasElement).getContext('2d',
-      {alpha: false});
+    this.field = document.createElement('canvas') as HTMLCanvasElement;
+    this.context = this.field.getContext('2d', {alpha: false});
 
     this.resize(this.options.width, this.options.height);
 
     this.container.appendChild(this.field);
 
-    this.applyStrokeStyle();
+    this.applyStyle(); // Was skipped over in super's composeOptions, because this.context can't be set before super() is called.
+  }
+
+  beginPath():void {
+    super.beginPath();
+    this.context.beginPath();
+  }
+
+  endPath():void {
+    this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+    super.endPath();
+    this.context.stroke();
+  }
+
+  moveTo(x: number, y: number):void {
+    super.moveTo(x, y);
+    this.context.moveTo(x, y);
   }
 
   lineTo(x: number, y: number) {
     super.lineTo(x, y);
     return this.context.lineTo(x, y);
   }
-
-  rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string = '') {
-    super.rect(x, y, width, height, backgroundColor, strokeColor);
-    this.context.beginPath();
-    this.context.rect(x, y, width, height);
-    if (backgroundColor) {
-      this.context.fillStyle = backgroundColor;
-      this.context.fill();
+  
+  rect(rect:Rect, options: PenciltestLineOptions):void {
+    const { x, y, width, height } = rect;
+    //this.beginPath();
+    this.composeOptions(options);
+    if (options.fillColor && !options.strokeColor) {
+      this.context.fillStyle = this.currentLineOptions.fillStyle;
+      this.context.fillRect(x, y, width, height);
+    } else {
+      this.context.rect(x, y, width, height);
     }
-    if (strokeColor) {
-      this.context.strokeStyle = strokeColor;
+    if (options.strokeColor) {
+      this.context.strokeStyle = this.currentLineOptions.strokeStyle;
       this.context.stroke();
     }
-
-    return this.applyStrokeStyle();
+    super.rect(rect, options);
   }
 
-  applyStrokeStyle() {
+  applyStyle() {
     if (this.context) {
-      this.context.fillStyle = null;
-      this.context.lineWidth = this.currentLineOptions.lineWeight;
-      this.context.lineJoin = this.currentLineOptions.lineCorner;
-      this.context.strokeStyle = super.getColorString(this.currentLineOptions.lineColor);
+      Object.assign(this.context, this.currentLineOptions);
     }
   }
 
-  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null): void {
-    super.composeOptions(overrides);
-    this.applyStrokeStyle();
+  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null):PenciltestLineOptions {
+    const composedOptions = super.composeOptions(overrides);
+    this.currentLineOptions = {
+      fillStyle: this.getColorString(composedOptions.fillColor, composedOptions.fillOpacity),
+      strokeStyle: this.getColorString(composedOptions.strokeColor, composedOptions.strokeOpacity),
+      lineJoin: composedOptions.strokeCorner,
+      lineWidth: composedOptions.strokeWeight,
+    };
+    this.applyStyle();
+    return composedOptions;
   }
 
-  moveTo(x: number, y: number):void {
-    super.moveTo(x, y);
-    this.context.moveTo(x, y);
-    this.context.beginPath();
-  }
-
-  render():void {
-    super.render();
-    if (this.context) {
-      this.context.stroke();
-    }
-  }
-
-  clear() {
-    this.context.clearRect(0, 0, this.width, this.height);
-    return super.clear();
+  clear(redrawBackground:boolean = true) {
+    const { x, y, width, height } = this.getFieldRect();
+    this.context.clearRect(x, y, width, height);
+    return super.clear(redrawBackground);
   }
 
   destroy() {

@@ -60,7 +60,7 @@ class PenciltestUI extends PenciltestUIComponent {
           'framerate',
           'frameHold',
           'background',
-          'lineColor',
+          'strokeColor',
           'resizeScene',
           'panScene',
           ],
@@ -127,8 +127,9 @@ class PenciltestUI extends PenciltestUIComponent {
             }
             const sceneDimensions = this.scene.getDimensions();
             const rendererOptions: PenciltestRendererOptions = {
-              lineColor: this.scene.lineColor,
-              lineWeight: this.scene.lineWeight,
+              strokeColor: this.scene.strokeColor,
+              strokeWeight: this.scene.strokeWeight,
+              strokeOpacity: this.scene.strokeOpacity,
               container: this.fieldElement,
               width: this.forceDimensions ? this.forceDimensions.width as number : sceneDimensions.width,
               height: this.forceDimensions ? this.forceDimensions.height as number : sceneDimensions.height
@@ -319,15 +320,9 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Alt+Shift+I'],
         async listener(this: Penciltest) {
           const newIndex = this.scene.current.frameNumber + 1;
-          let seconds;
-          try {
-            seconds = Number(await Utils.prompt('# of seconds to insert: ', 1));
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const secondsInput = await Utils.prompt('# of seconds to insert: ', 1);
+          if (typeof secondsInput !== 'string') { return; }
+          const seconds = Number(secondsInput);
           const insertFrameCount = Math.floor(this.scene.framerate / (this.scene.getFrameHold() * seconds));
           this.scene.newFrame(newIndex, insertFrameCount);
           this.goToFrame(newIndex);
@@ -359,28 +354,28 @@ class PenciltestUI extends PenciltestUIComponent {
         }
       },
 
-      lineColor: {
+      strokeColor: {
         label: "Line Color",
         async listener(this: Penciltest) {
-          let lineColor;
+          let strokeColor;
           try {
-            lineColor = await Utils.prompt('line color: ', this.scene.lineColor, {'input':'color'});
+            strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, {'input':'color'});
           } catch(reason) {
             if (reason !== Utils.promptCanceled) {
               console.error(reason);
             }
             return;
           }
-          if (lineColor) {
-            this.setOptions({lineColor: lineColor});
+          if (strokeColor) {
+            this.setOptions({strokeColor: strokeColor});
           }
         },
         action(this: Penciltest) {
           if (this.scene) {
-            this.scene.lineColor = this.options.lineColor;
+            this.scene.strokeColor = this.options.strokeColor;
           }
           if (this.renderer) {
-            this.renderer.options.lineColor = this.options.lineColor;
+            this.renderer.options.strokeColor = this.options.strokeColor;
             this.drawCurrentFrame();
           }
         }
@@ -576,7 +571,7 @@ class PenciltestUI extends PenciltestUIComponent {
         async listener(this: Penciltest) {
           const startMode = this.state.mode;
           if (startMode === PenciltestMode.WORKING) {
-            console.log(`Penciltest is: ${startMode}`);
+            console.info(`Penciltest is: ${startMode}`);
             return;
           }
           let amount;
@@ -915,8 +910,8 @@ class PenciltestUI extends PenciltestUIComponent {
 
           const selectionBounds = this.getFrameBounds(frames);
 
-          const fieldCenter = PTSpace.boundsCenter(this.scene.getDimensions());
-          const contentCenter = PTSpace.boundsCenter(selectionBounds);
+          const fieldCenter = PTSpace.rectCenter(this.scene.getDimensions());
+          const contentCenter = PTSpace.rectCenter(selectionBounds);
           const deltaPoint = PTSpace.diffPoints(fieldCenter, contentCenter);
 
           this.pan(deltaPoint, frames);
@@ -998,9 +993,14 @@ class PenciltestUI extends PenciltestUIComponent {
             loadAs:'uri',
             submitOnChange: true
           };
-          const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
-          if (uri) {
-            this.loadAudio(uri, filePath);
+          try {
+            const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
+            if (uri) {
+              this.loadAudio(uri, filePath);
+            }
+          } catch(e) {
+            console.error(e);
+            this.ui.showFeedback({text:`Audio file error: ${e.message}`});
           }
         }
       },
@@ -1022,13 +1022,9 @@ class PenciltestUI extends PenciltestUIComponent {
               max: 100
             }
           };
-          try {
-            this.scene.audio.volume = Number(await Utils.prompt(`Audio volume`, promptOptions));
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-              return;
-            }
+          const inputVolume:string | null = await Utils.prompt(`Audio volume`, promptOptions)
+          if (inputVolume !== null) {
+            this.scene.audio.volume = Number(inputVolume);
           }
         },
         action(this: Penciltest) {
@@ -1437,7 +1433,7 @@ class PenciltestUI extends PenciltestUIComponent {
     this.components.toggleHelp.getElement().addEventListener('click', helpListener);
   }
 
-  recordGesture(event: TouchEvent, bounds: Bounds) {
+  recordGesture(event: TouchEvent, bounds: Rect) {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
@@ -1467,7 +1463,7 @@ class PenciltestUI extends PenciltestUIComponent {
     }
   }
 
-  describePosition(coordinates: Point, bounds: Bounds) {
+  describePosition(coordinates: Point, bounds: Rect) {
     const positionDescriptors = {
       '0.00': { x: 'left'   , y: 'top'
     },
@@ -1796,34 +1792,6 @@ class PenciltestUI extends PenciltestUIComponent {
           parent: 'appStatus'
         },
         {
-          key: "statusFrameRate",
-          tagName: 'span',
-          children: [
-            {
-              key: 'statusFramerateLabel',
-              tagName: 'small',
-              text: 'FPS:'
-            },
-            {
-              key: 'statusFramerate',
-              tagName: 'span',
-              text: `${this.controller.scene?.framerate || '…'}`
-            },
-            {
-              key: 'statusFrameHold',
-              tagName: 'span',
-              text: `/${this.controller.scene.getFrameHold()}`,
-              attr: {
-                title: lc('exposureHoldTitle')
-              }
-            }
-          ],
-          attr: {
-            title: lc('statusFrameRate'),
-          },
-          parent: 'sceneStatus'
-        },
-        {
           key: "statusFrames",
           tagName: 'span',
           children: [
@@ -1858,7 +1826,7 @@ class PenciltestUI extends PenciltestUIComponent {
             {
               key: 'statusTimeLabel',
               tagName: 'small',
-              text: 'frame:'
+              text: 'time:'
             },
             {
               key: 'statusCurrentTime',
@@ -1877,6 +1845,34 @@ class PenciltestUI extends PenciltestUIComponent {
               }
             }
           ],
+          parent: 'sceneStatus'
+        },
+        {
+          key: "statusFrameRate",
+          tagName: 'span',
+          children: [
+            {
+              key: 'statusFramerateLabel',
+              tagName: 'small',
+              text: 'FPS:'
+            },
+            {
+              key: 'statusFramerate',
+              tagName: 'span',
+              text: `${this.controller.scene?.framerate || '…'}`
+            },
+            {
+              key: 'statusFrameHold',
+              tagName: 'span',
+              text: `/${this.controller.scene.getFrameHold()}`,
+              attr: {
+                title: lc('exposureHoldTitle')
+              }
+            }
+          ],
+          attr: {
+            title: lc('statusFrameRate'),
+          },
           parent: 'sceneStatus'
         },
         {

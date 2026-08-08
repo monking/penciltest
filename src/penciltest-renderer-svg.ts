@@ -49,15 +49,15 @@ class SVGRenderer extends BaseRenderer {
     if (this.drawingPath) {
       path = this.field.path(this.drawingPath);
       Object.assign(path.style, {
-        stroke: this.getColorString(this.currentLineOptions.lineColor)
+        stroke: this.getColorString(this.options.strokeColor)
       });
     }
     return super.render();
   }
 
-  clear() {
+  clear(redrawBackground:boolean = true) {
     this.field.clear();
-    return super.clear();
+    return super.clear(redrawBackground);
   }
 
   destroy() {

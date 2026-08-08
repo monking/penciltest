@@ -32,10 +32,10 @@ class PenciltestRenderExporter {
       : { start: 0, end: this.controller.scene.frames.length - 1 };
 
     const gifSize = Math.min(512, this.controller.scene.height);
-    const lineWeight = 1;
+    const strokeWeight = 1;
     let gifConfigurationString;
     try {
-      gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${lineWeight}`);
+      gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
     } catch(reason) {
       if (reason !== Utils.promptCanceled) {
         console.error(reason);
@@ -65,7 +65,7 @@ class PenciltestRenderExporter {
 
     //this.controller.ui.appActions.renderer.action();
 
-    const gifRenderOverrides = {lineWeight: gifLineWeight};
+    const gifRenderOverrides = {strokeWeight: gifLineWeight};
 
     const baseFrameDelay = 1000 / this.controller.scene.framerate;
 

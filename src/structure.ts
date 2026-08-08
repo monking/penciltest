@@ -30,14 +30,16 @@ type Color = [number, number, number, number] | [number, number, number];
 
 interface Dictionary {[key:string]:string};
 
-interface PenciltestLineOptions { /* Redundant member names for blending with other option sets. */
-  lineColor?: Color | string;
-  lineCorner?: CanvasLineJoin;
-  lineOpacity?: number;
-  lineWeight?: number;
+interface PenciltestLineOptions {
+  strokeColor?: Color | string;
+  strokeCorner?: CanvasLineJoin;
+  strokeOpacity?: number;
+  strokeWeight?: number;
+  fillColor?: Color | string;
+  fillOpacity?: number;
 }
 
-interface PenciltestSceneOptions extends PenciltestLineOptions, Bounds {
+interface PenciltestSceneOptions extends PenciltestLineOptions, Rect {
   background?: string;
   frameHold?: number;
   framerate?: number;
@@ -126,7 +128,7 @@ interface PenciltestSceneData extends PenciltestSceneOptions {
   instrument?: PenciltestInsrument;
   name?: string;
   uuid?: string;
-  getDimensions?(): Bounds;
+  getDimensions?(): Rect;
   packedScale?: number;
 };
 
@@ -151,6 +153,9 @@ interface PenciltestState {
 
 interface PenciltestRendererOptions extends PenciltestLineOptions, PenciltestSceneOptions {
   container?: string | HTMLElement;
+  width?: number;
+  height?: number;
+  backgroundColor?: string;
 }
 
 interface PenciltestRenderer {
@@ -159,35 +164,39 @@ interface PenciltestRenderer {
   width: number;
   height: number;
 
-  getColorString(color: Color | string): string;
+  resize(width: number, height: number):void;
 
-  currentLineOptions: PenciltestLineOptions;
+  moveTo(x: number, y: number):void
 
-  resize(width: number, height: number): void;
+  lineTo(x: number, y: number):void
 
-  moveTo(x: number, y: number): void
+  rect(config:Rect, options:PenciltestLineOptions):void
 
-  lineTo(x: number, y: number): void
+  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null):PenciltestLineOptions;
 
-  rect(x: number, y: number, width: number, height: number, backgroundColor: string, strokeColor: string): void
+  beginPath():void;
 
-  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null): void;
+  endPath():void;
 
-  path(stroke: Stroke): void;
+  subpath(path: Path):void;
 
-  render(): void
+  render():void
 
-  clear(): void
+  requestRender():void
 
-  destroy(): void
+  getColorString(color: Color | string, opacity:number):string
+
+  clear(redrawBackground:boolean):void
+
+  destroy():void
 }
 
 
 interface Mark extends Vector { weight?: number; }
 
 interface Stroke extends PenciltestLineOptions {
-  path: Array<Point>;
-}
+  path: Path;
+};
 
 interface PositionDescription { x: string; y: string; };
 

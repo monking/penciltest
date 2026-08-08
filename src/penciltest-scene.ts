@@ -18,10 +18,10 @@ class PenciltestScene implements PenciltestSceneData {
     framerate: 24,
     loop: false,
 
-    lineColor: 'black',
-    lineCorner: 'round',
-    lineOpacity: 1,
-    lineWeight: 1,
+    strokeColor: 'black',
+    strokeCorner: 'round',
+    strokeOpacity: 1,
+    strokeWeight: 1,
 
     aspectRatio: '1:1',
     height: 1024
@@ -51,10 +51,10 @@ class PenciltestScene implements PenciltestSceneData {
   width: number;
   height: number;
 
-  lineColor: Color | string;
-  lineCorner: CanvasLineJoin;
-  lineOpacity: number;
-  lineWeight: number;
+  strokeColor: Color | string;
+  strokeCorner: CanvasLineJoin;
+  strokeOpacity: number;
+  strokeWeight: number;
 
   constructor(sceneData:PenciltestSceneData) {
     const now = new Date();
@@ -73,8 +73,8 @@ class PenciltestScene implements PenciltestSceneData {
     this.framerate = 24;
     this.frameHold = 2;
     this.background = 'gray';
-    this.lineColor = 'black';
-    this.lineWeight = 1;
+    this.strokeColor = 'black';
+    this.strokeWeight = 1;
     this.frames = [];
     this.current = new SceneState(sceneData.current || {});
 
@@ -98,10 +98,10 @@ class PenciltestScene implements PenciltestSceneData {
     this.updateState();
   }
 
-  getDimensions(): Bounds {
+  getDimensions(): Rect {
     const aspectRatio = this.aspectRatio || '1:1';
     const ratioParts = aspectRatio.split(':').map(Number);
-    const dimensions: Bounds = { 
+    const dimensions: Rect = { 
       width: this.width,
       height: this.height,
       aspect: ratioParts[0] / ratioParts[1],
@@ -143,36 +143,14 @@ class PenciltestScene implements PenciltestSceneData {
     return this.current;
   }
 
-  setModified(date:Date | null = null): Date {
-    if (date === null) {
-      date = new Date();
+  resolveFrameNumber(inputIndex:number, loop:boolean = false) {
+    let realIndex = inputIndex;
+    if (loop) {
+      while ((realIndex < 0) || (realIndex >= this.frames.length)) { realIndex = (realIndex + this.frames.length) % this.frames.length; }
+    } else {
+      realIndex = Math.max(0, Math.min(this.frames.length - 1, realIndex));
     }
-    this.dateModified = date.toISOString();
-    return date;
-  }
-
-  getFrameHold(frameNumber:number = -1) {
-    if (frameNumber === -1) {
-      frameNumber = this.current.frameNumber;
-    }
-    return Math.max(1, this.frames[frameNumber]?.hold || this.frameHold);
-  }
-
-  setFrameHold(frameHold:number = 1, frameNumber:number = -1) {
-    if (frameNumber === -1) {
-      frameNumber = this.current.frameNumber;
-    }
-    this.frames[frameNumber].hold = Math.max(1, frameHold);
-  }
-
-  setVolume(volume:number, relative:boolean = false) {
-    if (typeof this.audio?.volume !== 'number') {
-      if (!this.audio) { this.audio = {}; }
-      this.audio.volume = 100;
-    }
-
-    const newVolume = relative ? volume + this.audio.volume : volume;
-    this.audio.volume = Math.max(0, Math.min(100, newVolume));
+    return realIndex;
   }
 
   newFrame(insertAtIndex:number = -1, count:number = 1, options:PenciltestFrame = {}): Array<PenciltestFrame> {
@@ -203,6 +181,54 @@ class PenciltestScene implements PenciltestSceneData {
       }
     }
     return this.frames[this.current.frameNumber || 0];
+  }
+
+  setCurrentFrameNumber(frameNumber:number, loop:boolean = true) {
+    return this.current.frameNumber = this.resolveFrameNumber(frameNumber, loop);
+  };
+
+  insertFrames(frames:Array<PenciltestFrame>, insertFrameNumber:number, jumpToOffset:number = -1) {
+    Array.prototype.splice.apply(this.frames, [insertFrameNumber, 0].concat(frames as Array<any>));
+    this.updateState();
+    this.setCurrentFrameNumber(
+      insertFrameNumber + (
+          jumpToOffset < 0
+            ? frames.length - jumpToOffset
+            : jumpToOffset
+        )
+    );
+  }
+
+  setModified(date:Date | null = null): Date {
+    if (date === null) {
+      date = new Date();
+    }
+    this.dateModified = date.toISOString();
+    return date;
+  }
+
+  getFrameHold(frameNumber:number = -1) {
+    if (frameNumber === -1) {
+      frameNumber = this.current.frameNumber;
+    }
+    return Math.max(1, this.frames[frameNumber]?.hold || this.frameHold);
+  }
+
+  setFrameHold(frameHold:number = 1, frameNumber:number = -1) {
+    if (frameNumber === -1) {
+      frameNumber = this.current.frameNumber;
+    }
+    this.frames[frameNumber].hold = Math.max(1, frameHold);
+  }
+
+  setVolume(volume:number, relative:boolean = false) {
+    if (typeof this.audio?.volume !== 'number') {
+      if (!this.audio) { this.audio = {}; }
+      this.audio.volume = 100;
+    }
+
+    const newVolume = relative ? volume + this.audio.volume : volume;
+    this.audio.volume = Math.max(0, Math.min(100, newVolume));
   }
 
   getCurrentStroke(makeNewIfEmpty:boolean = false): Stroke {

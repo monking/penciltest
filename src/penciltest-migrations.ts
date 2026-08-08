@@ -20,11 +20,13 @@ interface PenciltestMigrationMetadata {
 };
 
 class PenciltestMigrationBase implements PenciltestMigrationInterface {
-  fromVersion:string;
-  toVersion:string;
+  fromVersion:string = '0.0.0';
+  toVersion:string = '0.0.0';
 }
 
 class PTMigration_v0_to_v0_0_4 extends PenciltestMigrationBase {
+  static fromVersion = '0.0.0';
+  static toVersion = '0.0.4';
   constructor() {
     super();
     this.fromVersion = '0.0.0';
@@ -113,6 +115,29 @@ class PTMigration_v0_2_0_to_v0_3_0 extends PenciltestMigrationBase {
     if (scene?.current?.singleFrameDuration) {
       scene.current.singleFrameDuration *= 1000;
     }
+
+    return scene;
+  }
+};
+
+class PTMigration_v0_3_0_to_v0_3_1 extends PenciltestMigrationBase {
+  constructor() {
+    super();
+    this.fromVersion = '0.3.0';
+    this.toVersion = '0.3.1';
+  }
+  migrateScene(scene:any) {
+    // BEGIN: `line-` prefix changed to `stroke-`
+    Object.assign(scene.options, {
+      strokeColor: scene.options.lineColor,
+      strokeWeight: scene.options.lineWeight,
+      strokeOpacity: scene.options.lineOpacity,
+      strokeCorner: scene.options.lineCorner,
+    });
+    delete scene.options.lineColor;
+    delete scene.options.lineWeight;
+    delete scene.options.lineOpacity;
+    delete scene.options.lineCorner;
 
     return scene;
   }
@@ -258,7 +283,7 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
 class PTMigration_debug extends PenciltestMigrationBase {
   constructor() {
     super();
-    this.fromVersion = '0.3.0';
+    this.fromVersion = Penciltest.version;
     this.toVersion = Penciltest.debugVersion;
   }
   migrateScene(scene:any) { return scene; }
@@ -272,7 +297,7 @@ class PenciltestMigrator {
   constructor() {
     this.mungers = [
       new PTMunger_V0_3_0(),
-      new PTMunger_V0_3_1(),
+      //new PTMunger_V0_3_1(), // not ready yet to test this iteration of pack/unpack
     ];
 
     this.migrations = [
