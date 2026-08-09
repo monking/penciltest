@@ -98,7 +98,7 @@ class PTSpace {
   }
 
   static traceArc(config:Arc):Array<Point> {
-    debugger;
+    //debugger;
     const arc = { ...PTSpace.defaultArc, ...config };
     const points:Array<Point> = [];
     const arcStep = 1/arc.resolution;

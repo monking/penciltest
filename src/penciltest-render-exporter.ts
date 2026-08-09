@@ -33,13 +33,8 @@ class PenciltestRenderExporter {
 
     const gifSize = Math.min(512, this.controller.scene.height);
     const strokeWeight = 1;
-    let gifConfigurationString;
-    try {
-      gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
-    } catch(reason) {
-      if (reason !== Utils.promptCanceled) {
-        console.error(reason);
-      }
+    const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
+    if (!gifConfigurationString) {
       return;
     }
 

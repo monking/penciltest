@@ -41,6 +41,7 @@ interface PenciltestLineOptions {
 
 interface PenciltestSceneOptions extends PenciltestLineOptions, Rect {
   background?: string;
+  debug?: boolean;
   frameHold?: number;
   framerate?: number;
   loop?: boolean;
@@ -48,15 +49,15 @@ interface PenciltestSceneOptions extends PenciltestLineOptions, Rect {
 
 interface PenciltestOptions extends PenciltestSceneOptions {
   container?: string;
-  debug?: boolean;
   hideCursor?: boolean;
   onionSkin?: boolean;
   onionSkinFrameRadius?: number;
-  onionSkinOpacity?: number;
   renderer?: Renderers;
   scrubAudio?: boolean;
   showStatus?: boolean;
   smoothing?: number;
+  onionSkinForwardColor?: Color;
+  onionSkinBackwardColor?: Color;
 };
 
 interface PenciltestGesture {
@@ -219,18 +220,20 @@ type AppActionsList = {
 }
 
 interface PenciltestUIComponentOptions {
-  key?: string;
-  tagName?: string;
-  id?: string;
-  html?: string;
-  text?: string;
   attr?: Dictionary;
-  on?: {[key:string]: Function};
+  children?: Array<PenciltestUIComponentOptions>;
   className?: string;
-  style?: Dictionary;
+  el?: HTMLElement;
+  html?: string;
+  id?: string;
+  is?: PenciltestUIComponent;
+  key?: string;
+  on?: {[key:string]: Function};
   parent?: PenciltestUIComponent | string;
   parentElement?: HTMLElement;
-  children?: Array<PenciltestUIComponentOptions>;
+  style?: Dictionary;
+  tagName?: string;
+  text?: string;
 };
 
 type PenciltestUIComponentDict = { [key: string]: PenciltestUIComponent; };

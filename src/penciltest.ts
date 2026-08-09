@@ -41,11 +41,12 @@ class Penciltest {
     hideCursor: false,
     onionSkin: true,
     onionSkinFrameRadius: 4,
-    onionSkinOpacity: 0.5,
     renderer: Renderers.CANVAS,
     scrubAudio: false,
     showStatus: true,
     smoothing: 1,
+    onionSkinForwardColor: [0, 200, 50, 0.5],
+    onionSkinBackwardColor: [220, 0, 0, 0.5]
   };
 
   static defaultPlayback: PlaybackState = {
@@ -208,9 +209,7 @@ class Penciltest {
     if (isNewStroke) { delete this.previousMark; }
     stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
 
-    if (this.options.debug) {
-      console.log(`  mark ${this.previousMark?.x || '_'},${this.previousMark?.y || '_'}-->${mark.x},${mark.y}`);
-    }
+    if (this.options.debug) { console.log(`  mark ${this.previousMark?.x || '_'},${this.previousMark?.y || '_'}-->${mark.x},${mark.y}`); }
 
     if (this.state.mode === PenciltestMode.DRAWING) {
       if (this.previousMark && this.previousMark !== mark) {
@@ -248,21 +247,26 @@ class Penciltest {
       const eraserRadius = 20;
       if (isDown) {
         const currentFrame = this.scene.getCurrentFrame();
+        let erasures = 0;
         if (currentFrame.strokes?.length > 0) {
           const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, eraserRadius);
           if (erasingStrokeIndexes.length > 0) {
             erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
               currentFrame.strokes.splice(strokeIndex, 1);
+              erasures++;
             });
           }
+        }
+        if (erasures > 0) {
+          this.drawCurrentFrame();
         }
       }
       //const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
       this.renderer.requestRender(() => {
-        //console.log('  track(currentFrame + eraser bounds)');
+        if (this.options.debug) { console.log('  track(currentFrame + eraser bounds)'); }
         this.drawCurrentFrame();
         //this.renderer.rect(toolBounds, '', {strokeColor: 'red', strokeOpacity: 0.5});
-        this.renderer.circle({ center:trackMark, radius:eraserRadius }, {strokeColor: 'red', strokeOpacity: 0.5});
+        this.renderer.circle({center:trackMark, radius:eraserRadius}, {strokeColor: 'red', strokeOpacity: 0.5});
       });
     }
   }
@@ -375,22 +379,21 @@ class Penciltest {
     // NOTE: This draws the background, while drawFrame() does not.
     // NOTE: This also calls drawFrame.
     if (!this.renderer || !this.scene.frames.length) { return; }
-    console.log('    drawCurrentFrame: REQ');
+    if (this.options.debug) { console.log('    drawCurrentFrame: REQ'); }
 
     this.renderer.requestRender((timestamp) => {
-      console.log('    drawCurrentFrame:     HAP');
+      if (this.options.debug) { console.log('    drawCurrentFrame:     HAP'); }
       this.renderer.clear(true);
 
       if (this.options.onionSkin) {
         for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
           const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
-          const strokeOpacity = Math.pow(this.options.onionSkinOpacity, i)
           if (previousFrameNumber !== this.scene.current.frameNumber) {
             this.drawFrame(
               previousFrameNumber,
               {
                 ...overrides,
-                strokeColor: [255, 0, 0, strokeOpacity]
+                strokeColor: this.options.onionSkinBackwardColor.slice(0,3).concat([Math.pow(this.options.onionSkinBackwardColor[3], i)]) as Color
               }
             );
           }
@@ -400,7 +403,7 @@ class Penciltest {
               nextFrameNumber,
               {
                 ...overrides,
-                strokeColor: [0, 255, 255, strokeOpacity]
+                strokeColor: this.options.onionSkinForwardColor.slice(0,3).concat([Math.pow(this.options.onionSkinForwardColor[3], i)]) as Color
               }
             );
           }
@@ -408,13 +411,13 @@ class Penciltest {
       }
       this.renderer.composeOptions();
       this.drawFrame(this.scene.current.frameNumber, overrides);
-      console.log('    drawCurrentFrame:         END');
+      if (this.options.debug) { console.log('    drawCurrentFrame:         END'); }
     });
   }
 
   drawFrame(frameNumber: number, overrides: PenciltestRendererOptions): PenciltestFrame {
     if (!this.width || !this.height) { return; }
-    console.log('   drawFrame: BEGIN'); // XXX
+    if (this.options.debug) { console.log('   drawFrame: BEGIN'); }
 
     if (overrides) { this.renderer.composeOptions(overrides); }
 
@@ -427,7 +430,7 @@ class Penciltest {
       });
       this.renderer.endPath();
     }
-    console.log('   drawFrame:       END'); // XXX
+    if (this.options.debug) { console.log('   drawFrame:       END'); }
     return frame;
   }
 
@@ -593,12 +596,8 @@ class Penciltest {
     };
 
     if (!amount) {
-      try {
-        amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
-      } catch(reason) {
-        if (reason !== Utils.promptCanceled) {
-          console.error(reason);
-        }
+      amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
+      if (!amount) {
         return;
       }
     }
@@ -609,12 +608,8 @@ class Penciltest {
   async smoothScene(amount: number = 1) {
     if (await Utils.confirm('Would you like to smooth every frame of this scene?')) {
       if (amount < 1) {
-        try {
-          amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
-        } catch(reason) {
-          if (reason !== Utils.promptCanceled) {
-            console.error(reason);
-          }
+        amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
+        if (!amount) {
           return;
         }
       }
@@ -652,11 +647,9 @@ class Penciltest {
     return this.ui.updateStatusBar();
   }
 
-  newScene() {
-    this.scene = new PenciltestScene(this.options);
-
+  newScene(options:PenciltestSceneData = {}) {
+    this.scene = new PenciltestScene({ ...this.options, ...options });
     this.hasUnsavedChanges = false;
-
     return this.goToFrame(0);
   }
 

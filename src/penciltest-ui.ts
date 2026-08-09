@@ -90,8 +90,9 @@ class PenciltestUI extends PenciltestUIComponent {
           'dropFrames',
         ],
         Settings: [
-          'renderer',
           'toggleInterfaceHelp',
+          'config',
+          'renderer',
           'reset',
           'debug',
         ],
@@ -131,8 +132,9 @@ class PenciltestUI extends PenciltestUIComponent {
               strokeWeight: this.scene.strokeWeight,
               strokeOpacity: this.scene.strokeOpacity,
               container: this.fieldElement,
-              width: this.forceDimensions ? this.forceDimensions.width as number : sceneDimensions.width,
-              height: this.forceDimensions ? this.forceDimensions.height as number : sceneDimensions.height
+              width: this.forceDimensions ? Number(this.forceDimensions.width) : sceneDimensions.width,
+              height: this.forceDimensions ? Number(this.forceDimensions.height) : sceneDimensions.height,
+              debug: this.options.debug
             };
             if (this.options.renderer === Renderers.SVG) {
               this.renderer = new SVGRenderer(rendererOptions);
@@ -357,17 +359,9 @@ class PenciltestUI extends PenciltestUIComponent {
       strokeColor: {
         label: "Line Color",
         async listener(this: Penciltest) {
-          let strokeColor;
-          try {
-            strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, {'input':'color'});
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, {'input':'color'});
           if (strokeColor) {
-            this.setOptions({strokeColor: strokeColor});
+            this.setOptions({strokeColor});
           }
         },
         action(this: Penciltest) {
@@ -384,15 +378,7 @@ class PenciltestUI extends PenciltestUIComponent {
       background: {
         label: "Background Color",
         async listener(this: Penciltest) {
-          let bg;
-          try {
-            bg = await Utils.prompt('background color: ', this.scene.background, {'input':'color'});
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const bg = await Utils.prompt('background color: ', this.scene.background, {'input':'color'});
           if (bg) {
             this.setOptions({background: bg});
           }
@@ -412,13 +398,8 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Frame rate",
         async listener(this: Penciltest) {
           const oldFrameRate = this.scene.framerate;
-          let newFramerate;
-          try {
-            newFramerate = Number(await Utils.prompt(`${lc('promptSetFramerate')}:<br><small>FPS, frames per second</small>`, this.scene.framerate));
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
+          const newFramerate = Number(await Utils.prompt(`${lc('promptSetFramerate')}:<br><small>FPS, frames per second</small>`, this.scene.framerate));
+          if (newFramerate === null) {
             return;
           }
           if (newFramerate && newFramerate !== oldFrameRate) {
@@ -452,15 +433,7 @@ class PenciltestUI extends PenciltestUIComponent {
       frameHold: {
         label: "Default Frame Hold",
         async listener(this: Penciltest) {
-          let hold
-          try {
-            hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
           if (hold) {
             const oldHold = this.options.frameHold;
             this.setOptions({frameHold: Number(hold)});
@@ -541,16 +514,11 @@ class PenciltestUI extends PenciltestUIComponent {
             },
 						labelLogic: (smoothing:string) => smoothing
           };
-          let smoothing;
-          try {
-            smoothing = Number(await Utils.prompt('Smoothing', this.options.smoothing, promptOptions));
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
+          const smoothing = await Utils.prompt('Smoothing', this.options.smoothing, promptOptions);
+          if (smoothing === null) {
             return;
           }
-					this.setOptions({smoothing});
+					this.setOptions({smoothing: Number(smoothing)});
         },
         action(this: Penciltest) {
           this.ui.updateStatusBar();
@@ -574,16 +542,11 @@ class PenciltestUI extends PenciltestUIComponent {
             console.info(`Penciltest is: ${startMode}`);
             return;
           }
-          let amount;
-          try {
-            amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
-          } catch(ignore) {
+          const amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
+          if (amount === null || Number(amount) < 1) {
             return;
           }
-          if (amount < 1) {
-            return;
-          }
-          return await this.smoothScene(amount);
+          return await this.smoothScene(Number(amount));
         }
       },
 
@@ -613,7 +576,11 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Toggle Debug",
         title: "Verbose logs for debugging",
         listener(this: Penciltest) { this.setOptions({debug: !this.options.debug}); },
-        action(this: Penciltest) { this.ui.updateStatusBar(); }
+        action(this: Penciltest) {
+          if (this.scene) { this.scene.debug = this.options.debug; }
+          if (this.renderer) { this.renderer.options.debug = this.options.debug; }
+          this.ui.updateStatusBar();
+        }
       },
 
       showStatus: {
@@ -688,17 +655,10 @@ class PenciltestUI extends PenciltestUIComponent {
               },
               labelLogic: (offset:string) => offset
             };
-            try {
-              splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions))
-            } catch(reason) {
-              if (reason !== Utils.promptCanceled) {
-                console.error(reason);
-                return;
-              }
-            }
+            splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions));
           }
           if (splitOffset) {
-            this.splitFrame(this.scene.current.frameNumber, splitOffset);
+            this.splitFrame(this.scene.current.frameNumber, Number(splitOffset));
             this.ui.triggerAppAction('nextFrame');
           }
         }
@@ -727,15 +687,7 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Rename Scene",
         hotkey: ['F2'],
         async listener(this: Penciltest) {
-          let newName;
-          try {
-            newName = await Utils.prompt(lc('%%\\uscene%% %%name%%')+":", this.scene.name);
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const newName = await Utils.prompt(lc('%%\\uscene%% %%name%%')+":", this.scene.name);
           if (newName) {
             this.scene.name = newName;
             this.ui.updateStatusBar();
@@ -760,9 +712,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 }
               }
             } catch(reason) {
-              if (reason !== Utils.promptCanceled) {
-                console.error(reason);
-              }
+              console.error(reason);
               return;
             }
           }
@@ -777,7 +727,9 @@ class PenciltestUI extends PenciltestUIComponent {
             this.hasUnsavedChanges
             || Utils.confirm("Make a new scene? Unsaved changes will be lost.")
           ) {
-            this.newScene()
+            this.newScene({
+              debug: this.options.debug
+            })
           }
         }
       },
@@ -823,7 +775,9 @@ class PenciltestUI extends PenciltestUIComponent {
               download: `${this.scene.name || 'untitled'}.penciltest.gif`,
             },
             children: [
-              gifImage
+              {
+                is: gifImage
+              }
             ]
           }, this.ui.components);
 
@@ -834,8 +788,8 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             parent: this.ui,
             children: [
-              gifInstructions,
-              gifLink
+              { is: gifInstructions },
+              { is: gifLink }
             ],
             style: {
               position: 'absolute',
@@ -869,15 +823,7 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Alt+R'],
         async listener(this: Penciltest) {
           const sceneDimensions = this.scene.getDimensions();
-          let dimensionsResponse;
-          try {
-            dimensionsResponse = await Utils.prompt('Scene height & aspect (W/H)', `${sceneDimensions.height} ${sceneDimensions.aspectRatio}`)
-          } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-            }
-            return;
-          }
+          const dimensionsResponse = await Utils.prompt('Scene height & aspect (W/H)', `${sceneDimensions.height} ${sceneDimensions.aspectRatio}`)
           if (!dimensionsResponse) {
             return;
           }
@@ -975,10 +921,8 @@ class PenciltestUI extends PenciltestUIComponent {
           try {
             await this.setScene(JSON.parse(sceneJSON));
           } catch(reason) {
-            if (reason !== Utils.promptCanceled) {
-              console.error(reason);
-              this.ui.showFeedback({text:`ERROR: ${reason.message}`});
-            }
+            console.error(reason);
+            this.ui.showFeedback({text:`ERROR: ${reason.message}`});
           }
         }
       },
@@ -1079,6 +1023,14 @@ class PenciltestUI extends PenciltestUIComponent {
           this.ui.updateStatusBar();
           this.ui.showFeedback({text:`Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, {string:true, prefix:true})} s`});
           this.scrubAudio();
+        }
+      },
+
+      config: {
+        label: "Configuration",
+        hotkey: ['Ctrl+,'],
+        listener(this: Penciltest) {
+          //const inputConfig = Utils.prompt(); // TODO
         }
       },
 
@@ -1534,12 +1486,7 @@ class PenciltestUI extends PenciltestUIComponent {
     const sceneNames = this.controller.getSceneNames();
     if (sceneNames.length) {
       if (message == null) { message = 'Choose a scene'; }
-      const selectedSceneName = await Utils.promptSelect(message, sceneNames, this.controller.scene.name );
-      if (selectedSceneName) {
-        return selectedSceneName;
-      } else {
-        Utils.alert("No scene by that name.");
-      }
+      return  await Utils.promptSelect(message, sceneNames, this.controller.scene.name );
     } else {
       Utils.alert("You don't have any saved scenes yet.");
     }

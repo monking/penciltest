@@ -100,68 +100,10 @@ class Utils {
     }
     ;
     static async prompt(message, defaultValue = null, options = {}) {
-        const { input: givenPromptInput, submitOnChange: shouldSubmitOnChange, inputAttrs, inputLabel, labelLogic, } = options;
-        let property, value;
-        const promptModal = document.createElement('div');
-        Object.assign(promptModal.style, {
-            position: 'absolute',
-            top: '0px',
-            left: '0px',
-            bottom: '0px',
-            right: '0px',
-            backgroundColor: 'rgba(0,0,0,0.5)'
-        });
-        const promptForm = document.createElement('form');
-        Object.assign(promptForm.style, {
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            padding: '1em',
-            transform: 'translateX(-50%) translateY(-50%)',
-            backgroundColor: 'lightgray'
-        });
-        promptForm.innerHTML = message;
-        promptModal.appendChild(promptForm);
-        const inputRow = document.createElement('div');
-        const promptInput = (typeof givenPromptInput === 'string' || !givenPromptInput
-            ? document.createElement('input')
-            : givenPromptInput);
-        if (typeof givenPromptInput === 'string') {
-            promptInput.setAttribute('type', givenPromptInput);
-        }
-        if (inputAttrs) {
-            for (let key in inputAttrs) {
-                promptInput.setAttribute(key, inputAttrs[key]);
-            }
-        }
-        if (!promptInput.hasAttribute('id')) {
-            promptInput.setAttribute('id', 'promptInputLabel');
-        }
-        if (defaultValue !== null) {
-            promptInput.value = defaultValue;
-        }
-        inputRow.appendChild(promptInput);
-        if (inputLabel || labelLogic) {
-            const labelElement = document.createElement('label');
-            labelElement.setAttribute('for', promptInput.getAttribute('id'));
-            if (labelLogic) {
-                promptInput.addEventListener('input', (event) => {
-                    labelElement.innerText = labelLogic(promptInput.value);
-                });
-                labelElement.innerText = labelLogic(defaultValue);
-            }
-            else if (inputLabel) {
-                labelElement.innerText = inputLabel;
-            }
-            Object.assign(labelElement.style, {
-                padding: '0.5em 1em',
-                'vertical-align': 'top',
-                'line-height': '1.6em'
-            });
-            inputRow.appendChild(labelElement);
-        }
-        promptForm.appendChild(inputRow);
         const promptPromise = new Promise((resolve, reject) => {
+            const { input: givenPromptInput, submitOnChange: shouldSubmitOnChange, inputAttrs, inputLabel, labelLogic, } = options;
+            let value;
+            const promptComponents = {};
             const promptKeyListener = function (event) {
                 const keysDescription = Utils.describeKeyCombo(event);
                 if (keysDescription === 'Esc') {
@@ -171,8 +113,12 @@ class Utils {
                     submitPrompt();
                 }
             };
+            document.addEventListener('keydown', promptKeyListener);
             const closePromptModal = function () {
-                promptModal.remove();
+                const promptModal = promptComponents.modal.getElement();
+                if (promptModal) {
+                    promptModal.remove();
+                }
                 document.removeEventListener('keydown', promptKeyListener);
             };
             const cancelPrompt = () => {
@@ -180,38 +126,141 @@ class Utils {
                 resolve(null);
             };
             const submitPrompt = () => {
+                const promptInput = promptComponents.input.getElement();
                 closePromptModal();
                 resolve(promptInput.value);
             };
-            document.addEventListener('keydown', promptKeyListener);
-            const promptCancelButton = document.createElement('button');
-            promptCancelButton.type = 'button';
-            promptCancelButton.innerHTML = 'Cancel';
-            promptCancelButton.addEventListener('click', function (event) {
-                event.preventDefault();
-                closePromptModal();
-                resolve(null);
+            const promptComponentDefinitions = [];
+            const modalDef = {
+                key: 'modal',
+                style: {
+                    position: 'absolute',
+                    top: '0px',
+                    left: '0px',
+                    bottom: '0px',
+                    right: '0px',
+                    backgroundColor: 'rgba(0,0,0,0.5)'
+                },
+                parentElement: document.body
+            };
+            promptComponentDefinitions.push(modalDef);
+            const formDef = {
+                key: 'form',
+                tagName: 'form',
+                style: {
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    padding: '1em',
+                    transform: 'translateX(-50%) translateY(-50%)',
+                    backgroundColor: 'lightgray'
+                },
+                on: {
+                    'submit': function (event) {
+                        event.preventDefault();
+                        submitPrompt();
+                    },
+                },
+                html: message,
+                parent: 'modal'
+            };
+            promptComponentDefinitions.push(formDef);
+            promptComponentDefinitions.push({ key: 'inputRow', parent: 'form' });
+            promptComponentDefinitions.push({
+                tagName: 'button',
+                attr: {
+                    type: 'button'
+                },
+                text: 'Cancel',
+                on: {
+                    'click': (event) => {
+                        event.preventDefault();
+                        closePromptModal();
+                        resolve(null);
+                    }
+                },
+                parent: 'form'
             });
-            promptForm.appendChild(promptCancelButton);
+            debugger;
+            const inputDef = {
+                key: 'input',
+                attr: { id: 'promptInputLabel', ...inputAttrs },
+                parent: 'inputRow',
+            };
+            if (typeof givenPromptInput === 'string' || !givenPromptInput) {
+                inputDef.tagName = 'input';
+                if (givenPromptInput === 'string' && givenPromptInput) {
+                    inputDef.attr.type = givenPromptInput;
+                }
+            }
+            else if (typeof givenPromptInput === 'object') {
+                if (givenPromptInput.isPTComponent) {
+                    inputDef.is = givenPromptInput;
+                }
+                else if ("nodeName" in givenPromptInput) {
+                    inputDef.el = givenPromptInput;
+                }
+                else {
+                    const givenInputDef = givenPromptInput;
+                    Object.assign(inputDef, {
+                        ...givenInputDef,
+                        parent: inputDef.parent,
+                        on: { ...inputDef.on, ...givenInputDef.on },
+                        attr: { ...inputDef.attr, ...givenInputDef.attr }
+                    });
+                }
+            }
+            if (defaultValue !== null) {
+                inputDef.attr.value = defaultValue;
+            }
+            if (!inputDef.on) {
+                inputDef.on = {};
+            }
+            promptComponentDefinitions.push(inputDef);
+            if (inputLabel || labelLogic) {
+                const promptInputLabelDef = {
+                    key: 'promptInputLabel',
+                    tagName: 'label',
+                    attr: {
+                        for: inputDef.attr.id
+                    },
+                    style: {
+                        padding: '0.5em 1em',
+                        'vertical-align': 'top',
+                        'line-height': '1.6em'
+                    },
+                    parent: 'inputRow'
+                };
+                if (labelLogic) {
+                    inputDef.on.input = () => { promptComponents.promptInputLabel.getElement().innerText = labelLogic(promptComponents.input.getElement().value); };
+                    promptInputLabelDef.text = labelLogic(defaultValue);
+                }
+                else if (inputLabel) {
+                    promptInputLabelDef.text = inputLabel;
+                }
+                promptComponentDefinitions.push(promptInputLabelDef);
+            }
             if (shouldSubmitOnChange) {
-                promptInput.addEventListener('change', submitPrompt);
+                inputDef.on.change = submitPrompt;
             }
             else {
-                const promptAcceptButton = document.createElement('input');
-                promptAcceptButton.type = 'submit';
-                promptAcceptButton.value = 'Accept';
-                promptForm.addEventListener('submit', function (event) {
-                    event.preventDefault();
-                    submitPrompt();
+                promptComponentDefinitions.push({
+                    tagName: 'button',
+                    attr: {
+                        type: 'submit'
+                    },
+                    text: 'Accept',
+                    parent: 'form'
                 });
-                promptForm.appendChild(promptAcceptButton);
             }
-            document.body.appendChild(promptModal);
+            promptComponentDefinitions.forEach((def) => {
+                new PenciltestUIComponent(def, promptComponents);
+            });
             if (typeof options.onOpen === 'function') {
                 options.onOpen();
             }
             else {
-                promptInput.focus();
+                promptComponents.input.getElement().focus();
             }
         });
         Utils.registerGlobalPromise(promptPromise);
@@ -220,17 +269,23 @@ class Utils {
     ;
     static promptSelect(message, choices, defaultValue, options = {}) {
         // TODO: update the application core to handle async prompts (e.g. selectSceneNames)
-        const selectInput = document.createElement('select');
-        choices.forEach((choice, index) => {
-            const optionElement = document.createElement('option');
-            optionElement.value = choice;
-            optionElement.innerHTML = choice;
-            if (choice === defaultValue) {
-                optionElement.setAttribute('selected', 'true');
-            }
-            selectInput.appendChild(optionElement);
-        });
-        return Utils.prompt(message, null, { ...options, input: selectInput });
+        const selectDef = {
+            tagName: 'select',
+            children: choices.map((choice, index) => {
+                const optionDef = {
+                    tagName: 'option',
+                    attr: {
+                        value: choice
+                    },
+                    text: choice
+                };
+                if (choice === defaultValue) {
+                    optionDef.attr.selected = 'true';
+                }
+                return optionDef;
+            })
+        };
+        return Utils.prompt(message, null, { ...options, input: selectDef });
     }
     ;
     static async promptForFile(message, options = {}) {
@@ -449,7 +504,6 @@ class Utils {
         return Boolean(globalThis.penciltestGlobalPromises && ((_a = globalThis.penciltestGlobalPromises[group]) === null || _a === void 0 ? void 0 : _a.length) > 0);
     }
 }
-Utils.promptCanceled = 'canceled';
 Utils.keyCodeNames = {
     8: 'Backspace',
     9: 'Tab',
@@ -579,7 +633,7 @@ class PTSpace {
         };
     }
     static traceArc(config) {
-        debugger;
+        //debugger;
         const arc = { ...PTSpace.defaultArc, ...config };
         const points = [];
         const arcStep = 1 / arc.resolution;
@@ -995,6 +1049,13 @@ class PTMigration_v0_3_0_to_v0_3_1 extends PenciltestMigrationBase {
         this.fromVersion = '0.3.0';
         this.toVersion = '0.3.1';
     }
+    migrateApp(controller) {
+        // BEGIN: onion skin opacity is part of the color, and so configurable separately forward and backward.
+        const onionSkinOpacity = controller.options.onionSkinOpacity;
+        controller.options.onionSkinForwardColor = [0, 200, 50, onionSkinOpacity];
+        controller.options.onionSkinBackwardColor = [220, 0, 0, onionSkinOpacity];
+        delete controller.options.onionSkinOpacity;
+    }
     migrateScene(scene) {
         // BEGIN: `line-` prefix changed to `stroke-`
         Object.assign(scene.options, {
@@ -1327,6 +1388,9 @@ class PenciltestMigrator {
 "use strict";
 class PenciltestUIComponent {
     static restore(options, components) {
+        if (options.is) {
+            return options.is;
+        }
         if (options.key && options.key in components) {
             const component = components[options.key];
             component.setContent(options);
@@ -1335,6 +1399,7 @@ class PenciltestUIComponent {
         return new PenciltestUIComponent(options, components);
     }
     constructor(options, components = {}) {
+        this.isPTComponent = true;
         this.options = {
             tagName: 'div',
             ...options
@@ -1343,7 +1408,7 @@ class PenciltestUIComponent {
         this.children = [];
         this.el = {};
         //this.refreshHandlers = [];
-        const element = this.setElement(document.createElement(this.options.tagName || 'div'));
+        const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
         if (this.options.on) {
             for (let eventName in this.options.on) {
                 this.getElement().addEventListener(eventName, this.options.on[eventName].bind(this.getElement()));
@@ -1491,7 +1556,9 @@ class BaseRenderer {
         //this.resize(this.options.width, this.options.height); // Let descendants do this. It might not be ready yet.
     }
     setOptions(options) {
-        console.log('   setOptions'); // XXX
+        if (this.options.debug) {
+            console.log('   setOptions');
+        }
         Object.assign(this.options, options);
     }
     getColorString(color, opacity = -1) {
@@ -1518,7 +1585,9 @@ class BaseRenderer {
         return `rgb(${rgb}${opacityValue ? ' / ' + opacityValue : ''})`;
     }
     resize(width, height) {
-        console.log('  resize'); // XXX
+        if (this.options.debug) {
+            console.log('  resize');
+        }
         this.width = width;
         this.height = height;
     }
@@ -1538,7 +1607,9 @@ class BaseRenderer {
         return composedOptions;
     }
     subpath(path) {
-        console.log(' subpath'); // XXX
+        if (this.options.debug) {
+            console.log(' subpath');
+        }
         path.forEach((segment, index) => {
             const { x, y } = segment;
             if (index === 0) {
@@ -1550,22 +1621,30 @@ class BaseRenderer {
         });
     }
     moveTo(x, y) {
-        console.log('moveTo: %s, %s', x, y); // XXX
+        if (this.options.debug) {
+            console.log('moveTo: %s, %s', x, y);
+        }
     }
     moveToPoint(point) {
         this.moveTo(point.x, point.y);
     }
     lineTo(x, y) {
-        console.log('lineTo: %s, %s', x, y); // XXX
+        if (this.options.debug) {
+            console.log('lineTo: %s, %s', x, y);
+        }
     }
     lineToPoint(point) {
         this.lineTo(point.x, point.y);
     }
     rect(rect, options) {
-        console.log('rect'); // XXX
+        if (this.options.debug) {
+            console.log('rect');
+        }
     }
     requestRender(...enqueueWork) {
-        console.log('   render: REQ'); // XXX
+        if (this.options.debug) {
+            console.log('   render: REQ');
+        }
         if (enqueueWork.length > 0) {
             Array.prototype.push.apply(this.renderOperationQueue, enqueueWork);
         }
@@ -1578,7 +1657,9 @@ class BaseRenderer {
         });
     }
     render() {
-        console.log('   render:     BEGIN'); // XXX
+        if (this.options.debug) {
+            console.log('   render:     BEGIN');
+        }
         const queueLength = this.renderOperationQueue.length;
         if (queueLength === 0) {
             return;
@@ -1586,31 +1667,45 @@ class BaseRenderer {
         const renderStart = performance.now();
         this.renderOperationQueue.forEach((o) => o());
         const renderElapsed = performance.now() - renderStart;
-        console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`);
+        if (this.options.debug) {
+            console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`);
+        }
         this.renderOperationQueue = [];
     }
     getFieldRect() {
-        console.log('  getFieldRect'); // XXX
+        if (this.options.debug) {
+            console.log('  getFieldRect');
+        }
         return { x: 0, y: 0, width: this.width, height: this.height };
     }
     beginPath() {
-        console.log('beginPath'); // XXX
+        if (this.options.debug) {
+            console.log('beginPath');
+        }
     }
     endPath() {
-        console.log('endPath'); // XXX
+        if (this.options.debug) {
+            console.log('endPath');
+        }
     }
     clear(redrawBackground = true) {
-        console.log(` clear${redrawBackground ? ' BACK' : ''}`); // XXX
+        if (this.options.debug) {
+            console.log(` clear${redrawBackground ? ' BACK' : ''}`);
+        }
         if (redrawBackground) {
             const fieldRect = this.getFieldRect();
             this.rect(fieldRect, { fillColor: this.options.backgroundColor });
         }
     }
     destroy() {
-        console.log('   destroy'); // XXX
+        if (this.options.debug) {
+            console.log('   destroy');
+        }
     }
     arc(arc, options) {
-        console.log(' arc'); // XXX
+        if (this.options.debug) {
+            console.log(' arc');
+        }
         const arcPoints = PTSpace.traceArc(arc);
         this.moveToPoint(arcPoints[0]);
         arcPoints
@@ -1619,7 +1714,9 @@ class BaseRenderer {
         });
     }
     circle(arc, options) {
-        console.log(' circle'); // XXX
+        if (this.options.debug) {
+            console.log(' circle');
+        }
         this.arc(arc, options);
         // Maybe other contexts will have diferent logic. For now, the default
         // "arc" without arguments is a circle, so `arc` and `circle` are the same
@@ -1634,7 +1731,8 @@ BaseRenderer.defaultOptions = {
     strokeOpacity: 1,
     strokeCorner: 'round',
     width: 1920,
-    height: 1080
+    height: 1080,
+    debug: false
 };
 
 "use strict";
@@ -1827,8 +1925,9 @@ class PenciltestUI extends PenciltestUIComponent {
                     'dropFrames',
                 ],
                 Settings: [
-                    'renderer',
                     'toggleInterfaceHelp',
+                    'config',
+                    'renderer',
                     'reset',
                     'debug',
                 ],
@@ -1862,8 +1961,9 @@ class PenciltestUI extends PenciltestUIComponent {
                             strokeWeight: this.scene.strokeWeight,
                             strokeOpacity: this.scene.strokeOpacity,
                             container: this.fieldElement,
-                            width: this.forceDimensions ? this.forceDimensions.width : sceneDimensions.width,
-                            height: this.forceDimensions ? this.forceDimensions.height : sceneDimensions.height
+                            width: this.forceDimensions ? Number(this.forceDimensions.width) : sceneDimensions.width,
+                            height: this.forceDimensions ? Number(this.forceDimensions.height) : sceneDimensions.height,
+                            debug: this.options.debug
                         };
                         if (this.options.renderer === Renderers.SVG) {
                             this.renderer = new SVGRenderer(rendererOptions);
@@ -2074,18 +2174,9 @@ class PenciltestUI extends PenciltestUIComponent {
             strokeColor: {
                 label: "Line Color",
                 async listener() {
-                    let strokeColor;
-                    try {
-                        strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, { 'input': 'color' });
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
-                        return;
-                    }
+                    const strokeColor = await Utils.prompt('line color: ', this.scene.strokeColor, { 'input': 'color' });
                     if (strokeColor) {
-                        this.setOptions({ strokeColor: strokeColor });
+                        this.setOptions({ strokeColor });
                     }
                 },
                 action() {
@@ -2101,16 +2192,7 @@ class PenciltestUI extends PenciltestUIComponent {
             background: {
                 label: "Background Color",
                 async listener() {
-                    let bg;
-                    try {
-                        bg = await Utils.prompt('background color: ', this.scene.background, { 'input': 'color' });
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
-                        return;
-                    }
+                    const bg = await Utils.prompt('background color: ', this.scene.background, { 'input': 'color' });
                     if (bg) {
                         this.setOptions({ background: bg });
                     }
@@ -2129,14 +2211,8 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Frame rate",
                 async listener() {
                     const oldFrameRate = this.scene.framerate;
-                    let newFramerate;
-                    try {
-                        newFramerate = Number(await Utils.prompt(`${lc('promptSetFramerate')}:<br><small>FPS, frames per second</small>`, this.scene.framerate));
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
+                    const newFramerate = Number(await Utils.prompt(`${lc('promptSetFramerate')}:<br><small>FPS, frames per second</small>`, this.scene.framerate));
+                    if (newFramerate === null) {
                         return;
                     }
                     if (newFramerate && newFramerate !== oldFrameRate) {
@@ -2169,16 +2245,7 @@ class PenciltestUI extends PenciltestUIComponent {
             frameHold: {
                 label: "Default Frame Hold",
                 async listener() {
-                    let hold;
-                    try {
-                        hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
-                        return;
-                    }
+                    const hold = await Utils.prompt('default exposures per drawing: ', this.options.frameHold);
                     if (hold) {
                         const oldHold = this.options.frameHold;
                         this.setOptions({ frameHold: Number(hold) });
@@ -2253,17 +2320,11 @@ class PenciltestUI extends PenciltestUIComponent {
                         },
                         labelLogic: (smoothing) => smoothing
                     };
-                    let smoothing;
-                    try {
-                        smoothing = Number(await Utils.prompt('Smoothing', this.options.smoothing, promptOptions));
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
+                    const smoothing = await Utils.prompt('Smoothing', this.options.smoothing, promptOptions);
+                    if (smoothing === null) {
                         return;
                     }
-                    this.setOptions({ smoothing });
+                    this.setOptions({ smoothing: Number(smoothing) });
                 },
                 action() {
                     this.ui.updateStatusBar();
@@ -2285,17 +2346,11 @@ class PenciltestUI extends PenciltestUIComponent {
                         console.info(`Penciltest is: ${startMode}`);
                         return;
                     }
-                    let amount;
-                    try {
-                        amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
-                    }
-                    catch (ignore) {
+                    const amount = Number(await Utils.prompt('Smoothing all frames in this scene. By how much? 1-5', 2));
+                    if (amount === null || Number(amount) < 1) {
                         return;
                     }
-                    if (amount < 1) {
-                        return;
-                    }
-                    return await this.smoothScene(amount);
+                    return await this.smoothScene(Number(amount));
                 }
             },
             lessHold: {
@@ -2322,7 +2377,15 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Toggle Debug",
                 title: "Verbose logs for debugging",
                 listener() { this.setOptions({ debug: !this.options.debug }); },
-                action() { this.ui.updateStatusBar(); }
+                action() {
+                    if (this.scene) {
+                        this.scene.debug = this.options.debug;
+                    }
+                    if (this.renderer) {
+                        this.renderer.options.debug = this.options.debug;
+                    }
+                    this.ui.updateStatusBar();
+                }
             },
             showStatus: {
                 label: "Toggle Status",
@@ -2393,18 +2456,10 @@ class PenciltestUI extends PenciltestUIComponent {
                             },
                             labelLogic: (offset) => offset
                         };
-                        try {
-                            splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions));
-                        }
-                        catch (reason) {
-                            if (reason !== Utils.promptCanceled) {
-                                console.error(reason);
-                                return;
-                            }
-                        }
+                        splitOffset = Number(await Utils.prompt(`Split the frame in twain<br><small>out of ${startingFrameHold} exposures, where to split?</small>`, splitOffset, promptOptions));
                     }
                     if (splitOffset) {
-                        this.splitFrame(this.scene.current.frameNumber, splitOffset);
+                        this.splitFrame(this.scene.current.frameNumber, Number(splitOffset));
                         this.ui.triggerAppAction('nextFrame');
                     }
                 }
@@ -2432,16 +2487,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Rename Scene",
                 hotkey: ['F2'],
                 async listener() {
-                    let newName;
-                    try {
-                        newName = await Utils.prompt(lc('%%\\uscene%% %%name%%') + ":", this.scene.name);
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
-                        return;
-                    }
+                    const newName = await Utils.prompt(lc('%%\\uscene%% %%name%%') + ":", this.scene.name);
                     if (newName) {
                         this.scene.name = newName;
                         this.ui.updateStatusBar();
@@ -2467,9 +2513,7 @@ class PenciltestUI extends PenciltestUIComponent {
                             }
                         }
                         catch (reason) {
-                            if (reason !== Utils.promptCanceled) {
-                                console.error(reason);
-                            }
+                            console.error(reason);
                             return;
                         }
                     }
@@ -2481,7 +2525,9 @@ class PenciltestUI extends PenciltestUIComponent {
                 listener() {
                     if (this.hasUnsavedChanges
                         || Utils.confirm("Make a new scene? Unsaved changes will be lost.")) {
-                        this.newScene();
+                        this.newScene({
+                            debug: this.options.debug
+                        });
                     }
                 }
             },
@@ -2523,7 +2569,9 @@ class PenciltestUI extends PenciltestUIComponent {
                             download: `${this.scene.name || 'untitled'}.penciltest.gif`,
                         },
                         children: [
-                            gifImage
+                            {
+                                is: gifImage
+                            }
                         ]
                     }, this.ui.components);
                     const gifContainer = PenciltestUIComponent.restore({
@@ -2533,8 +2581,8 @@ class PenciltestUI extends PenciltestUIComponent {
                         },
                         parent: this.ui,
                         children: [
-                            gifInstructions,
-                            gifLink
+                            { is: gifInstructions },
+                            { is: gifLink }
                         ],
                         style: {
                             position: 'absolute',
@@ -2564,16 +2612,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 hotkey: ['Alt+R'],
                 async listener() {
                     const sceneDimensions = this.scene.getDimensions();
-                    let dimensionsResponse;
-                    try {
-                        dimensionsResponse = await Utils.prompt('Scene height & aspect (W/H)', `${sceneDimensions.height} ${sceneDimensions.aspectRatio}`);
-                    }
-                    catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                        }
-                        return;
-                    }
+                    const dimensionsResponse = await Utils.prompt('Scene height & aspect (W/H)', `${sceneDimensions.height} ${sceneDimensions.aspectRatio}`);
                     if (!dimensionsResponse) {
                         return;
                     }
@@ -2662,10 +2701,8 @@ class PenciltestUI extends PenciltestUIComponent {
                         await this.setScene(JSON.parse(sceneJSON));
                     }
                     catch (reason) {
-                        if (reason !== Utils.promptCanceled) {
-                            console.error(reason);
-                            this.ui.showFeedback({ text: `ERROR: ${reason.message}` });
-                        }
+                        console.error(reason);
+                        this.ui.showFeedback({ text: `ERROR: ${reason.message}` });
                     }
                 }
             },
@@ -2762,6 +2799,13 @@ class PenciltestUI extends PenciltestUIComponent {
                     this.ui.updateStatusBar();
                     this.ui.showFeedback({ text: `Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, { string: true, prefix: true })} s` });
                     this.scrubAudio();
+                }
+            },
+            config: {
+                label: "Configuration",
+                hotkey: ['Ctrl+,'],
+                listener() {
+                    //const inputConfig = Utils.prompt(); // TODO
                 }
             },
             toggleInterfaceHelp: {
@@ -3187,13 +3231,7 @@ class PenciltestUI extends PenciltestUIComponent {
             if (message == null) {
                 message = 'Choose a scene';
             }
-            const selectedSceneName = await Utils.promptSelect(message, sceneNames, this.controller.scene.name);
-            if (selectedSceneName) {
-                return selectedSceneName;
-            }
-            else {
-                Utils.alert("No scene by that name.");
-            }
+            return await Utils.promptSelect(message, sceneNames, this.controller.scene.name);
         }
         else {
             Utils.alert("You don't have any saved scenes yet.");
@@ -4218,14 +4256,8 @@ class PenciltestRenderExporter {
             : { start: 0, end: this.controller.scene.frames.length - 1 };
         const gifSize = Math.min(512, this.controller.scene.height);
         const strokeWeight = 1;
-        let gifConfigurationString;
-        try {
-            gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
-        }
-        catch (reason) {
-            if (reason !== Utils.promptCanceled) {
-                console.error(reason);
-            }
+        const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
+        if (!gifConfigurationString) {
             return;
         }
         const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
@@ -4429,18 +4461,25 @@ class Penciltest {
             const eraserRadius = 20;
             if (isDown) {
                 const currentFrame = this.scene.getCurrentFrame();
+                let erasures = 0;
                 if (((_a = currentFrame.strokes) === null || _a === void 0 ? void 0 : _a.length) > 0) {
                     const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, eraserRadius);
                     if (erasingStrokeIndexes.length > 0) {
                         erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
                             currentFrame.strokes.splice(strokeIndex, 1);
+                            erasures++;
                         });
                     }
+                }
+                if (erasures > 0) {
+                    this.drawCurrentFrame();
                 }
             }
             //const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
             this.renderer.requestRender(() => {
-                //console.log('  track(currentFrame + eraser bounds)');
+                if (this.options.debug) {
+                    console.log('  track(currentFrame + eraser bounds)');
+                }
                 this.drawCurrentFrame();
                 //this.renderer.rect(toolBounds, '', {strokeColor: 'red', strokeOpacity: 0.5});
                 this.renderer.circle({ center: trackMark, radius: eraserRadius }, { strokeColor: 'red', strokeOpacity: 0.5 });
@@ -4558,32 +4597,37 @@ class Penciltest {
         if (!this.renderer || !this.scene.frames.length) {
             return;
         }
-        console.log('    drawCurrentFrame: REQ');
+        if (this.options.debug) {
+            console.log('    drawCurrentFrame: REQ');
+        }
         this.renderer.requestRender((timestamp) => {
-            console.log('    drawCurrentFrame:     HAP');
+            if (this.options.debug) {
+                console.log('    drawCurrentFrame:     HAP');
+            }
             this.renderer.clear(true);
             if (this.options.onionSkin) {
                 for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
                     const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
-                    const strokeOpacity = Math.pow(this.options.onionSkinOpacity, i);
                     if (previousFrameNumber !== this.scene.current.frameNumber) {
                         this.drawFrame(previousFrameNumber, {
                             ...overrides,
-                            strokeColor: [255, 0, 0, strokeOpacity]
+                            strokeColor: this.options.onionSkinBackwardColor.slice(0, 3).concat([Math.pow(this.options.onionSkinBackwardColor[3], i)])
                         });
                     }
                     const nextFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber + i);
                     if (nextFrameNumber !== this.scene.current.frameNumber) {
                         this.drawFrame(nextFrameNumber, {
                             ...overrides,
-                            strokeColor: [0, 255, 255, strokeOpacity]
+                            strokeColor: this.options.onionSkinForwardColor.slice(0, 3).concat([Math.pow(this.options.onionSkinForwardColor[3], i)])
                         });
                     }
                 }
             }
             this.renderer.composeOptions();
             this.drawFrame(this.scene.current.frameNumber, overrides);
-            console.log('    drawCurrentFrame:         END');
+            if (this.options.debug) {
+                console.log('    drawCurrentFrame:         END');
+            }
         });
     }
     drawFrame(frameNumber, overrides) {
@@ -4591,7 +4635,9 @@ class Penciltest {
         if (!this.width || !this.height) {
             return;
         }
-        console.log('   drawFrame: BEGIN'); // XXX
+        if (this.options.debug) {
+            console.log('   drawFrame: BEGIN');
+        }
         if (overrides) {
             this.renderer.composeOptions(overrides);
         }
@@ -4604,7 +4650,9 @@ class Penciltest {
             });
             this.renderer.endPath();
         }
-        console.log('   drawFrame:       END'); // XXX
+        if (this.options.debug) {
+            console.log('   drawFrame:       END');
+        }
         return frame;
     }
     scaleStroke(stroke, factor) {
@@ -4760,13 +4808,8 @@ class Penciltest {
             return result;
         };
         if (!amount) {
-            try {
-                amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
-            }
-            catch (reason) {
-                if (reason !== Utils.promptCanceled) {
-                    console.error(reason);
-                }
+            amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
+            if (!amount) {
                 return;
             }
         }
@@ -4776,13 +4819,8 @@ class Penciltest {
     async smoothScene(amount = 1) {
         if (await Utils.confirm('Would you like to smooth every frame of this scene?')) {
             if (amount < 1) {
-                try {
-                    amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
-                }
-                catch (reason) {
-                    if (reason !== Utils.promptCanceled) {
-                        console.error(reason);
-                    }
+                amount = Number(await Utils.prompt('How much to smooth? 1-5', 2));
+                if (!amount) {
                     return;
                 }
             }
@@ -4815,8 +4853,8 @@ class Penciltest {
         this.scene.updateState();
         return this.ui.updateStatusBar();
     }
-    newScene() {
-        this.scene = new PenciltestScene(this.options);
+    newScene(options = {}) {
+        this.scene = new PenciltestScene({ ...this.options, ...options });
         this.hasUnsavedChanges = false;
         return this.goToFrame(0);
     }
@@ -5097,11 +5135,12 @@ Penciltest.defaultOptions = {
     hideCursor: false,
     onionSkin: true,
     onionSkinFrameRadius: 4,
-    onionSkinOpacity: 0.5,
     renderer: Renderers.CANVAS,
     scrubAudio: false,
     showStatus: true,
     smoothing: 1,
+    onionSkinForwardColor: [0, 200, 50, 0.5],
+    onionSkinBackwardColor: [220, 0, 0, 0.5]
 };
 Penciltest.defaultPlayback = {
     heldExposures: 0,

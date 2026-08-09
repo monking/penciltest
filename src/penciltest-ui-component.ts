@@ -8,8 +8,10 @@ class PenciltestUIComponent {
   children: Array<PenciltestUIComponent>;
   //refreshHandlers: Array<Function>;
   isAttached: boolean;
+  isPTComponent: boolean;
 
   static restore(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict): PenciltestUIComponent {
+    if (options.is) { return options.is; }
     if (options.key && options.key in components) {
       const component = components[options.key];
       component.setContent(options);
@@ -19,6 +21,8 @@ class PenciltestUIComponent {
   }
 
   constructor(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
+    this.isPTComponent = true;
+
     this.options = {
       tagName: 'div',
       ...options
@@ -30,7 +34,7 @@ class PenciltestUIComponent {
     this.el = {};
     //this.refreshHandlers = [];
 
-    const element = this.setElement(document.createElement(this.options.tagName || 'div'));
+    const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
 
     if (this.options.on) {
       for (let eventName in this.options.on) {

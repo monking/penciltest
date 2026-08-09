@@ -1,5 +1,5 @@
 interface PromptOptions {
-  input?: HTMLInputElement | HTMLSelectElement | string;
+  input?: HTMLInputElement | HTMLSelectElement | PenciltestUIComponent | PenciltestUIComponentOptions | string;
   inputAttrs?: { [key:string]: any; };
   inputLabel?: string;
   labelLogic?: (value:string) => string;
@@ -61,81 +61,20 @@ class Utils {
     });
   };
 
-  static promptCanceled = 'canceled';
-  static async prompt(message: string, defaultValue: any = null, options: PromptOptions = {}): Promise<string> {
-    const {
-      input: givenPromptInput,
-      submitOnChange: shouldSubmitOnChange,
-      inputAttrs,
-      inputLabel,
-      labelLogic,
-    } = options;
-
-    let property: string | number, value: any;
-    const promptModal = document.createElement('div');
-    Object.assign(promptModal.style, {
-      position: 'absolute',
-      top: '0px',
-      left: '0px',
-      bottom: '0px',
-      right: '0px',
-      backgroundColor: 'rgba(0,0,0,0.5)'
-    });
-
-    const promptForm = document.createElement('form');
-    Object.assign(promptForm.style, {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      padding: '1em',
-      transform: 'translateX(-50%) translateY(-50%)',
-      backgroundColor: 'lightgray'
-    });
-    promptForm.innerHTML = message;
-    promptModal.appendChild(promptForm);
-
-    const inputRow = document.createElement('div');
-
-    const promptInput = (typeof givenPromptInput === 'string' || !givenPromptInput
-      ? document.createElement('input')
-      : givenPromptInput) as HTMLInputElement;
-    if (typeof givenPromptInput === 'string') {
-      promptInput.setAttribute('type', givenPromptInput);
-    }
-    if (inputAttrs) {
-      for (let key in inputAttrs) {
-        promptInput.setAttribute(key, inputAttrs[key]);
-      }
-    }
-    if (!promptInput.hasAttribute('id')) {
-      promptInput.setAttribute('id', 'promptInputLabel');
-    }
-    if (defaultValue !== null) { promptInput.value = defaultValue; }
-
-    inputRow.appendChild(promptInput);
-
-    if (inputLabel || labelLogic) {
-      const labelElement = document.createElement('label')
-      labelElement.setAttribute('for', promptInput.getAttribute('id'));
-      if (labelLogic) {
-        promptInput.addEventListener('input', (event) => {
-          labelElement.innerText = labelLogic(promptInput.value);
-        });
-        labelElement.innerText = labelLogic(defaultValue);
-      } else if (inputLabel) {
-        labelElement.innerText = inputLabel;
-      }
-      Object.assign(labelElement.style, {
-        padding: '0.5em 1em',
-        'vertical-align': 'top',
-        'line-height': '1.6em'
-      });
-      inputRow.appendChild(labelElement);
-    }
-
-    promptForm.appendChild(inputRow);
-
+  static async prompt(message: string, defaultValue: any = null, options: PromptOptions = {}): Promise<string | null> {
     const promptPromise:Promise<string> = new Promise((resolve, reject) => {
+      const {
+        input: givenPromptInput,
+        submitOnChange: shouldSubmitOnChange,
+        inputAttrs,
+        inputLabel,
+        labelLogic,
+      } = options;
+
+      let value: any;
+
+      const promptComponents:PenciltestUIComponentDict = {};
+
       const promptKeyListener = function(event: KeyboardEvent): any {
         const keysDescription = Utils.describeKeyCombo(event);
         if (keysDescription === 'Esc') {
@@ -144,9 +83,13 @@ class Utils {
           submitPrompt();
         }
       };
+      document.addEventListener('keydown', promptKeyListener);
 
       const closePromptModal = function() {
-        promptModal.remove();
+        const promptModal = promptComponents.modal.getElement();
+        if (promptModal) {
+          promptModal.remove();
+        }
         document.removeEventListener('keydown', promptKeyListener);
       };
 
@@ -156,40 +99,140 @@ class Utils {
       };
 
       const submitPrompt = (): void => {
+        const promptInput = promptComponents.input.getElement() as HTMLInputElement;
         closePromptModal();
         resolve(promptInput.value);
       };
 
-      document.addEventListener('keydown', promptKeyListener);
+      const promptComponentDefinitions = [];
 
-      const promptCancelButton = document.createElement('button');
-      promptCancelButton.type = 'button';
-      promptCancelButton.innerHTML = 'Cancel';
-      promptCancelButton.addEventListener('click', function(event: { preventDefault: () => void; }) {
-        event.preventDefault();
-        closePromptModal();
-        resolve(null);
-      });
-      promptForm.appendChild(promptCancelButton);
+      const modalDef:PenciltestUIComponentOptions = {
+        key: 'modal',
+        style: {
+          position: 'absolute',
+          top: '0px',
+          left: '0px',
+          bottom: '0px',
+          right: '0px',
+          backgroundColor: 'rgba(0,0,0,0.5)'
+        },
+        parentElement: document.body
+      };
+      promptComponentDefinitions.push(modalDef);
 
-      if (shouldSubmitOnChange) {
-        promptInput.addEventListener('change', submitPrompt);
-      } else {
-        const promptAcceptButton = document.createElement('input');
-        promptAcceptButton.type = 'submit';
-        promptAcceptButton.value = 'Accept';
-        promptForm.addEventListener('submit', function(event: Event) {
-          event.preventDefault();
-          submitPrompt();
+      const formDef:PenciltestUIComponentOptions = {
+        key: 'form',
+        tagName: 'form',
+        style: {
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          padding: '1em',
+          transform: 'translateX(-50%) translateY(-50%)',
+          backgroundColor: 'lightgray'
+        },
+        on: {
+          'submit': function(event:Event) {
+            event.preventDefault();
+            submitPrompt();
+          },
+        },
+        html: message,
+        parent: 'modal'
+      };
+      promptComponentDefinitions.push(formDef);
+      promptComponentDefinitions.push({ key: 'inputRow', parent: 'form' });
+      promptComponentDefinitions.push({
+          tagName: 'button',
+          attr: {
+            type: 'button'
+          },
+          text: 'Cancel',
+          on: {
+            'click': (event: Event) => {
+              event.preventDefault();
+              closePromptModal();
+              resolve(null);
+            }
+          },
+          parent: 'form'
         });
-        promptForm.appendChild(promptAcceptButton);
+
+      debugger;
+      const inputDef:PenciltestUIComponentOptions = {
+        key: 'input',
+        attr: { id: 'promptInputLabel', ...inputAttrs },
+        parent: 'inputRow',
+      };
+      if (typeof givenPromptInput === 'string' || !givenPromptInput) {
+        inputDef.tagName = 'input';
+        if (givenPromptInput === 'string' && givenPromptInput) {
+          inputDef.attr.type = givenPromptInput;
+        }
+      } else if (typeof givenPromptInput === 'object') {
+        if ((givenPromptInput as PenciltestUIComponent).isPTComponent) {
+          inputDef.is = givenPromptInput as PenciltestUIComponent;
+        } else if ("nodeName" in givenPromptInput) {
+          inputDef.el = givenPromptInput as HTMLInputElement;
+        } else {
+          const givenInputDef = givenPromptInput as PenciltestUIComponentOptions;
+          Object.assign(inputDef, {
+            ...givenInputDef,
+            parent: inputDef.parent,
+            on: { ...inputDef.on, ...givenInputDef.on },
+            attr: { ...inputDef.attr, ...givenInputDef.attr }
+          });
+        }
+      }
+      if (defaultValue !== null) { inputDef.attr.value = defaultValue; }
+      if (!inputDef.on) { inputDef.on = {}; }
+
+      promptComponentDefinitions.push(inputDef);
+
+      if (inputLabel || labelLogic) {
+        const promptInputLabelDef:PenciltestUIComponentOptions = {
+          key: 'promptInputLabel',
+          tagName: 'label',
+          attr: {
+            for: inputDef.attr.id
+          },
+          style: {
+            padding: '0.5em 1em',
+            'vertical-align': 'top',
+            'line-height': '1.6em'
+          },
+          parent: 'inputRow'
+        }
+        if (labelLogic) {
+          inputDef.on.input = () => { promptComponents.promptInputLabel.getElement().innerText = labelLogic((promptComponents.input.getElement() as HTMLInputElement).value); };
+          promptInputLabelDef.text = labelLogic(defaultValue);
+        } else if (inputLabel) {
+          promptInputLabelDef.text = inputLabel;
+        }
+        promptComponentDefinitions.push(promptInputLabelDef);
       }
 
-      document.body.appendChild(promptModal);
+      if (shouldSubmitOnChange) {
+        inputDef.on.change = submitPrompt;
+      } else {
+        promptComponentDefinitions.push({
+          tagName: 'button',
+          attr: {
+            type: 'submit'
+          },
+          text: 'Accept',
+          parent: 'form'
+        });
+      }
+
+      promptComponentDefinitions.forEach((def) => {
+        new PenciltestUIComponent(def, promptComponents);
+      });
+
       if (typeof options.onOpen === 'function') {
         options.onOpen();
       } else {
-        promptInput.focus();
+        promptComponents.input.getElement().focus();
       }
     });
 
@@ -198,18 +241,23 @@ class Utils {
     return promptPromise;
   };
 
-
   static promptSelect(message: string, choices: Array<string>, defaultValue: string, options: PromptOptions = {}): Promise<string | boolean> {
     // TODO: update the application core to handle async prompts (e.g. selectSceneNames)
-    const selectInput = document.createElement('select');
-    choices.forEach((choice, index) => {
-      const optionElement = document.createElement('option');
-      optionElement.value = choice;
-      optionElement.innerHTML = choice;
-      if (choice === defaultValue) { optionElement.setAttribute('selected', 'true'); }
-      selectInput.appendChild(optionElement);
-    });
-    return Utils.prompt(message, null, { ...options,  input: selectInput });
+    const selectDef:PenciltestUIComponentOptions = {
+      tagName: 'select',
+      children: choices.map((choice, index) => {
+        const optionDef:PenciltestUIComponentOptions = {
+          tagName: 'option',
+          attr: {
+            value: choice
+          },
+          text: choice
+        };
+        if (choice === defaultValue) { optionDef.attr.selected = 'true'; }
+        return optionDef;
+      })
+    };
+    return Utils.prompt(message, null, { ...options,  input: selectDef });
   };
 
   static async promptForFile(message: string, options: FilePromptOptions = {}): Promise<Array<any>> {

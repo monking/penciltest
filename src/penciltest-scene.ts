@@ -45,6 +45,7 @@ class PenciltestScene implements PenciltestSceneData {
   frameHold: number;
   framerate: number;
   loop: boolean;
+  debug: boolean;
 
   aspectRatio: string;
   aspect: number;

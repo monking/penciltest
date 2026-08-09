@@ -11,7 +11,7 @@ interface PenciltestMigrationInterface {
   toVersion:string;
   migrateScene?:(scene:any) => any;
   migrateStorage?:(name:string, get:Function) => any;
-  //migrateState?:(appState:any) => any;
+  migrateApp?:(controller:Penciltest) => any;
 };
 
 interface PenciltestMigrationMetadata {
@@ -125,6 +125,13 @@ class PTMigration_v0_3_0_to_v0_3_1 extends PenciltestMigrationBase {
     super();
     this.fromVersion = '0.3.0';
     this.toVersion = '0.3.1';
+  }
+  migrateApp(controller:any) {
+    // BEGIN: onion skin opacity is part of the color, and so configurable separately forward and backward.
+    const onionSkinOpacity = controller.options.onionSkinOpacity;
+    controller.options.onionSkinForwardColor = [0, 200, 50, onionSkinOpacity];
+    controller.options.onionSkinBackwardColor = [220, 0, 0, onionSkinOpacity];
+    delete controller.options.onionSkinOpacity;
   }
   migrateScene(scene:any) {
     // BEGIN: `line-` prefix changed to `stroke-`

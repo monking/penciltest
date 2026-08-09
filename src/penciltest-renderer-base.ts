@@ -16,7 +16,8 @@ class BaseRenderer implements PenciltestRenderer {
     strokeOpacity: 1,
     strokeCorner: 'round',
     width: 1920,
-    height: 1080
+    height: 1080,
+    debug: false
   };
 
   constructor(options: PenciltestRendererOptions) {
@@ -42,7 +43,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   setOptions(options:PenciltestRendererOptions) {
-    console.log('   setOptions'); // XXX
+    if (this.options.debug) { console.log('   setOptions'); }
     Object.assign(this.options, options);
   }
 
@@ -69,7 +70,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   resize(width: number, height: number): void {
-    console.log('  resize'); // XXX
+    if (this.options.debug) { console.log('  resize'); }
     this.width = width;
     this.height = height;
   }
@@ -89,7 +90,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   subpath(path: Path) {
-    console.log(' subpath'); // XXX
+    if (this.options.debug) { console.log(' subpath'); }
     path.forEach((segment, index) => {
       const { x, y } = segment;
       if (index === 0) {
@@ -101,7 +102,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   moveTo(x: number, y: number): void {
-    console.log('moveTo: %s, %s', x, y); // XXX
+    if (this.options.debug) { console.log('moveTo: %s, %s', x, y); }
   }
 
   moveToPoint(point:Point): void {
@@ -109,7 +110,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   lineTo(x: number, y: number): void {
-    console.log('lineTo: %s, %s', x, y); // XXX
+    if (this.options.debug) { console.log('lineTo: %s, %s', x, y); }
   }
 
   lineToPoint(point:Point): void {
@@ -117,11 +118,11 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   rect(rect:Rect, options: PenciltestLineOptions):void {
-    console.log('rect'); // XXX
+    if (this.options.debug) { console.log('rect'); }
   }
 
   requestRender(...enqueueWork:Array<Function>): void {
-    console.log('   render: REQ'); // XXX
+    if (this.options.debug) { console.log('   render: REQ'); }
     if (enqueueWork.length > 0) {
       Array.prototype.push.apply(this.renderOperationQueue, enqueueWork);
     }
@@ -133,33 +134,33 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   render(): void {
-    console.log('   render:     BEGIN'); // XXX
+    if (this.options.debug) { console.log('   render:     BEGIN'); }
     const queueLength = this.renderOperationQueue.length;
     if (queueLength === 0) { return; }
     const renderStart = performance.now();
     this.renderOperationQueue.forEach((o) => o());
     const renderElapsed = performance.now() - renderStart;
-    console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`);
+    if (this.options.debug) { console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`); }
     this.renderOperationQueue = [];
   }
 
 
 
   getFieldRect():Rect {
-    console.log('  getFieldRect'); // XXX
+    if (this.options.debug) { console.log('  getFieldRect'); }
     return {x:0, y:0, width:this.width, height:this.height};
   }
 
   beginPath():void {
-    console.log('beginPath'); // XXX
+    if (this.options.debug) { console.log('beginPath'); }
   }
 
   endPath():void {
-    console.log('endPath'); // XXX
+    if (this.options.debug) { console.log('endPath'); }
   }
 
   clear(redrawBackground:boolean = true):void {
-    console.log(` clear${redrawBackground ? ' BACK' : ''}`); // XXX
+    if (this.options.debug) { console.log(` clear${redrawBackground ? ' BACK' : ''}`); }
     if (redrawBackground) {
       const fieldRect = this.getFieldRect();
       this.rect(fieldRect, { fillColor: this.options.backgroundColor });
@@ -167,11 +168,11 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   destroy(): void {
-    console.log('   destroy'); // XXX
+    if (this.options.debug) { console.log('   destroy'); }
   }
 
   arc(arc:Arc, options:PenciltestLineOptions): void {
-    console.log(' arc'); // XXX
+    if (this.options.debug) { console.log(' arc'); }
     const arcPoints = PTSpace.traceArc(arc)
     this.moveToPoint(arcPoints[0]);
     arcPoints
@@ -181,7 +182,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   circle(arc:Arc, options:PenciltestLineOptions): void {
-    console.log(' circle'); // XXX
+    if (this.options.debug) { console.log(' circle'); }
     this.arc(arc, options);
     // Maybe other contexts will have diferent logic. For now, the default
     // "arc" without arguments is a circle, so `arc` and `circle` are the same
