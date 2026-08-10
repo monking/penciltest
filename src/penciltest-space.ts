@@ -30,7 +30,7 @@ class PTSpace {
     radius: 10,
     start: 0,
     end: 1,
-    resolution: 100,
+    resolution: 24,
   };
 
   static boundsAroundPoint(point:Point, radiusX:number, radiusY:number = NaN): Rect {
@@ -90,28 +90,27 @@ class PTSpace {
     return bounds;
   }
 
-  static arcPoint(config:Arc, position:number) {
+  static arcPoint(arc:Arc, angle:number) {
     return {
-      x: Math.cos(Math.PI * 2 * position) * config.radius,
-      y: Math.sin(Math.PI * 2 * position) * config.radius,
+      x: Math.cos(Math.PI * 2 * angle) * arc.radius,
+      y: Math.sin(Math.PI * 2 * angle) * arc.radius,
     };
   }
 
   static traceArc(config:Arc):Array<Point> {
-    //debugger;
     const arc = { ...PTSpace.defaultArc, ...config };
     const points:Array<Point> = [];
-    const arcStep = 1/arc.resolution;
-    let position = arc.start;
-    while (position <= arc.end) {
-      if (position > arc.end) { debugger; position = arc.end; }
-      points.push(PTSpace.arcPoint(arc, position));
-      if (position === arc.end) {
+    const arcStep = (arc.start < arc.end ? 1 : -1)/arc.resolution;
+    let angle = arc.start;
+    while (angle <= arc.end) {
+      if (angle > arc.end) { angle = arc.end; }
+      points.push(PTSpace.sumPoints(PTSpace.arcPoint(arc, angle), config.center));
+      if (angle === arc.end) {
         break;
       }
-      position += arcStep;
-      if (position > arc.end) {
-        position = arc.end;
+      angle += arcStep;
+      if (angle > arc.end) {
+        angle = arc.end;
       }
     }
     return points;
@@ -141,14 +140,19 @@ class PTSpace {
   };
 
   static scalePoint(point: Point, factor: number): Point {
-    return {
+    const scaledPoint:Mark = {
+      ...point, // for overloaded types like Mark
       x: point.x * factor,
       y: point.y * factor
+    };
+    if ("w" in scaledPoint) {
+      scaledPoint.w *= factor;
     }
+    return scaledPoint;
   };
 
   static magnitude(point: Point): number {
-    return Math.sqrt(point.x * point.x + point.y + point.y);
+    return Math.sqrt(point.x * point.x + point.y * point.y);
   };
 
   static lerpPoint(a:Point, b:Point, weight:number = 0.5): Point {
@@ -158,11 +162,13 @@ class PTSpace {
     };
   }
 
-  static sumPoints(point1:Point, point2:Point): Point {
-    return {
-      x: point1.x + point2.x,
-      y: point1.y + point2.y
-    };
+  static sumPoints(...points:Array<Point>): Point {
+    return points.reduce((sum, point) => {
+      return {
+        x: sum.x + point.x,
+        y: sum.y + point.y
+      };
+    }, PTSpace.zeroPoint);
   };
 
   static diffPoints(point1:Point, point2:Point): Point {

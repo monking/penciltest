@@ -1,7 +1,18 @@
+interface TextOptions {
+  anchor:Point;
+  fillColor?:string;
+  fontFamily?:string;
+  fontSize?:number;
+  strokeColor?:string;
+  strokeFirst?:boolean;
+  strokeWidth?:number;
+}
+
 class BaseRenderer implements PenciltestRenderer {
 
   options: PenciltestRendererOptions;
   overrides: PenciltestRendererOptions;
+  currentStyle: PenciltestRendererOptions;
   width: number;
   height: number;
   container: HTMLElement;
@@ -11,8 +22,8 @@ class BaseRenderer implements PenciltestRenderer {
   static defaultOptions: PenciltestRendererOptions = {
     container: 'body',
     strokeColor: 'black',
-    backgroundColor: 'lightgray',
-    strokeWeight: 1,
+    background: 'lightgray',
+    strokeWidth: 1,
     strokeOpacity: 1,
     strokeCorner: 'round',
     width: 1920,
@@ -62,7 +73,7 @@ class BaseRenderer implements PenciltestRenderer {
         opacityValue = String(color[3]);
       }
     } else if (opacityValue) {
-      rgb = `from ${rgb} r g b`;
+      rgb = `from ${String(color)} r g b`;
     } else {
       return String(color);
     }
@@ -75,18 +86,16 @@ class BaseRenderer implements PenciltestRenderer {
     this.height = height;
   }
 
-  composeOptions(options: PenciltestRendererOptions = {}, persist: boolean | null = null):PenciltestLineOptions {
-    const composedOptions = {
+  composeOptions(options: PenciltestRendererOptions = {}, persist: boolean | null = null) {
+    this.currentStyle = {
       ...this.options
     };
 
     if (persist === true) { Object.assign(this.overrides, options); }
 
-    if (persist !== false) { Object.assign(composedOptions, this.overrides); }
+    if (persist !== false) { Object.assign(this.currentStyle, this.overrides); }
 
-    if (persist !== true) { Object.assign(composedOptions, options); }
-
-    return composedOptions;
+    if (persist !== true) { Object.assign(this.currentStyle, options); }
   }
 
   subpath(path: Path) {
@@ -129,16 +138,16 @@ class BaseRenderer implements PenciltestRenderer {
     if (!isNaN(this.renderWaitId)) { return; } // Already pending request.
     this.renderWaitId = globalThis.requestAnimationFrame((timestamp) => {
       this.renderWaitId = NaN;
-      this.render();
+      this.render(timestamp);
     });
   }
 
-  render(): void {
+  render(timestamp:number = 0): void {
     if (this.options.debug) { console.log('   render:     BEGIN'); }
     const queueLength = this.renderOperationQueue.length;
     if (queueLength === 0) { return; }
     const renderStart = performance.now();
-    this.renderOperationQueue.forEach((o) => o());
+    this.renderOperationQueue.forEach((o) => o(this, timestamp));
     const renderElapsed = performance.now() - renderStart;
     if (this.options.debug) { console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`); }
     this.renderOperationQueue = [];
@@ -151,8 +160,11 @@ class BaseRenderer implements PenciltestRenderer {
     return {x:0, y:0, width:this.width, height:this.height};
   }
 
-  beginPath():void {
+  beginPath(options:PenciltestLineOptions | null = null):void {
     if (this.options.debug) { console.log('beginPath'); }
+    if (options !== null) {
+      this.composeOptions(options);
+    }
   }
 
   endPath():void {
@@ -161,9 +173,9 @@ class BaseRenderer implements PenciltestRenderer {
 
   clear(redrawBackground:boolean = true):void {
     if (this.options.debug) { console.log(` clear${redrawBackground ? ' BACK' : ''}`); }
-    if (redrawBackground) {
+    if (redrawBackground && this.options.background !== 'transparent') {
       const fieldRect = this.getFieldRect();
-      this.rect(fieldRect, { fillColor: this.options.backgroundColor });
+      this.rect(fieldRect, { fillColor: this.options.background });
     }
   }
 
@@ -171,21 +183,25 @@ class BaseRenderer implements PenciltestRenderer {
     if (this.options.debug) { console.log('   destroy'); }
   }
 
-  arc(arc:Arc, options:PenciltestLineOptions): void {
-    if (this.options.debug) { console.log(' arc'); }
+  arc(arc:Arc, options:PenciltestLineOptions = {}): void {
+    Object.assign(arc, PTSpace.defaultArc, arc);
     const arcPoints = PTSpace.traceArc(arc)
-    this.moveToPoint(arcPoints[0]);
-    arcPoints
-      .forEach((point:Point, i) => {
-        this.lineToPoint(point);
-      });
+    this.composeOptions(options);
+    if (this.options.debug) { console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor}`); }
+    this.subpath(arcPoints);
   }
 
   circle(arc:Arc, options:PenciltestLineOptions): void {
-    if (this.options.debug) { console.log(' circle'); }
-    this.arc(arc, options);
+    if (this.options.debug) { console.log({'fn':'circle',arc,options}); }
+    const circle:Arc = { start: 0, ...arc }
+    circle.end = circle.start + 1;
+    this.arc(circle, options);
     // Maybe other contexts will have diferent logic. For now, the default
     // "arc" without arguments is a circle, so `arc` and `circle` are the same
     // for now..
+  }
+
+  text(text:string, options: TextOptions) {
+    if (this.options.debug) { console.log({'fn':'text',text,options}); }
   }
 }

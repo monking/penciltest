@@ -21,7 +21,7 @@ class PenciltestScene implements PenciltestSceneData {
     strokeColor: 'black',
     strokeCorner: 'round',
     strokeOpacity: 1,
-    strokeWeight: 1,
+    strokeWidth: 1,
 
     aspectRatio: '1:1',
     height: 1024
@@ -55,7 +55,7 @@ class PenciltestScene implements PenciltestSceneData {
   strokeColor: Color | string;
   strokeCorner: CanvasLineJoin;
   strokeOpacity: number;
-  strokeWeight: number;
+  strokeWidth: number;
 
   constructor(sceneData:PenciltestSceneData) {
     const now = new Date();
@@ -75,7 +75,7 @@ class PenciltestScene implements PenciltestSceneData {
     this.frameHold = 2;
     this.background = 'gray';
     this.strokeColor = 'black';
-    this.strokeWeight = 1;
+    this.strokeWidth = 1;
     this.frames = [];
     this.current = new SceneState(sceneData.current || {});
 

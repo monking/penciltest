@@ -47,6 +47,7 @@ class Locale {
     }
 
     const engine = (key:string, innerDict:LocaleDict = {}, recursionLimit:number = Locale.recursionLimit): string => {
+      if (!key) { return ''; }
       const filters: Array<Function> = [];
       // NOTE: Filters are run inside out.
       // e.g. "\\U\\p5" will first run the 'p' (plural) filter, then 'U' (uppercase) on the output of 'p'.

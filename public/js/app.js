@@ -63,6 +63,9 @@ class Locale {
             this.pluralOperation = (message, engine) => Number(message) === 1 ? engine('_singular') : engine('_plural');
         }
         const engine = (key, innerDict = {}, recursionLimit = Locale.recursionLimit) => {
+            if (!key) {
+                return '';
+            }
             const filters = [];
             // NOTE: Filters are run inside out.
             // e.g. "\\U\\p5" will first run the 'p' (plural) filter, then 'U' (uppercase) on the output of 'p'.

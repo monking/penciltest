@@ -32,15 +32,15 @@ class PenciltestRenderExporter {
       : { start: 0, end: this.controller.scene.frames.length - 1 };
 
     const gifSize = Math.min(512, this.controller.scene.height);
-    const strokeWeight = 1;
-    const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
+    const strokeWidth = 1;
+    const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWidth}`);
     if (!gifConfigurationString) {
       return;
     }
 
     const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
     const maxGifDimension = parseInt(gifConfiguration[0], 10);
-    const gifLineWeight = parseInt(gifConfiguration[1], 10);
+    const gifLineWidth = parseInt(gifConfiguration[1], 10);
     const dimensions = this.controller.scene.getDimensions();
     if (dimensions.width > maxGifDimension) {
       dimensions.width = maxGifDimension;
@@ -60,7 +60,7 @@ class PenciltestRenderExporter {
 
     //this.controller.ui.appActions.renderer.action();
 
-    const gifRenderOverrides = {strokeWeight: gifLineWeight};
+    const gifRenderOverrides = {strokeWidth: gifLineWidth};
 
     const baseFrameDelay = 1000 / this.controller.scene.framerate;
 
@@ -75,7 +75,7 @@ class PenciltestRenderExporter {
     for (let frameNumber = renderRange.start; frameNumber <= renderRange.end; frameNumber++) {
       this.controller.goToFrame(frameNumber, gifRenderOverrides);
       gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
-      gifEncoder.addFrame((this.controller.renderer as CanvasRenderer).context);
+      gifEncoder.addFrame((this.controller.sceneRenderer as CanvasRenderer).context);
     }
 
     gifEncoder.finish();

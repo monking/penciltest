@@ -34,7 +34,7 @@ interface PenciltestLineOptions {
   strokeColor?: Color | string;
   strokeCorner?: CanvasLineJoin;
   strokeOpacity?: number;
-  strokeWeight?: number;
+  strokeWidth?: number;
   fillColor?: Color | string;
   fillOpacity?: number;
 }
@@ -49,15 +49,17 @@ interface PenciltestSceneOptions extends PenciltestLineOptions, Rect {
 
 interface PenciltestOptions extends PenciltestSceneOptions {
   container?: string;
+  eraserWidth?: number;
   hideCursor?: boolean;
   onionSkin?: boolean;
+  onionSkinBackwardColor?: Color;
+  onionSkinForwardColor?: Color;
   onionSkinFrameRadius?: number;
   renderer?: Renderers;
   scrubAudio?: boolean;
   showStatus?: boolean;
   smoothing?: number;
-  onionSkinForwardColor?: Color;
-  onionSkinBackwardColor?: Color;
+  strokeWidth?: number;
 };
 
 interface PenciltestGesture {
@@ -156,7 +158,7 @@ interface PenciltestRendererOptions extends PenciltestLineOptions, PenciltestSce
   container?: string | HTMLElement;
   width?: number;
   height?: number;
-  backgroundColor?: string;
+  alpha?: boolean;
 }
 
 interface PenciltestRenderer {
@@ -173,7 +175,7 @@ interface PenciltestRenderer {
 
   rect(config:Rect, options:PenciltestLineOptions):void
 
-  composeOptions(overrides: PenciltestRendererOptions, persist: boolean | null):PenciltestLineOptions;
+  composeOptions(overrides?: PenciltestRendererOptions, persist?: boolean | null):void;
 
   beginPath():void;
 
@@ -193,9 +195,10 @@ interface PenciltestRenderer {
 }
 
 
-interface Mark extends Vector { weight?: number; }
+interface Mark extends Vector { w?: number; }
 
 interface Stroke extends PenciltestLineOptions {
+  width?: number;
   path: Path;
 };
 

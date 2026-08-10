@@ -102,7 +102,7 @@ class PenciltestUI extends PenciltestUIComponent {
     this.appActions = {
       showMenu: {
         label: "Show Menu",
-        hotkey: ['Tab'],
+        hotkey: ['F'],
         gesture: /4 still/,
         listener(this: Penciltest) {
           this.ui.toggleMenu(this.ui.pointer || {x: 10, y: 10});
@@ -122,27 +122,10 @@ class PenciltestUI extends PenciltestUIComponent {
           self.setOptions({renderer: selectedRenderer as Renderers.CANVAS | Renderers.SVG})
         },
         action(this: Penciltest) {
-          if (this.fieldElement) {
-            if (this.renderer != null) {
-              this.renderer.destroy();
-            }
-            const sceneDimensions = this.scene.getDimensions();
-            const rendererOptions: PenciltestRendererOptions = {
-              strokeColor: this.scene.strokeColor,
-              strokeWeight: this.scene.strokeWeight,
-              strokeOpacity: this.scene.strokeOpacity,
-              container: this.fieldElement,
-              width: this.forceDimensions ? Number(this.forceDimensions.width) : sceneDimensions.width,
-              height: this.forceDimensions ? Number(this.forceDimensions.height) : sceneDimensions.height,
-              debug: this.options.debug
-            };
-            if (this.options.renderer === Renderers.SVG) {
-              this.renderer = new SVGRenderer(rendererOptions);
-            } else {
-              this.renderer = new CanvasRenderer(rendererOptions);
-            }
-            return this.renderer;
+          if (this.sceneRenderer != null) {
+            this.sceneRenderer.destroy();
           }
+          this.prepareRenderers();
         }
       },
 
@@ -368,8 +351,8 @@ class PenciltestUI extends PenciltestUIComponent {
           if (this.scene) {
             this.scene.strokeColor = this.options.strokeColor;
           }
-          if (this.renderer) {
-            this.renderer.options.strokeColor = this.options.strokeColor;
+          if (this.sceneRenderer) {
+            this.sceneRenderer.options.strokeColor = this.options.strokeColor;
             this.drawCurrentFrame();
           }
         }
@@ -387,8 +370,8 @@ class PenciltestUI extends PenciltestUIComponent {
           if (this.scene) {
             this.scene.background = this.options.background;
           }
-          if (this.renderer) {
-            this.renderer.options.background = this.options.background;
+          if (this.sceneRenderer) {
+            this.sceneRenderer.options.background = this.options.background;
           }
           this.drawCurrentFrame()
         }
@@ -578,7 +561,8 @@ class PenciltestUI extends PenciltestUIComponent {
         listener(this: Penciltest) { this.setOptions({debug: !this.options.debug}); },
         action(this: Penciltest) {
           if (this.scene) { this.scene.debug = this.options.debug; }
-          if (this.renderer) { this.renderer.options.debug = this.options.debug; }
+          if (this.sceneRenderer) { this.sceneRenderer.options.debug = this.options.debug; }
+          if (this.toolRenderer) { this.toolRenderer.options.debug = this.options.debug; }
           this.ui.updateStatusBar();
         }
       },
@@ -588,7 +572,13 @@ class PenciltestUI extends PenciltestUIComponent {
         hotkey: ['Tab'],
         cancelComplementKeyEvent: true,
         title: "Show/hide the scene status bar",
-        listener(this: Penciltest) { this.setOptions({showStatus: !this.options.showStatus}); },
+        listener(this: Penciltest, event:Event) {
+          const keyEvent = event as KeyboardEvent;
+          if (keyEvent.altKey || keyEvent.shiftKey || keyEvent.ctrlKey) {
+            return;
+          }
+          this.setOptions({showStatus: !this.options.showStatus});
+        },
         action(this: Penciltest) {
           this.ui.components.statusBar.getElement().classList.toggle('hidden', !this.options.showStatus);
           this.resize();
@@ -749,7 +739,7 @@ class PenciltestUI extends PenciltestUIComponent {
               position: 'relative',
               color: 'white',
               textAlign: 'center',
-              backgroundColor: 'rgba(0,0,0,0.5)'
+              background: 'rgba(0,0,0,0.5)'
             }
           }, this.ui.components);
 
@@ -917,8 +907,10 @@ class PenciltestUI extends PenciltestUIComponent {
             loadAs: 'text',
             submitOnChange: true
           };
-          const [sceneJSON, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
           try {
+            const inputFile = await Utils.promptForFile(promptMessage, promptOptions);
+            if (inputFile === null) { return []; }
+            const [sceneJSON, filePath] = inputFile;
             await this.setScene(JSON.parse(sceneJSON));
           } catch(reason) {
             console.error(reason);
@@ -938,7 +930,9 @@ class PenciltestUI extends PenciltestUIComponent {
             submitOnChange: true
           };
           try {
-            const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
+            const inputFile = await Utils.promptForFile(promptMessage, promptOptions);
+            if (inputFile === null) { return; }
+            const [uri, filePath] = inputFile;
             if (uri) {
               this.loadAudio(uri, filePath);
             }
@@ -994,9 +988,51 @@ class PenciltestUI extends PenciltestUIComponent {
         }
       },
 
+      smallerTool: {
+        label: "Smaller tool",
+        hotkey: ['['],
+        repeat: true,
+        title: "Decrease the radius of the current tool",
+        listener(this: Penciltest) {
+          if (this.state.mode !== PenciltestMode.DRAWING) { return; }
+          switch(this.state.toolStack[0]) {
+            case PenciltestTool.ERASER:
+              this.setOptions({eraserWidth: Math.max(1, this.options.eraserWidth - 1)});
+              break;
+            default:
+              this.setOptions({strokeWidth: Math.max(1, this.options.strokeWidth - 1)});
+              break;
+          }
+        },
+        action(this: Penciltest) {
+          this.drawTool({metadataTimeout: 3000});
+        }
+      },
+
+      largerTool: {
+        label: "Larger tool",
+        hotkey: [']'],
+        repeat: true,
+        title: "Increase the radius of the current tool",
+        listener(this: Penciltest) {
+          if (this.state.mode !== PenciltestMode.DRAWING) { return; }
+          switch(this.state.toolStack[0]) {
+            case PenciltestTool.ERASER:
+              this.setOptions({eraserWidth: Math.min(256, this.options.eraserWidth + 1)});
+              break;
+            default:
+              this.setOptions({strokeWidth: Math.min(256, this.options.strokeWidth + 1)});
+              break;
+          }
+        },
+        action(this: Penciltest) {
+          this.drawTool({metadataTimeout: 3000});
+        }
+      },
+
       shiftAudioEarlier: {
         label: "Shift Audio Earlier",
-        hotkey: ['['],
+        hotkey: ['Shift+['],
         repeat: true,
         title: "Decrease the offset of the audio playback",
         listener(this: Penciltest) {
@@ -1013,7 +1049,7 @@ class PenciltestUI extends PenciltestUIComponent {
       shiftAudioLater: {
         label: "Shift Audio Later",
         title: "Increase the offset of the audio playback",
-        hotkey: [']'],
+        hotkey: ['Shift+]'],
         repeat: true,
         listener(this: Penciltest) {
           if (!this.scene?.audio?.offset) {
@@ -1073,10 +1109,10 @@ class PenciltestUI extends PenciltestUIComponent {
     };
 
     this.defaultDragOptions = {
-      startTarget: document.body,
-      moveTarget: document.body,
-      endTarget: document.body,
-      coordinateScope: 'client',
+      startTarget: this.controller.container,
+      moveTarget: this.controller.container,
+      endTarget: this.controller.container,
+      coordinateScope: 'page',
       touchLimit: 5,
     };
 
@@ -1227,8 +1263,6 @@ class PenciltestUI extends PenciltestUIComponent {
 
     this.pointer = {x: 0, y: 0}; // FIXME Smoothing may make this origin evident.
 
-    //const trackFromEvent = (pageCoords: any) => Object.assign(this.pointer, pageCoords); // DELME: unused @1785514531
-    
     let fieldBounds;
     const updateFieldBounds = () => {
       fieldBounds = {
@@ -1279,8 +1313,8 @@ class PenciltestUI extends PenciltestUIComponent {
         fieldPointerMoveListener(event);
         //const pagePoint = Utils.eventPoint(pointerEvent);
         //const offsetPoint = {
-        //  x: this.controller.fieldContainer.offsetLeft,
-        //  y: this.controller.fieldContainer.offsetTop
+        //  x: this.controller.fieldElement.offsetLeft,
+        //  y: this.controller.fieldElement.offsetTop
         //};
         //this.controller.track(PTSpace.diffPoints(pagePoint, offsetPoint));
       }
@@ -1296,13 +1330,14 @@ class PenciltestUI extends PenciltestUIComponent {
         return this.progressGesture(this.describeGesture(fieldBounds));
       } else {
         const pagePoint = Utils.eventPoint(event, 'page');
-        Object.assign(this.pointer, pagePoint);
+        const offsetPoint = {
+          x: this.controller.fieldElement.offsetLeft,
+          y: this.controller.fieldElement.offsetTop
+        };
+        const trackPoint = PTSpace.diffPoints(pagePoint, offsetPoint);
+        Object.assign(this.pointer, trackPoint);
         if (this.controller.state.mode === PenciltestMode.DRAWING) {
-          const offsetPoint = {
-            x: this.controller.fieldContainer.offsetLeft,
-            y: this.controller.fieldContainer.offsetTop
-          };
-          this.controller.track(PTSpace.diffPoints(pagePoint, offsetPoint));
+          this.controller.track(trackPoint);
         }
       }
     };
@@ -1366,16 +1401,16 @@ class PenciltestUI extends PenciltestUIComponent {
     //     event.preventDefault()
     // )
     // globalThis.addEventListener 'touchstart', preventPinchZoomHandler, true
-    // document.body.addEventListener 'touchstart', preventPinchZoomHandler, true
+    // this.controller.container.addEventListener 'touchstart', preventPinchZoomHandler, true
     // globalThis.addEventListener 'touchmove', preventPinchZoomHandler, true
-    // document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
+    // this.controller.container.addEventListener 'touchmove', preventPinchZoomHandler, true
 
     const helpListener = () => this.triggerAppAction('toggleInterfaceHelp')
 
     this.components.appStatus.getElement().addEventListener('click', statusClickListener);
     this.components.sceneStatus.getElement().addEventListener('click', statusClickListener);
-    this.controller.fieldElement.addEventListener('mousedown', fieldPointerPressListener);
-    this.controller.fieldElement.addEventListener('touchstart', fieldPointerPressListener);
+    this.controller.fieldContainer.addEventListener('mousedown', fieldPointerPressListener);
+    this.controller.fieldContainer.addEventListener('touchstart', fieldPointerPressListener);
     globalThis.addEventListener('mousemove', fieldPointerMoveListener);
     globalThis.addEventListener('touchmove', fieldPointerMoveListener);
     this.controller.container.addEventListener('contextmenu', contextMenuListener);
@@ -1389,11 +1424,11 @@ class PenciltestUI extends PenciltestUIComponent {
     if (!this.currentGesture) {
       this.currentGesture = {
         touches: event.targetTouches.length,
-        origin: Utils.eventPoint(event, "client", 5)
+        origin: Utils.eventPoint(event, "page", 5)
       };
     }
 
-    this.currentGesture.last = Utils.eventPoint(event, "client", 5);
+    this.currentGesture.last = Utils.eventPoint(event, "page", 5);
     this.currentGesture.delta = PTSpace.diffPoints(this.currentGesture.last, this.currentGesture.origin);
     return this.currentGesture.deltaNormalized = {
       x: this.currentGesture.delta.x / bounds.width,
@@ -1732,6 +1767,9 @@ class PenciltestUI extends PenciltestUIComponent {
               attr: {'contenteditable': 'true'},
               on: {
                 input: (e) => this.controller.scene.name = (e.target as HTMLElement).innerText,
+                focus: (e) => {
+                  if ((e.target as HTMLElement).innerText === 'untitled') { (e.target as HTMLElement).innerText = ''; }
+                },
                 blur: (e) => this.updateStatusBar()
               }
             },

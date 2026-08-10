@@ -81,6 +81,7 @@
     transition-duration: 0.3s;
     opacity: 0;
     user-select: none;
+    pointer-events: none;
   }
 
   .menu {

@@ -38,7 +38,10 @@ class PenciltestUIComponent {
 
     if (this.options.on) {
       for (let eventName in this.options.on) {
-        this.getElement().addEventListener(eventName, this.options.on[eventName].bind(this.getElement()));
+        const boundListener = this.options.on[eventName].bind(this.getElement())
+        this.getElement().addEventListener(eventName, (event) => {
+          boundListener(event, this.components);
+        });
       }
     }
 

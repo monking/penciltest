@@ -1,13 +1,16 @@
 interface PromptOptions {
+  inputKeys?: Array<string>;
+  onOpen?: Function;
+}
+interface PromptSingleInputOptions extends PromptOptions {
   input?: HTMLInputElement | HTMLSelectElement | PenciltestUIComponent | PenciltestUIComponentOptions | string;
   inputAttrs?: { [key:string]: any; };
   inputLabel?: string;
   labelLogic?: (value:string) => string;
-  onOpen?: Function;
   submitOnChange?: boolean;
 }
 
-interface FilePromptOptions extends PromptOptions {
+interface FilePromptOptions extends PromptSingleInputOptions {
   accept?: string;
   loadAs?: "text" | "uri" | "files";
 }
@@ -61,17 +64,8 @@ class Utils {
     });
   };
 
-  static async prompt(message: string, defaultValue: any = null, options: PromptOptions = {}): Promise<string | null> {
-    const promptPromise:Promise<string> = new Promise((resolve, reject) => {
-      const {
-        input: givenPromptInput,
-        submitOnChange: shouldSubmitOnChange,
-        inputAttrs,
-        inputLabel,
-        labelLogic,
-      } = options;
-
-      let value: any;
+  static async promptForm(message:string, formComponentDefs: Array<PenciltestUIComponentOptions>, options: PromptOptions = {}): Promise<Dictionary> {
+    const promptPromise:Promise<Dictionary> = new Promise((resolve, reject) => {
 
       const promptComponents:PenciltestUIComponentDict = {};
 
@@ -99,9 +93,18 @@ class Utils {
       };
 
       const submitPrompt = (): void => {
-        const promptInput = promptComponents.input.getElement() as HTMLInputElement;
+        const result = {};
+        if (Array.isArray(options.inputKeys) && options.inputKeys.length > 0) {
+          options.inputKeys.forEach((key) => {
+            const component = promptComponents[key];
+            if (!component) { return; }
+            const inputElement = promptComponents[key].getElement() as HTMLInputElement;
+            if (!inputElement) { return; }
+            result[key] = inputElement.value;
+          });
+        }
         closePromptModal();
-        resolve(promptInput.value);
+        resolve(result);
       };
 
       const promptComponentDefinitions = [];
@@ -141,89 +144,37 @@ class Utils {
         parent: 'modal'
       };
       promptComponentDefinitions.push(formDef);
-      promptComponentDefinitions.push({ key: 'inputRow', parent: 'form' });
       promptComponentDefinitions.push({
-          tagName: 'button',
-          attr: {
-            type: 'button'
-          },
-          text: 'Cancel',
-          on: {
-            'click': (event: Event) => {
-              event.preventDefault();
-              closePromptModal();
-              resolve(null);
-            }
-          },
-          parent: 'form'
-        });
+        key: 'formBody',
+        parent: 'form',
+        children: formComponentDefs
+      });
+      promptComponentDefinitions.push({
+        key: 'cancel',
+        tagName: 'button',
+        attr: {
+          type: 'button'
+        },
+        text: 'Cancel',
+        on: {
+          'click': (event: Event) => {
+            event.preventDefault();
+            closePromptModal();
+            resolve(null);
+          }
+        },
+        parent: 'form'
+      });
+      promptComponentDefinitions.push({
+        key: 'submit',
+        tagName: 'button',
+        attr: {
+          type: 'submit'
+        },
+        text: 'Accept',
+        parent: 'form'
+      });
 
-      debugger;
-      const inputDef:PenciltestUIComponentOptions = {
-        key: 'input',
-        attr: { id: 'promptInputLabel', ...inputAttrs },
-        parent: 'inputRow',
-      };
-      if (typeof givenPromptInput === 'string' || !givenPromptInput) {
-        inputDef.tagName = 'input';
-        if (givenPromptInput === 'string' && givenPromptInput) {
-          inputDef.attr.type = givenPromptInput;
-        }
-      } else if (typeof givenPromptInput === 'object') {
-        if ((givenPromptInput as PenciltestUIComponent).isPTComponent) {
-          inputDef.is = givenPromptInput as PenciltestUIComponent;
-        } else if ("nodeName" in givenPromptInput) {
-          inputDef.el = givenPromptInput as HTMLInputElement;
-        } else {
-          const givenInputDef = givenPromptInput as PenciltestUIComponentOptions;
-          Object.assign(inputDef, {
-            ...givenInputDef,
-            parent: inputDef.parent,
-            on: { ...inputDef.on, ...givenInputDef.on },
-            attr: { ...inputDef.attr, ...givenInputDef.attr }
-          });
-        }
-      }
-      if (defaultValue !== null) { inputDef.attr.value = defaultValue; }
-      if (!inputDef.on) { inputDef.on = {}; }
-
-      promptComponentDefinitions.push(inputDef);
-
-      if (inputLabel || labelLogic) {
-        const promptInputLabelDef:PenciltestUIComponentOptions = {
-          key: 'promptInputLabel',
-          tagName: 'label',
-          attr: {
-            for: inputDef.attr.id
-          },
-          style: {
-            padding: '0.5em 1em',
-            'vertical-align': 'top',
-            'line-height': '1.6em'
-          },
-          parent: 'inputRow'
-        }
-        if (labelLogic) {
-          inputDef.on.input = () => { promptComponents.promptInputLabel.getElement().innerText = labelLogic((promptComponents.input.getElement() as HTMLInputElement).value); };
-          promptInputLabelDef.text = labelLogic(defaultValue);
-        } else if (inputLabel) {
-          promptInputLabelDef.text = inputLabel;
-        }
-        promptComponentDefinitions.push(promptInputLabelDef);
-      }
-
-      if (shouldSubmitOnChange) {
-        inputDef.on.change = submitPrompt;
-      } else {
-        promptComponentDefinitions.push({
-          tagName: 'button',
-          attr: {
-            type: 'submit'
-          },
-          text: 'Accept',
-          parent: 'form'
-        });
-      }
 
       promptComponentDefinitions.forEach((def) => {
         new PenciltestUIComponent(def, promptComponents);
@@ -239,10 +190,87 @@ class Utils {
     Utils.registerGlobalPromise(promptPromise);
 
     return promptPromise;
+  }
+
+  static async prompt(message: string, defaultValue: any = null, options: PromptSingleInputOptions = {}): Promise<string | null> {
+    const {
+      input: givenPromptInput,
+      submitOnChange: shouldSubmitOnChange,
+      inputAttrs,
+      inputLabel,
+      labelLogic,
+    } = options;
+
+    const promptComponentDefinitions = [];
+
+    const inputDef:PenciltestUIComponentOptions = {
+      key: 'input',
+      attr: { id: 'promptInputLabel', ...inputAttrs },
+      parent: 'formBody',
+    };
+    if (typeof givenPromptInput === 'string' || !givenPromptInput) {
+      inputDef.tagName = 'input';
+      if (typeof givenPromptInput === 'string' && givenPromptInput) {
+        inputDef.attr.type = givenPromptInput;
+      }
+    } else if (typeof givenPromptInput === 'object') {
+      if ((givenPromptInput as PenciltestUIComponent).isPTComponent) {
+        inputDef.is = givenPromptInput as PenciltestUIComponent;
+      } else if ("nodeName" in givenPromptInput) {
+        inputDef.el = givenPromptInput as HTMLInputElement;
+      } else {
+        const givenInputDef = givenPromptInput as PenciltestUIComponentOptions;
+        Object.assign(inputDef, {
+          ...givenInputDef,
+          parent: inputDef.parent,
+          on: { ...inputDef.on, ...givenInputDef.on },
+          attr: { ...inputDef.attr, ...givenInputDef.attr }
+        });
+      }
+    }
+    if (defaultValue !== null) { inputDef.attr.value = defaultValue; }
+    if (!inputDef.on) { inputDef.on = {}; }
+
+    promptComponentDefinitions.push(inputDef);
+
+    if (inputLabel || labelLogic) {
+      const promptInputLabelDef:PenciltestUIComponentOptions = {
+        key: 'promptInputLabel',
+        tagName: 'label',
+        attr: {
+          for: inputDef.attr.id
+        },
+        style: {
+          padding: '0.5em 1em',
+          'vertical-align': 'top',
+          'line-height': '1.6em'
+        },
+        parent: 'formBody'
+      }
+      if (labelLogic) {
+        inputDef.on.input = (event, components) => { components.promptInputLabel.getElement().innerText = labelLogic((components.input.getElement() as HTMLInputElement).value); };
+        promptInputLabelDef.text = labelLogic(defaultValue);
+      } else if (inputLabel) {
+        promptInputLabelDef.text = inputLabel;
+      }
+      promptComponentDefinitions.push(promptInputLabelDef);
+    }
+
+    if (shouldSubmitOnChange) {
+      inputDef.on.change = (event, components) => {
+        (components.form.getElement() as HTMLFormElement).requestSubmit();
+      };
+    }
+
+    const promptFormOptions:PromptOptions = {
+      ...options,
+      inputKeys: ['input']
+    };
+    const result = await Utils.promptForm(message, promptComponentDefinitions, promptFormOptions);
+    return result === null ? null : result.input;
   };
 
-  static promptSelect(message: string, choices: Array<string>, defaultValue: string, options: PromptOptions = {}): Promise<string | boolean> {
-    // TODO: update the application core to handle async prompts (e.g. selectSceneNames)
+  static promptSelect(message: string, choices: Array<string>, defaultValue: string, options: PromptSingleInputOptions = {}): Promise<string | boolean> {
     const selectDef:PenciltestUIComponentOptions = {
       tagName: 'select',
       children: choices.map((choice, index) => {
@@ -260,39 +288,37 @@ class Utils {
     return Utils.prompt(message, null, { ...options,  input: selectDef });
   };
 
-  static async promptForFile(message: string, options: FilePromptOptions = {}): Promise<Array<any>> {
+  static async promptForFile(message: string, options: FilePromptOptions = {}): Promise<Array<any> | null> {
     // FIXME include filePath in result
     const { accept, loadAs } = options;
     const fileInput = document.createElement('input') as HTMLInputElement;
     fileInput.setAttribute('type', 'file');
     if (accept) { fileInput.setAttribute('accept', accept); }
-    try {
-      const filePath = await Utils.prompt(
-        message,
-        null,
-        {
-          onOpen: () => fileInput.click(),
-          ...options,
-          input: fileInput
-        }
-      );
-      if (filePath) {
-        const files = Array.from(fileInput.files);
-        if (loadAs === 'text') {
-          return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
-            const fileReader = new FileReader();
-            fileReader.addEventListener('load', (event: ProgressEvent<FileReader>) => resolve(event.target.result));
-            fileReader.addEventListener('error', (event: ProgressEvent<FileReader>) => reject(event));
-            fileReader.readAsText(file);
-          })));
-        } else if (loadAs === 'uri') {
-          return files.map((file) => URL.createObjectURL(file));
-        } else {
-          return files;
-        }
-      };
-    } catch(ignore) {
-      return [];
+    const filePath = await Utils.prompt(
+      message,
+      null,
+      {
+        onOpen: () => fileInput.click(),
+        ...options,
+        input: fileInput
+      }
+    );
+    if (filePath) {
+      const files = Array.from(fileInput.files);
+      if (loadAs === 'text') {
+        return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+          const fileReader = new FileReader();
+          fileReader.addEventListener('load', (event: ProgressEvent<FileReader>) => resolve(event.target.result));
+          fileReader.addEventListener('error', (event: ProgressEvent<FileReader>) => reject(event));
+          fileReader.readAsText(file);
+        })));
+      } else if (loadAs === 'uri') {
+        return files.map((file) => URL.createObjectURL(file));
+      } else {
+        return files;
+      }
+    } else {
+      return null;
     }
   };
 

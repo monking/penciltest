@@ -1,19 +1,20 @@
 class CanvasRenderer extends BaseRenderer {
   field: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
-  currentLineOptions: {
-      fillStyle:string;
-      strokeStyle:string;
-      lineJoin:string;
-      lineWidth:number;
-    };
+  currentCanvasStyle: {
+    fillStyle:string;
+    strokeStyle:string;
+    lineJoin:string;
+    lineWidth:number;
+  };
   //container: HTMLElement;
 
   constructor(options: PenciltestRendererOptions) {
     super(options);
 
     this.field = document.createElement('canvas') as HTMLCanvasElement;
-    this.context = this.field.getContext('2d', {alpha: false});
+    this.field.style.backgroundColor = this.getColorString(this.options.background);
+    this.context = this.field.getContext('2d', {alpha: options.alpha});
 
     this.resize(this.options.width, this.options.height);
 
@@ -28,7 +29,7 @@ class CanvasRenderer extends BaseRenderer {
   }
 
   endPath():void {
-    this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+    this.context.strokeStyle = this.currentCanvasStyle.strokeStyle;
     super.endPath();
     this.context.stroke();
   }
@@ -48,13 +49,13 @@ class CanvasRenderer extends BaseRenderer {
     //this.beginPath();
     this.composeOptions(options);
     if (options.fillColor && !options.strokeColor) {
-      this.context.fillStyle = this.currentLineOptions.fillStyle;
+      this.context.fillStyle = this.currentCanvasStyle.fillStyle;
       this.context.fillRect(x, y, width, height);
     } else {
       this.context.rect(x, y, width, height);
     }
     if (options.strokeColor) {
-      this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+      this.context.strokeStyle = this.currentCanvasStyle.strokeStyle;
       this.context.stroke();
     }
     super.rect(rect, options);
@@ -62,20 +63,19 @@ class CanvasRenderer extends BaseRenderer {
 
   applyStyle() {
     if (this.context) {
-      Object.assign(this.context, this.currentLineOptions);
+      Object.assign(this.context, this.currentCanvasStyle);
     }
   }
 
-  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null):PenciltestLineOptions {
-    const composedOptions = super.composeOptions(overrides);
-    this.currentLineOptions = {
-      fillStyle: this.getColorString(composedOptions.fillColor, composedOptions.fillOpacity),
-      strokeStyle: this.getColorString(composedOptions.strokeColor, composedOptions.strokeOpacity),
-      lineJoin: composedOptions.strokeCorner,
-      lineWidth: composedOptions.strokeWeight,
+  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null) {
+    super.composeOptions(overrides);
+    this.currentCanvasStyle = {
+      fillStyle: this.getColorString(this.currentStyle.fillColor, this.currentStyle.fillOpacity),
+      strokeStyle: this.getColorString(this.currentStyle.strokeColor, this.currentStyle.strokeOpacity),
+      lineJoin: this.currentStyle.strokeCorner,
+      lineWidth: this.currentStyle.strokeWidth,
     };
     this.applyStyle();
-    return composedOptions;
   }
 
   clear(redrawBackground:boolean = true) {
@@ -93,5 +93,58 @@ class CanvasRenderer extends BaseRenderer {
     this.field.setAttribute('width', String(width));
     this.field.setAttribute('height', String(height));
     return super.resize(width, height);
+  }
+
+  arc(arc:Arc, options:PenciltestLineOptions = {}): void {
+    if (this.options.debug) { console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor} (${this.currentCanvasStyle.strokeStyle})`); }
+    this.composeOptions(options);
+    this.applyStyle();
+    this.context.arc(
+      arc.center.x,
+      arc.center.y,
+      arc.radius,
+      arc.start * Math.PI * 2,
+      arc.end * Math.PI * 2
+    );
+  }
+
+  text(text:string, options: TextOptions) {
+    super.text(text, options);
+    const {
+      anchor,
+      fillColor,
+      font,
+      strokeColor,
+      strokeFirst,
+      strokeWidth,
+    } = {
+      fillColor: 'black',
+      font: '12px sans-serif',
+      strokeColor: '',
+      strokeFirst: false,
+      strokeWidth: 0,
+      ...options
+    };
+    this.context.font = font;
+    const renderOperations = [];
+    if (fillColor) {
+      renderOperations.push(() => {
+        this.context.fillStyle = fillColor;
+        this.context.fillText(text, anchor.x, anchor.y);
+      });
+    }
+    if (strokeColor && strokeWidth) {
+      renderOperations.push(() => {
+        this.context.strokeStyle = strokeColor;
+        this.context.lineWidth = strokeWidth;
+        this.context.strokeText(text, anchor.x, anchor.y);
+      });
+    }
+
+    if (strokeFirst && renderOperations.length > 1) {
+      renderOperations.reverse();
+    }
+
+    renderOperations.forEach((o) => o());
   }
 }

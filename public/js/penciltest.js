@@ -99,10 +99,8 @@ class Utils {
         });
     }
     ;
-    static async prompt(message, defaultValue = null, options = {}) {
+    static async promptForm(message, formComponentDefs, options = {}) {
         const promptPromise = new Promise((resolve, reject) => {
-            const { input: givenPromptInput, submitOnChange: shouldSubmitOnChange, inputAttrs, inputLabel, labelLogic, } = options;
-            let value;
             const promptComponents = {};
             const promptKeyListener = function (event) {
                 const keysDescription = Utils.describeKeyCombo(event);
@@ -126,9 +124,22 @@ class Utils {
                 resolve(null);
             };
             const submitPrompt = () => {
-                const promptInput = promptComponents.input.getElement();
+                const result = {};
+                if (Array.isArray(options.inputKeys) && options.inputKeys.length > 0) {
+                    options.inputKeys.forEach((key) => {
+                        const component = promptComponents[key];
+                        if (!component) {
+                            return;
+                        }
+                        const inputElement = promptComponents[key].getElement();
+                        if (!inputElement) {
+                            return;
+                        }
+                        result[key] = inputElement.value;
+                    });
+                }
                 closePromptModal();
-                resolve(promptInput.value);
+                resolve(result);
             };
             const promptComponentDefinitions = [];
             const modalDef = {
@@ -165,8 +176,13 @@ class Utils {
                 parent: 'modal'
             };
             promptComponentDefinitions.push(formDef);
-            promptComponentDefinitions.push({ key: 'inputRow', parent: 'form' });
             promptComponentDefinitions.push({
+                key: 'formBody',
+                parent: 'form',
+                children: formComponentDefs
+            });
+            promptComponentDefinitions.push({
+                key: 'cancel',
                 tagName: 'button',
                 attr: {
                     type: 'button'
@@ -181,78 +197,15 @@ class Utils {
                 },
                 parent: 'form'
             });
-            debugger;
-            const inputDef = {
-                key: 'input',
-                attr: { id: 'promptInputLabel', ...inputAttrs },
-                parent: 'inputRow',
-            };
-            if (typeof givenPromptInput === 'string' || !givenPromptInput) {
-                inputDef.tagName = 'input';
-                if (givenPromptInput === 'string' && givenPromptInput) {
-                    inputDef.attr.type = givenPromptInput;
-                }
-            }
-            else if (typeof givenPromptInput === 'object') {
-                if (givenPromptInput.isPTComponent) {
-                    inputDef.is = givenPromptInput;
-                }
-                else if ("nodeName" in givenPromptInput) {
-                    inputDef.el = givenPromptInput;
-                }
-                else {
-                    const givenInputDef = givenPromptInput;
-                    Object.assign(inputDef, {
-                        ...givenInputDef,
-                        parent: inputDef.parent,
-                        on: { ...inputDef.on, ...givenInputDef.on },
-                        attr: { ...inputDef.attr, ...givenInputDef.attr }
-                    });
-                }
-            }
-            if (defaultValue !== null) {
-                inputDef.attr.value = defaultValue;
-            }
-            if (!inputDef.on) {
-                inputDef.on = {};
-            }
-            promptComponentDefinitions.push(inputDef);
-            if (inputLabel || labelLogic) {
-                const promptInputLabelDef = {
-                    key: 'promptInputLabel',
-                    tagName: 'label',
-                    attr: {
-                        for: inputDef.attr.id
-                    },
-                    style: {
-                        padding: '0.5em 1em',
-                        'vertical-align': 'top',
-                        'line-height': '1.6em'
-                    },
-                    parent: 'inputRow'
-                };
-                if (labelLogic) {
-                    inputDef.on.input = () => { promptComponents.promptInputLabel.getElement().innerText = labelLogic(promptComponents.input.getElement().value); };
-                    promptInputLabelDef.text = labelLogic(defaultValue);
-                }
-                else if (inputLabel) {
-                    promptInputLabelDef.text = inputLabel;
-                }
-                promptComponentDefinitions.push(promptInputLabelDef);
-            }
-            if (shouldSubmitOnChange) {
-                inputDef.on.change = submitPrompt;
-            }
-            else {
-                promptComponentDefinitions.push({
-                    tagName: 'button',
-                    attr: {
-                        type: 'submit'
-                    },
-                    text: 'Accept',
-                    parent: 'form'
-                });
-            }
+            promptComponentDefinitions.push({
+                key: 'submit',
+                tagName: 'button',
+                attr: {
+                    type: 'submit'
+                },
+                text: 'Accept',
+                parent: 'form'
+            });
             promptComponentDefinitions.forEach((def) => {
                 new PenciltestUIComponent(def, promptComponents);
             });
@@ -266,9 +219,81 @@ class Utils {
         Utils.registerGlobalPromise(promptPromise);
         return promptPromise;
     }
+    static async prompt(message, defaultValue = null, options = {}) {
+        const { input: givenPromptInput, submitOnChange: shouldSubmitOnChange, inputAttrs, inputLabel, labelLogic, } = options;
+        const promptComponentDefinitions = [];
+        const inputDef = {
+            key: 'input',
+            attr: { id: 'promptInputLabel', ...inputAttrs },
+            parent: 'formBody',
+        };
+        if (typeof givenPromptInput === 'string' || !givenPromptInput) {
+            inputDef.tagName = 'input';
+            if (typeof givenPromptInput === 'string' && givenPromptInput) {
+                inputDef.attr.type = givenPromptInput;
+            }
+        }
+        else if (typeof givenPromptInput === 'object') {
+            if (givenPromptInput.isPTComponent) {
+                inputDef.is = givenPromptInput;
+            }
+            else if ("nodeName" in givenPromptInput) {
+                inputDef.el = givenPromptInput;
+            }
+            else {
+                const givenInputDef = givenPromptInput;
+                Object.assign(inputDef, {
+                    ...givenInputDef,
+                    parent: inputDef.parent,
+                    on: { ...inputDef.on, ...givenInputDef.on },
+                    attr: { ...inputDef.attr, ...givenInputDef.attr }
+                });
+            }
+        }
+        if (defaultValue !== null) {
+            inputDef.attr.value = defaultValue;
+        }
+        if (!inputDef.on) {
+            inputDef.on = {};
+        }
+        promptComponentDefinitions.push(inputDef);
+        if (inputLabel || labelLogic) {
+            const promptInputLabelDef = {
+                key: 'promptInputLabel',
+                tagName: 'label',
+                attr: {
+                    for: inputDef.attr.id
+                },
+                style: {
+                    padding: '0.5em 1em',
+                    'vertical-align': 'top',
+                    'line-height': '1.6em'
+                },
+                parent: 'formBody'
+            };
+            if (labelLogic) {
+                inputDef.on.input = (event, components) => { components.promptInputLabel.getElement().innerText = labelLogic(components.input.getElement().value); };
+                promptInputLabelDef.text = labelLogic(defaultValue);
+            }
+            else if (inputLabel) {
+                promptInputLabelDef.text = inputLabel;
+            }
+            promptComponentDefinitions.push(promptInputLabelDef);
+        }
+        if (shouldSubmitOnChange) {
+            inputDef.on.change = (event, components) => {
+                components.form.getElement().requestSubmit();
+            };
+        }
+        const promptFormOptions = {
+            ...options,
+            inputKeys: ['input']
+        };
+        const result = await Utils.promptForm(message, promptComponentDefinitions, promptFormOptions);
+        return result === null ? null : result.input;
+    }
     ;
     static promptSelect(message, choices, defaultValue, options = {}) {
-        // TODO: update the application core to handle async prompts (e.g. selectSceneNames)
         const selectDef = {
             tagName: 'select',
             children: choices.map((choice, index) => {
@@ -296,33 +321,30 @@ class Utils {
         if (accept) {
             fileInput.setAttribute('accept', accept);
         }
-        try {
-            const filePath = await Utils.prompt(message, null, {
-                onOpen: () => fileInput.click(),
-                ...options,
-                input: fileInput
-            });
-            if (filePath) {
-                const files = Array.from(fileInput.files);
-                if (loadAs === 'text') {
-                    return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
-                        const fileReader = new FileReader();
-                        fileReader.addEventListener('load', (event) => resolve(event.target.result));
-                        fileReader.addEventListener('error', (event) => reject(event));
-                        fileReader.readAsText(file);
-                    })));
-                }
-                else if (loadAs === 'uri') {
-                    return files.map((file) => URL.createObjectURL(file));
-                }
-                else {
-                    return files;
-                }
+        const filePath = await Utils.prompt(message, null, {
+            onOpen: () => fileInput.click(),
+            ...options,
+            input: fileInput
+        });
+        if (filePath) {
+            const files = Array.from(fileInput.files);
+            if (loadAs === 'text') {
+                return await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+                    const fileReader = new FileReader();
+                    fileReader.addEventListener('load', (event) => resolve(event.target.result));
+                    fileReader.addEventListener('error', (event) => reject(event));
+                    fileReader.readAsText(file);
+                })));
             }
-            ;
+            else if (loadAs === 'uri') {
+                return files.map((file) => URL.createObjectURL(file));
+            }
+            else {
+                return files;
+            }
         }
-        catch (ignore) {
-            return [];
+        else {
+            return null;
         }
     }
     ;
@@ -626,30 +648,28 @@ class PTSpace {
         });
         return bounds;
     }
-    static arcPoint(config, position) {
+    static arcPoint(arc, angle) {
         return {
-            x: Math.cos(Math.PI * 2 * position) * config.radius,
-            y: Math.sin(Math.PI * 2 * position) * config.radius,
+            x: Math.cos(Math.PI * 2 * angle) * arc.radius,
+            y: Math.sin(Math.PI * 2 * angle) * arc.radius,
         };
     }
     static traceArc(config) {
-        //debugger;
         const arc = { ...PTSpace.defaultArc, ...config };
         const points = [];
-        const arcStep = 1 / arc.resolution;
-        let position = arc.start;
-        while (position <= arc.end) {
-            if (position > arc.end) {
-                debugger;
-                position = arc.end;
+        const arcStep = (arc.start < arc.end ? 1 : -1) / arc.resolution;
+        let angle = arc.start;
+        while (angle <= arc.end) {
+            if (angle > arc.end) {
+                angle = arc.end;
             }
-            points.push(PTSpace.arcPoint(arc, position));
-            if (position === arc.end) {
+            points.push(PTSpace.sumPoints(PTSpace.arcPoint(arc, angle), config.center));
+            if (angle === arc.end) {
                 break;
             }
-            position += arcStep;
-            if (position > arc.end) {
-                position = arc.end;
+            angle += arcStep;
+            if (angle > arc.end) {
+                angle = arc.end;
             }
         }
         return points;
@@ -675,14 +695,19 @@ class PTSpace {
     }
     ;
     static scalePoint(point, factor) {
-        return {
+        const scaledPoint = {
+            ...point, // for overloaded types like Mark
             x: point.x * factor,
             y: point.y * factor
         };
+        if ("w" in scaledPoint) {
+            scaledPoint.w *= factor;
+        }
+        return scaledPoint;
     }
     ;
     static magnitude(point) {
-        return Math.sqrt(point.x * point.x + point.y + point.y);
+        return Math.sqrt(point.x * point.x + point.y * point.y);
     }
     ;
     static lerpPoint(a, b, weight = 0.5) {
@@ -691,11 +716,13 @@ class PTSpace {
             y: Utils.lerp(a.y, b.y, weight)
         };
     }
-    static sumPoints(point1, point2) {
-        return {
-            x: point1.x + point2.x,
-            y: point1.y + point2.y
-        };
+    static sumPoints(...points) {
+        return points.reduce((sum, point) => {
+            return {
+                x: sum.x + point.x,
+                y: sum.y + point.y
+            };
+        }, PTSpace.zeroPoint);
     }
     ;
     static diffPoints(point1, point2) {
@@ -719,7 +746,7 @@ PTSpace.defaultArc = {
     radius: 10,
     start: 0,
     end: 1,
-    resolution: 100,
+    resolution: 24,
 };
 
 "use strict";
@@ -753,7 +780,7 @@ class PenciltestScene {
         this.frameHold = 2;
         this.background = 'gray';
         this.strokeColor = 'black';
-        this.strokeWeight = 1;
+        this.strokeWidth = 1;
         this.frames = [];
         this.current = new SceneState(sceneData.current || {});
         // Restrict assignment to existing keys in new scene.
@@ -920,7 +947,7 @@ PenciltestScene.defaultOptions = {
     strokeColor: 'black',
     strokeCorner: 'round',
     strokeOpacity: 1,
-    strokeWeight: 1,
+    strokeWidth: 1,
     aspectRatio: '1:1',
     height: 1024
 };
@@ -1411,7 +1438,10 @@ class PenciltestUIComponent {
         const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
         if (this.options.on) {
             for (let eventName in this.options.on) {
-                this.getElement().addEventListener(eventName, this.options.on[eventName].bind(this.getElement()));
+                const boundListener = this.options.on[eventName].bind(this.getElement());
+                this.getElement().addEventListener(eventName, (event) => {
+                    boundListener(event, this.components);
+                });
             }
         }
         if (this.options.children) {
@@ -1577,7 +1607,7 @@ class BaseRenderer {
             }
         }
         else if (opacityValue) {
-            rgb = `from ${rgb} r g b`;
+            rgb = `from ${String(color)} r g b`;
         }
         else {
             return String(color);
@@ -1592,19 +1622,18 @@ class BaseRenderer {
         this.height = height;
     }
     composeOptions(options = {}, persist = null) {
-        const composedOptions = {
+        this.currentStyle = {
             ...this.options
         };
         if (persist === true) {
             Object.assign(this.overrides, options);
         }
         if (persist !== false) {
-            Object.assign(composedOptions, this.overrides);
+            Object.assign(this.currentStyle, this.overrides);
         }
         if (persist !== true) {
-            Object.assign(composedOptions, options);
+            Object.assign(this.currentStyle, options);
         }
-        return composedOptions;
     }
     subpath(path) {
         if (this.options.debug) {
@@ -1653,10 +1682,10 @@ class BaseRenderer {
         } // Already pending request.
         this.renderWaitId = globalThis.requestAnimationFrame((timestamp) => {
             this.renderWaitId = NaN;
-            this.render();
+            this.render(timestamp);
         });
     }
-    render() {
+    render(timestamp = 0) {
         if (this.options.debug) {
             console.log('   render:     BEGIN');
         }
@@ -1665,7 +1694,7 @@ class BaseRenderer {
             return;
         }
         const renderStart = performance.now();
-        this.renderOperationQueue.forEach((o) => o());
+        this.renderOperationQueue.forEach((o) => o(this, timestamp));
         const renderElapsed = performance.now() - renderStart;
         if (this.options.debug) {
             console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`);
@@ -1678,9 +1707,12 @@ class BaseRenderer {
         }
         return { x: 0, y: 0, width: this.width, height: this.height };
     }
-    beginPath() {
+    beginPath(options = null) {
         if (this.options.debug) {
             console.log('beginPath');
+        }
+        if (options !== null) {
+            this.composeOptions(options);
         }
     }
     endPath() {
@@ -1692,9 +1724,9 @@ class BaseRenderer {
         if (this.options.debug) {
             console.log(` clear${redrawBackground ? ' BACK' : ''}`);
         }
-        if (redrawBackground) {
+        if (redrawBackground && this.options.background !== 'transparent') {
             const fieldRect = this.getFieldRect();
-            this.rect(fieldRect, { fillColor: this.options.backgroundColor });
+            this.rect(fieldRect, { fillColor: this.options.background });
         }
     }
     destroy() {
@@ -1702,32 +1734,37 @@ class BaseRenderer {
             console.log('   destroy');
         }
     }
-    arc(arc, options) {
-        if (this.options.debug) {
-            console.log(' arc');
-        }
+    arc(arc, options = {}) {
+        Object.assign(arc, PTSpace.defaultArc, arc);
         const arcPoints = PTSpace.traceArc(arc);
-        this.moveToPoint(arcPoints[0]);
-        arcPoints
-            .forEach((point, i) => {
-            this.lineToPoint(point);
-        });
+        this.composeOptions(options);
+        if (this.options.debug) {
+            console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor}`);
+        }
+        this.subpath(arcPoints);
     }
     circle(arc, options) {
         if (this.options.debug) {
-            console.log(' circle');
+            console.log({ 'fn': 'circle', arc, options });
         }
-        this.arc(arc, options);
+        const circle = { start: 0, ...arc };
+        circle.end = circle.start + 1;
+        this.arc(circle, options);
         // Maybe other contexts will have diferent logic. For now, the default
         // "arc" without arguments is a circle, so `arc` and `circle` are the same
         // for now..
+    }
+    text(text, options) {
+        if (this.options.debug) {
+            console.log({ 'fn': 'text', text, options });
+        }
     }
 }
 BaseRenderer.defaultOptions = {
     container: 'body',
     strokeColor: 'black',
-    backgroundColor: 'lightgray',
-    strokeWeight: 1,
+    background: 'lightgray',
+    strokeWidth: 1,
     strokeOpacity: 1,
     strokeCorner: 'round',
     width: 1920,
@@ -1741,7 +1778,8 @@ class CanvasRenderer extends BaseRenderer {
     constructor(options) {
         super(options);
         this.field = document.createElement('canvas');
-        this.context = this.field.getContext('2d', { alpha: false });
+        this.field.style.backgroundColor = this.getColorString(this.options.background);
+        this.context = this.field.getContext('2d', { alpha: options.alpha });
         this.resize(this.options.width, this.options.height);
         this.container.appendChild(this.field);
         this.applyStyle(); // Was skipped over in super's composeOptions, because this.context can't be set before super() is called.
@@ -1751,7 +1789,7 @@ class CanvasRenderer extends BaseRenderer {
         this.context.beginPath();
     }
     endPath() {
-        this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+        this.context.strokeStyle = this.currentCanvasStyle.strokeStyle;
         super.endPath();
         this.context.stroke();
     }
@@ -1768,33 +1806,32 @@ class CanvasRenderer extends BaseRenderer {
         //this.beginPath();
         this.composeOptions(options);
         if (options.fillColor && !options.strokeColor) {
-            this.context.fillStyle = this.currentLineOptions.fillStyle;
+            this.context.fillStyle = this.currentCanvasStyle.fillStyle;
             this.context.fillRect(x, y, width, height);
         }
         else {
             this.context.rect(x, y, width, height);
         }
         if (options.strokeColor) {
-            this.context.strokeStyle = this.currentLineOptions.strokeStyle;
+            this.context.strokeStyle = this.currentCanvasStyle.strokeStyle;
             this.context.stroke();
         }
         super.rect(rect, options);
     }
     applyStyle() {
         if (this.context) {
-            Object.assign(this.context, this.currentLineOptions);
+            Object.assign(this.context, this.currentCanvasStyle);
         }
     }
     composeOptions(overrides = {}, persist = null) {
-        const composedOptions = super.composeOptions(overrides);
-        this.currentLineOptions = {
-            fillStyle: this.getColorString(composedOptions.fillColor, composedOptions.fillOpacity),
-            strokeStyle: this.getColorString(composedOptions.strokeColor, composedOptions.strokeOpacity),
-            lineJoin: composedOptions.strokeCorner,
-            lineWidth: composedOptions.strokeWeight,
+        super.composeOptions(overrides);
+        this.currentCanvasStyle = {
+            fillStyle: this.getColorString(this.currentStyle.fillColor, this.currentStyle.fillOpacity),
+            strokeStyle: this.getColorString(this.currentStyle.strokeColor, this.currentStyle.strokeOpacity),
+            lineJoin: this.currentStyle.strokeCorner,
+            lineWidth: this.currentStyle.strokeWidth,
         };
         this.applyStyle();
-        return composedOptions;
     }
     clear(redrawBackground = true) {
         const { x, y, width, height } = this.getFieldRect();
@@ -1809,6 +1846,44 @@ class CanvasRenderer extends BaseRenderer {
         this.field.setAttribute('width', String(width));
         this.field.setAttribute('height', String(height));
         return super.resize(width, height);
+    }
+    arc(arc, options = {}) {
+        if (this.options.debug) {
+            console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor} (${this.currentCanvasStyle.strokeStyle})`);
+        }
+        this.composeOptions(options);
+        this.applyStyle();
+        this.context.arc(arc.center.x, arc.center.y, arc.radius, arc.start * Math.PI * 2, arc.end * Math.PI * 2);
+    }
+    text(text, options) {
+        super.text(text, options);
+        const { anchor, fillColor, font, strokeColor, strokeFirst, strokeWidth, } = {
+            fillColor: 'black',
+            font: '12px sans-serif',
+            strokeColor: '',
+            strokeFirst: false,
+            strokeWidth: 0,
+            ...options
+        };
+        this.context.font = font;
+        const renderOperations = [];
+        if (fillColor) {
+            renderOperations.push(() => {
+                this.context.fillStyle = fillColor;
+                this.context.fillText(text, anchor.x, anchor.y);
+            });
+        }
+        if (strokeColor && strokeWidth) {
+            renderOperations.push(() => {
+                this.context.strokeStyle = strokeColor;
+                this.context.lineWidth = strokeWidth;
+                this.context.strokeText(text, anchor.x, anchor.y);
+            });
+        }
+        if (strokeFirst && renderOperations.length > 1) {
+            renderOperations.reverse();
+        }
+        renderOperations.forEach((o) => o());
     }
 }
 
@@ -1936,7 +2011,7 @@ class PenciltestUI extends PenciltestUIComponent {
         this.appActions = {
             showMenu: {
                 label: "Show Menu",
-                hotkey: ['Tab'],
+                hotkey: ['F'],
                 gesture: /4 still/,
                 listener() {
                     this.ui.toggleMenu(this.ui.pointer || { x: 10, y: 10 });
@@ -1951,28 +2026,10 @@ class PenciltestUI extends PenciltestUIComponent {
                     self.setOptions({ renderer: selectedRenderer });
                 },
                 action() {
-                    if (this.fieldElement) {
-                        if (this.renderer != null) {
-                            this.renderer.destroy();
-                        }
-                        const sceneDimensions = this.scene.getDimensions();
-                        const rendererOptions = {
-                            strokeColor: this.scene.strokeColor,
-                            strokeWeight: this.scene.strokeWeight,
-                            strokeOpacity: this.scene.strokeOpacity,
-                            container: this.fieldElement,
-                            width: this.forceDimensions ? Number(this.forceDimensions.width) : sceneDimensions.width,
-                            height: this.forceDimensions ? Number(this.forceDimensions.height) : sceneDimensions.height,
-                            debug: this.options.debug
-                        };
-                        if (this.options.renderer === Renderers.SVG) {
-                            this.renderer = new SVGRenderer(rendererOptions);
-                        }
-                        else {
-                            this.renderer = new CanvasRenderer(rendererOptions);
-                        }
-                        return this.renderer;
+                    if (this.sceneRenderer != null) {
+                        this.sceneRenderer.destroy();
                     }
+                    this.prepareRenderers();
                 }
             },
             pageFlip: {
@@ -2183,8 +2240,8 @@ class PenciltestUI extends PenciltestUIComponent {
                     if (this.scene) {
                         this.scene.strokeColor = this.options.strokeColor;
                     }
-                    if (this.renderer) {
-                        this.renderer.options.strokeColor = this.options.strokeColor;
+                    if (this.sceneRenderer) {
+                        this.sceneRenderer.options.strokeColor = this.options.strokeColor;
                         this.drawCurrentFrame();
                     }
                 }
@@ -2201,8 +2258,8 @@ class PenciltestUI extends PenciltestUIComponent {
                     if (this.scene) {
                         this.scene.background = this.options.background;
                     }
-                    if (this.renderer) {
-                        this.renderer.options.background = this.options.background;
+                    if (this.sceneRenderer) {
+                        this.sceneRenderer.options.background = this.options.background;
                     }
                     this.drawCurrentFrame();
                 }
@@ -2381,8 +2438,11 @@ class PenciltestUI extends PenciltestUIComponent {
                     if (this.scene) {
                         this.scene.debug = this.options.debug;
                     }
-                    if (this.renderer) {
-                        this.renderer.options.debug = this.options.debug;
+                    if (this.sceneRenderer) {
+                        this.sceneRenderer.options.debug = this.options.debug;
+                    }
+                    if (this.toolRenderer) {
+                        this.toolRenderer.options.debug = this.options.debug;
                     }
                     this.ui.updateStatusBar();
                 }
@@ -2392,7 +2452,13 @@ class PenciltestUI extends PenciltestUIComponent {
                 hotkey: ['Tab'],
                 cancelComplementKeyEvent: true,
                 title: "Show/hide the scene status bar",
-                listener() { this.setOptions({ showStatus: !this.options.showStatus }); },
+                listener(event) {
+                    const keyEvent = event;
+                    if (keyEvent.altKey || keyEvent.shiftKey || keyEvent.ctrlKey) {
+                        return;
+                    }
+                    this.setOptions({ showStatus: !this.options.showStatus });
+                },
                 action() {
                     this.ui.components.statusBar.getElement().classList.toggle('hidden', !this.options.showStatus);
                     this.resize();
@@ -2545,7 +2611,7 @@ class PenciltestUI extends PenciltestUIComponent {
                             position: 'relative',
                             color: 'white',
                             textAlign: 'center',
-                            backgroundColor: 'rgba(0,0,0,0.5)'
+                            background: 'rgba(0,0,0,0.5)'
                         }
                     }, this.ui.components);
                     const gifImage = PenciltestUIComponent.restore({
@@ -2696,8 +2762,12 @@ class PenciltestUI extends PenciltestUIComponent {
                         loadAs: 'text',
                         submitOnChange: true
                     };
-                    const [sceneJSON, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
                     try {
+                        const inputFile = await Utils.promptForFile(promptMessage, promptOptions);
+                        if (inputFile === null) {
+                            return [];
+                        }
+                        const [sceneJSON, filePath] = inputFile;
                         await this.setScene(JSON.parse(sceneJSON));
                     }
                     catch (reason) {
@@ -2717,7 +2787,11 @@ class PenciltestUI extends PenciltestUIComponent {
                         submitOnChange: true
                     };
                     try {
-                        const [uri, filePath] = await Utils.promptForFile(promptMessage, promptOptions);
+                        const inputFile = await Utils.promptForFile(promptMessage, promptOptions);
+                        if (inputFile === null) {
+                            return;
+                        }
+                        const [uri, filePath] = inputFile;
                         if (uri) {
                             this.loadAudio(uri, filePath);
                         }
@@ -2770,9 +2844,53 @@ class PenciltestUI extends PenciltestUIComponent {
                     this.ui.showFeedback({ text: `Volume: ${this.scene.audio.volume}%` });
                 }
             },
+            smallerTool: {
+                label: "Smaller tool",
+                hotkey: ['['],
+                repeat: true,
+                title: "Decrease the radius of the current tool",
+                listener() {
+                    if (this.state.mode !== PenciltestMode.DRAWING) {
+                        return;
+                    }
+                    switch (this.state.toolStack[0]) {
+                        case PenciltestTool.ERASER:
+                            this.setOptions({ eraserWidth: Math.max(1, this.options.eraserWidth - 1) });
+                            break;
+                        default:
+                            this.setOptions({ strokeWidth: Math.max(1, this.options.strokeWidth - 1) });
+                            break;
+                    }
+                },
+                action() {
+                    this.drawTool({ metadataTimeout: 3000 });
+                }
+            },
+            largerTool: {
+                label: "Larger tool",
+                hotkey: [']'],
+                repeat: true,
+                title: "Increase the radius of the current tool",
+                listener() {
+                    if (this.state.mode !== PenciltestMode.DRAWING) {
+                        return;
+                    }
+                    switch (this.state.toolStack[0]) {
+                        case PenciltestTool.ERASER:
+                            this.setOptions({ eraserWidth: Math.min(256, this.options.eraserWidth + 1) });
+                            break;
+                        default:
+                            this.setOptions({ strokeWidth: Math.min(256, this.options.strokeWidth + 1) });
+                            break;
+                    }
+                },
+                action() {
+                    this.drawTool({ metadataTimeout: 3000 });
+                }
+            },
             shiftAudioEarlier: {
                 label: "Shift Audio Earlier",
-                hotkey: ['['],
+                hotkey: ['Shift+['],
                 repeat: true,
                 title: "Decrease the offset of the audio playback",
                 listener() {
@@ -2788,7 +2906,7 @@ class PenciltestUI extends PenciltestUIComponent {
             shiftAudioLater: {
                 label: "Shift Audio Later",
                 title: "Increase the offset of the audio playback",
-                hotkey: [']'],
+                hotkey: ['Shift+]'],
                 repeat: true,
                 listener() {
                     var _a, _b;
@@ -2843,10 +2961,10 @@ class PenciltestUI extends PenciltestUIComponent {
             },
         };
         this.defaultDragOptions = {
-            startTarget: document.body,
-            moveTarget: document.body,
-            endTarget: document.body,
-            coordinateScope: 'client',
+            startTarget: this.controller.container,
+            moveTarget: this.controller.container,
+            endTarget: this.controller.container,
+            coordinateScope: 'page',
             touchLimit: 5,
         };
         const startingComponents = [
@@ -2986,7 +3104,6 @@ class PenciltestUI extends PenciltestUIComponent {
     addInputListeners() {
         this.previousEvent = null;
         this.pointer = { x: 0, y: 0 }; // FIXME Smoothing may make this origin evident.
-        //const trackFromEvent = (pageCoords: any) => Object.assign(this.pointer, pageCoords); // DELME: unused @1785514531
         let fieldBounds;
         const updateFieldBounds = () => {
             fieldBounds = {
@@ -3038,8 +3155,8 @@ class PenciltestUI extends PenciltestUIComponent {
                 fieldPointerMoveListener(event);
                 //const pagePoint = Utils.eventPoint(pointerEvent);
                 //const offsetPoint = {
-                //  x: this.controller.fieldContainer.offsetLeft,
-                //  y: this.controller.fieldContainer.offsetTop
+                //  x: this.controller.fieldElement.offsetLeft,
+                //  y: this.controller.fieldElement.offsetTop
                 //};
                 //this.controller.track(PTSpace.diffPoints(pagePoint, offsetPoint));
             }
@@ -3053,13 +3170,14 @@ class PenciltestUI extends PenciltestUIComponent {
             }
             else {
                 const pagePoint = Utils.eventPoint(event, 'page');
-                Object.assign(this.pointer, pagePoint);
+                const offsetPoint = {
+                    x: this.controller.fieldElement.offsetLeft,
+                    y: this.controller.fieldElement.offsetTop
+                };
+                const trackPoint = PTSpace.diffPoints(pagePoint, offsetPoint);
+                Object.assign(this.pointer, trackPoint);
                 if (this.controller.state.mode === PenciltestMode.DRAWING) {
-                    const offsetPoint = {
-                        x: this.controller.fieldContainer.offsetLeft,
-                        y: this.controller.fieldContainer.offsetTop
-                    };
-                    this.controller.track(PTSpace.diffPoints(pagePoint, offsetPoint));
+                    this.controller.track(trackPoint);
                 }
             }
         };
@@ -3120,14 +3238,14 @@ class PenciltestUI extends PenciltestUIComponent {
         //     event.preventDefault()
         // )
         // globalThis.addEventListener 'touchstart', preventPinchZoomHandler, true
-        // document.body.addEventListener 'touchstart', preventPinchZoomHandler, true
+        // this.controller.container.addEventListener 'touchstart', preventPinchZoomHandler, true
         // globalThis.addEventListener 'touchmove', preventPinchZoomHandler, true
-        // document.body.addEventListener 'touchmove', preventPinchZoomHandler, true
+        // this.controller.container.addEventListener 'touchmove', preventPinchZoomHandler, true
         const helpListener = () => this.triggerAppAction('toggleInterfaceHelp');
         this.components.appStatus.getElement().addEventListener('click', statusClickListener);
         this.components.sceneStatus.getElement().addEventListener('click', statusClickListener);
-        this.controller.fieldElement.addEventListener('mousedown', fieldPointerPressListener);
-        this.controller.fieldElement.addEventListener('touchstart', fieldPointerPressListener);
+        this.controller.fieldContainer.addEventListener('mousedown', fieldPointerPressListener);
+        this.controller.fieldContainer.addEventListener('touchstart', fieldPointerPressListener);
         globalThis.addEventListener('mousemove', fieldPointerMoveListener);
         globalThis.addEventListener('touchmove', fieldPointerMoveListener);
         this.controller.container.addEventListener('contextmenu', contextMenuListener);
@@ -3140,10 +3258,10 @@ class PenciltestUI extends PenciltestUIComponent {
         if (!this.currentGesture) {
             this.currentGesture = {
                 touches: event.targetTouches.length,
-                origin: Utils.eventPoint(event, "client", 5)
+                origin: Utils.eventPoint(event, "page", 5)
             };
         }
-        this.currentGesture.last = Utils.eventPoint(event, "client", 5);
+        this.currentGesture.last = Utils.eventPoint(event, "page", 5);
         this.currentGesture.delta = PTSpace.diffPoints(this.currentGesture.last, this.currentGesture.origin);
         return this.currentGesture.deltaNormalized = {
             x: this.currentGesture.delta.x / bounds.width,
@@ -3464,6 +3582,11 @@ class PenciltestUI extends PenciltestUIComponent {
                             attr: { 'contenteditable': 'true' },
                             on: {
                                 input: (e) => this.controller.scene.name = e.target.innerText,
+                                focus: (e) => {
+                                    if (e.target.innerText === 'untitled') {
+                                        e.target.innerText = '';
+                                    }
+                                },
                                 blur: (e) => this.updateStatusBar()
                             }
                         },
@@ -4255,14 +4378,14 @@ class PenciltestRenderExporter {
             ? this.controller.state.frameSelection
             : { start: 0, end: this.controller.scene.frames.length - 1 };
         const gifSize = Math.min(512, this.controller.scene.height);
-        const strokeWeight = 1;
-        const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWeight}`);
+        const strokeWidth = 1;
+        const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWidth}`);
         if (!gifConfigurationString) {
             return;
         }
         const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
         const maxGifDimension = parseInt(gifConfiguration[0], 10);
-        const gifLineWeight = parseInt(gifConfiguration[1], 10);
+        const gifLineWidth = parseInt(gifConfiguration[1], 10);
         const dimensions = this.controller.scene.getDimensions();
         if (dimensions.width > maxGifDimension) {
             dimensions.width = maxGifDimension;
@@ -4279,7 +4402,7 @@ class PenciltestRenderExporter {
         //this.controller.ui.appActions.renderer.action();
         this.controller.resize();
         //this.controller.ui.appActions.renderer.action();
-        const gifRenderOverrides = { strokeWeight: gifLineWeight };
+        const gifRenderOverrides = { strokeWidth: gifLineWidth };
         const baseFrameDelay = 1000 / this.controller.scene.framerate;
         // prepare encoder
         const gifEncoder = GIFEncoder();
@@ -4291,7 +4414,7 @@ class PenciltestRenderExporter {
         for (let frameNumber = renderRange.start; frameNumber <= renderRange.end; frameNumber++) {
             this.controller.goToFrame(frameNumber, gifRenderOverrides);
             gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
-            gifEncoder.addFrame(this.controller.renderer.context);
+            gifEncoder.addFrame(this.controller.sceneRenderer.context);
         }
         gifEncoder.finish();
         const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }));
@@ -4317,7 +4440,7 @@ class Penciltest {
             ...Penciltest.defaultState,
             ...storedState,
         };
-        this.markBuffer = [];
+        this.trackBuffer = [];
         this.workingOn = [];
         this.playback = { ...Penciltest.defaultPlayback };
         this.migrator = new PenciltestMigrator();
@@ -4328,8 +4451,10 @@ class Penciltest {
         this.newScene();
         this.setOptions(this.options)
             .then(() => {
+            //this.prepareRenderers(); // Already called in penciltest-ui reaction to `renderer` setting. Leaving this note here to remember this is when it happens.
             this.resize();
             this.drawCurrentFrame();
+            this.useTool(PenciltestTool.PENCIL);
         });
     }
     ;
@@ -4354,6 +4479,28 @@ class Penciltest {
             this.scene.updateState();
         }
         this.resize();
+    }
+    prepareRenderers() {
+        const rendererOptions = {
+            strokeColor: this.scene.strokeColor,
+            strokeWidth: this.scene.strokeWidth,
+            strokeOpacity: this.scene.strokeOpacity,
+            container: this.fieldElement,
+            background: this.scene.background,
+            debug: this.options.debug
+        };
+        if (this.options.renderer === Renderers.SVG) {
+            this.sceneRenderer = new SVGRenderer(rendererOptions);
+        }
+        else {
+            this.sceneRenderer = new CanvasRenderer(rendererOptions);
+        }
+        const toolRendererOptions = {
+            ...rendererOptions,
+            background: 'transparent',
+            alpha: true,
+        };
+        this.toolRenderer = new CanvasRenderer(toolRendererOptions);
     }
     setPlayback(newPlayback) {
         Object.assign(this.playback, newPlayback);
@@ -4430,11 +4577,11 @@ class Penciltest {
         if (this.state.mode === PenciltestMode.DRAWING) {
             if (this.previousMark && this.previousMark !== mark) {
                 const previousMark = Utils.clone(this.previousMark); // to enable deferred rendering
-                this.renderer.requestRender(() => {
-                    this.renderer.beginPath();
-                    this.renderer.moveToPoint(previousMark);
-                    this.renderer.lineToPoint(mark);
-                    this.renderer.endPath();
+                this.sceneRenderer.requestRender((renderer, timestamp) => {
+                    renderer.beginPath({ strokeWidth: this.options.strokeWidth * this.zoomFactor });
+                    renderer.moveToPoint(previousMark);
+                    renderer.lineToPoint(mark);
+                    renderer.endPath();
                 });
             }
         }
@@ -4445,25 +4592,23 @@ class Penciltest {
     track(trackMark) {
         var _a;
         const isDown = this.state.pointerMode === PointerMode.PRESS;
-        if (isDown && this.options.smoothing > 0) {
-            this.markBuffer.unshift(trackMark);
-            if (this.markBuffer.length > this.options.smoothing) {
-                this.markBuffer.pop();
-            }
+        this.trackBuffer.unshift(trackMark);
+        if (this.trackBuffer.length > 3) {
+            this.trackBuffer.pop();
         }
+        const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
+        this.drawTool({ trackPoint: trackMark, down: isDown });
         if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
             if (isDown) {
-                this.mark(trackMark);
+                this.mark({ ...trackMark, w: this.options.strokeWidth });
             }
         }
         else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-            const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
-            const eraserRadius = 20;
             if (isDown) {
                 const currentFrame = this.scene.getCurrentFrame();
                 let erasures = 0;
                 if (((_a = currentFrame.strokes) === null || _a === void 0 ? void 0 : _a.length) > 0) {
-                    const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, eraserRadius);
+                    const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, this.options.eraserWidth / 2);
                     if (erasingStrokeIndexes.length > 0) {
                         erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
                             currentFrame.strokes.splice(strokeIndex, 1);
@@ -4475,23 +4620,16 @@ class Penciltest {
                     this.drawCurrentFrame();
                 }
             }
-            //const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
-            this.renderer.requestRender(() => {
-                if (this.options.debug) {
-                    console.log('  track(currentFrame + eraser bounds)');
-                }
-                this.drawCurrentFrame();
-                //this.renderer.rect(toolBounds, '', {strokeColor: 'red', strokeOpacity: 0.5});
-                this.renderer.circle({ center: trackMark, radius: eraserRadius }, { strokeColor: 'red', strokeOpacity: 0.5 });
-            });
         }
     }
-    findIntersectingStrokes(strokes, scenePoint, radius, findAll = true) {
+    findIntersectingStrokes(strokes, scenePoint, radius, checkCircle = true, findAll = true) {
         const matches = [];
-        let doneCheckingStrokes = false;
         for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
             for (let segment of strokes[strokeIndex].path) {
                 if (Math.abs(scenePoint.x - segment.x) < radius && Math.abs(scenePoint.y - segment.y) < radius) {
+                    if (checkCircle && PTSpace.magnitude(PTSpace.diffPoints(scenePoint, segment)) > radius) {
+                        continue;
+                    }
                     matches.push(strokeIndex);
                     if (!findAll)
                         return matches;
@@ -4594,43 +4732,43 @@ class Penciltest {
     drawCurrentFrame(overrides = {}) {
         // NOTE: This draws the background, while drawFrame() does not.
         // NOTE: This also calls drawFrame.
-        if (!this.renderer || !this.scene.frames.length) {
+        if (!this.sceneRenderer || !this.scene.frames.length) {
             return;
         }
         if (this.options.debug) {
             console.log('    drawCurrentFrame: REQ');
         }
-        this.renderer.requestRender((timestamp) => {
+        this.sceneRenderer.requestRender((renderer, timestamp) => {
             if (this.options.debug) {
                 console.log('    drawCurrentFrame:     HAP');
             }
-            this.renderer.clear(true);
+            renderer.clear(true);
             if (this.options.onionSkin) {
                 for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
                     const previousFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber - i);
                     if (previousFrameNumber !== this.scene.current.frameNumber) {
-                        this.drawFrame(previousFrameNumber, {
+                        this.drawFrame(previousFrameNumber, renderer, {
                             ...overrides,
                             strokeColor: this.options.onionSkinBackwardColor.slice(0, 3).concat([Math.pow(this.options.onionSkinBackwardColor[3], i)])
                         });
                     }
                     const nextFrameNumber = this.resolveFrameNumber(this.scene.current.frameNumber + i);
                     if (nextFrameNumber !== this.scene.current.frameNumber) {
-                        this.drawFrame(nextFrameNumber, {
+                        this.drawFrame(nextFrameNumber, renderer, {
                             ...overrides,
                             strokeColor: this.options.onionSkinForwardColor.slice(0, 3).concat([Math.pow(this.options.onionSkinForwardColor[3], i)])
                         });
                     }
                 }
             }
-            this.renderer.composeOptions();
-            this.drawFrame(this.scene.current.frameNumber, overrides);
+            renderer.composeOptions();
+            this.drawFrame(this.scene.current.frameNumber, renderer, overrides);
             if (this.options.debug) {
                 console.log('    drawCurrentFrame:         END');
             }
         });
     }
-    drawFrame(frameNumber, overrides) {
+    drawFrame(frameNumber, renderer, overrides = {}) {
         var _a;
         if (!this.width || !this.height) {
             return;
@@ -4638,22 +4776,99 @@ class Penciltest {
         if (this.options.debug) {
             console.log('   drawFrame: BEGIN');
         }
-        if (overrides) {
-            this.renderer.composeOptions(overrides);
-        }
         const frame = this.scene.frames[frameNumber];
         if (((_a = frame === null || frame === void 0 ? void 0 : frame.strokes) === null || _a === void 0 ? void 0 : _a.length) > 0) {
-            this.renderer.beginPath();
+            renderer.beginPath();
             frame.strokes.forEach((stroke) => {
+                renderer.composeOptions({
+                    ...overrides,
+                    strokeWidth: (stroke.width || this.scene.strokeWidth || 1) * this.zoomFactor
+                });
                 const scaledStroke = this.scaleStroke(stroke, this.zoomFactor);
-                this.renderer.subpath(scaledStroke.path);
+                renderer.subpath(scaledStroke.path);
             });
-            this.renderer.endPath();
+            renderer.endPath();
         }
         if (this.options.debug) {
             console.log('   drawFrame:       END');
         }
         return frame;
+    }
+    drawTool(state = {}) {
+        const { trackPoint, down: isDown, metadataTimeout } = { trackPoint: this.trackBuffer[0], ...state };
+        if (typeof (trackPoint === null || trackPoint === void 0 ? void 0 : trackPoint.x) !== 'number'
+            || typeof (trackPoint === null || trackPoint === void 0 ? void 0 : trackPoint.y) !== 'number') {
+            return;
+        }
+        //console.log({trackPoint, buffer: this.trackBuffer, state}); // XXX
+        let toolDiameterSceneSpace, outerWidth = 1, innerWidth = 2, crosshairOuterRadius = 12, crosshairInnerRadius = 6, innerColor = 'white', outerColor = 'black';
+        if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
+            toolDiameterSceneSpace = this.options.strokeWidth;
+            innerWidth = 2;
+            innerColor = 'white';
+        }
+        else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
+            toolDiameterSceneSpace = this.options.eraserWidth;
+            innerWidth = 3;
+            innerColor = 'red';
+        }
+        else if (this.state.toolStack[0] === PenciltestTool.PAN) {
+            return;
+        }
+        const toolScreenRadius = Math.max(0.5, toolDiameterSceneSpace / 2 * this.zoomFactor);
+        const innerScreenRadius = Math.max(0.5, toolScreenRadius - innerWidth / 2);
+        if (this.options.debug) {
+            console.log(`  track:${this.state.toolStack[0]} ⊙ ${toolDiameterSceneSpace}`, { toolScreenRadius, innerScreenRadius, innerWidth, innerColor, outerColor });
+        }
+        if (metadataTimeout > 0) {
+            if (this.toolMetaTimeoutId) {
+                clearTimeout(this.toolMetaTimeoutId);
+            }
+            this.toolMetaTimeoutId = setTimeout(() => {
+                this.toolMetaTimeoutId = 0;
+                this.drawTool();
+            }, metadataTimeout);
+        }
+        this.toolRenderer.requestRender((renderer, timestamp) => {
+            renderer.clear();
+            // ID
+            if (innerScreenRadius !== toolScreenRadius) {
+                renderer.beginPath();
+                renderer.circle({ center: trackPoint, radius: innerScreenRadius }, { strokeColor: innerColor, strokeWidth: innerWidth });
+                renderer.endPath();
+            }
+            // OD
+            renderer.beginPath();
+            renderer.circle({ center: trackPoint, radius: toolScreenRadius }, { strokeColor: outerColor, strokeWidth: outerWidth });
+            renderer.endPath();
+            // crosshair
+            renderer.beginPath({
+                lineWidth: 1,
+                strokeColor: 'black'
+            });
+            renderer.moveToPoint(PTSpace.sumPoints(trackPoint, { x: 0, y: -crosshairOuterRadius }));
+            renderer.lineToPoint(PTSpace.sumPoints(trackPoint, { x: 0, y: -crosshairInnerRadius }));
+            renderer.moveToPoint(PTSpace.sumPoints(trackPoint, { x: 0, y: crosshairOuterRadius }));
+            renderer.lineToPoint(PTSpace.sumPoints(trackPoint, { x: 0, y: crosshairInnerRadius }));
+            renderer.moveToPoint(PTSpace.sumPoints(trackPoint, { x: -crosshairOuterRadius, y: 0 }));
+            renderer.lineToPoint(PTSpace.sumPoints(trackPoint, { x: -crosshairInnerRadius, y: 0 }));
+            renderer.moveToPoint(PTSpace.sumPoints(trackPoint, { x: crosshairOuterRadius, y: 0 }));
+            renderer.lineToPoint(PTSpace.sumPoints(trackPoint, { x: crosshairInnerRadius, y: 0 }));
+            renderer.endPath();
+            // metadata text
+            if (this.toolMetaTimeoutId > 0) {
+                const metadataOutput = `${toolDiameterSceneSpace}px`;
+                const metaTextOptions = {
+                    anchor: PTSpace.sumPoints(trackPoint, { x: Math.max(toolScreenRadius, crosshairOuterRadius) + 8, y: 0 }),
+                    fillColor: 'black',
+                    font: 'bold 14px monospace',
+                    strokeColor: 'white',
+                    strokeFirst: true,
+                    strokeWidth: 3,
+                };
+                this.toolRenderer.text(metadataOutput, metaTextOptions);
+            }
+        });
     }
     scaleStroke(stroke, factor) {
         return {
@@ -4665,6 +4880,9 @@ class Penciltest {
     useTool(toolName) {
         const index = this.state.toolStack.indexOf(toolName);
         const isChanging = index !== 0;
+        if (this.options.debug) {
+            console.log(`   useTool:${toolName} ${isChanging ? 'CHANGE' : 'SAME'}`);
+        }
         if (isChanging) {
             if (index > -1) {
                 this.state.toolStack.splice(index, 1);
@@ -4672,6 +4890,7 @@ class Penciltest {
             this.state.toolStack.unshift(toolName);
             this.container.setAttribute('x-tool', toolName);
             this.ui.updateStatusBar();
+            this.drawTool();
         }
         return isChanging;
     }
@@ -4693,19 +4912,21 @@ class Penciltest {
         }
     }
     cancelStroke() {
-        this.markBuffer = [];
+        this.trackBuffer = [];
         return this.scene.current.strokeNumber = -1;
     }
     lift() {
-        if (this.markBuffer && this.markBuffer.length > 0) {
-            const lastMark = this.markBuffer.shift();
-            this.track(lastMark);
-            this.markBuffer = [];
+        //if (this.trackBuffer && this.trackBuffer.length > 0) {
+        //  const lastMark = this.trackBuffer.shift()
+        //  this.track(lastMark);
+        //  this.trackBuffer = [];
+        //}
+        if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
+            this.scene.current.strokeNumber = -1;
         }
-        this.scene.current.strokeNumber = -1;
-        if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-            return this.drawCurrentFrame();
-        }
+        //if (this.state.toolStack[0] === PenciltestTool.ERASER) {
+        //  return this.drawCurrentFrame();
+        //}
     }
     getSelectedFrames(frames = [], cut = false) {
         if (frames.length > 0) {
@@ -4795,12 +5016,12 @@ class Penciltest {
             this.lift();
             frame.strokes = [];
             this.scene.current.frameNumber = index;
-            this.renderer.clear(true);
+            this.sceneRenderer.clear(true);
             const result = [];
             for (let stroke of oldStrokes) {
                 for (let segment of stroke.path) {
-                    const fieldScalePoint = PTSpace.scalePoint(segment, this.height / this.scene.height);
-                    this.track.apply(this, [fieldScalePoint.x, fieldScalePoint.y]);
+                    const fieldScalePoint = PTSpace.scalePoint(segment, this.zoomFactor);
+                    this.track(fieldScalePoint);
                 }
                 result.push(this.lift());
             }
@@ -4946,19 +5167,13 @@ class Penciltest {
         else {
             this.destroyAudio();
         }
-        if (this.renderer) {
+        if (this.sceneRenderer) {
             if (this.scene.background) {
-                this.renderer.options.background = this.scene.background;
+                this.sceneRenderer.options.background = this.scene.background;
             }
-            if (this.scene.strokeColor) {
-                this.renderer.options.strokeColor = this.scene.strokeColor;
-            }
-            if (this.scene.strokeOpacity) {
-                this.renderer.options.strokeOpacity = this.scene.strokeOpacity;
-            }
-            if (this.scene.strokeWeight) {
-                this.renderer.options.strokeWeight = this.scene.strokeWeight;
-            }
+            //if (this.scene.strokeColor) { this.sceneRenderer.options.strokeColor = this.scene.strokeColor; }
+            //if (this.scene.strokeOpacity) { this.sceneRenderer.options.strokeOpacity = this.scene.strokeOpacity; }
+            //if (this.scene.strokeWidth) { this.sceneRenderer.options.strokeWidth = this.scene.strokeWidth; }
         }
         this.scene.updateState();
         this.goToFrame(this.scene.current.frameNumber || 0);
@@ -5048,7 +5263,7 @@ class Penciltest {
         this.seekAudioToFrame(this.scene.current.frameNumber, exposureOffset);
         clearTimeout(this.playback.scrubAudioId);
         this.playAudio();
-        return this.playback.scrubAudioId = setTimeout(() => this.pauseAudio(), Math.max(this.scene.current.singleFrameDuration * (frameExposures - exposureOffset), 200));
+        return this.playback.scrubAudioId = setTimeout(() => this.pauseAudio(), this.scene.current.singleFrameDuration * (frameExposures - exposureOffset));
     }
     pan(deltaPoint, selection = []) {
         if (selection.length === 0) {
@@ -5070,34 +5285,36 @@ class Penciltest {
         });
     }
     resize() {
-        let containerHeight, containerWidth;
-        if (this.forceDimensions) {
-            containerWidth = this.forceDimensions.width;
-            containerHeight = this.forceDimensions.height;
-        }
-        else {
-            containerWidth = this.container.offsetWidth;
-            containerHeight = this.container.offsetHeight;
-            if (this.options.showStatus) {
-                containerHeight -= 36;
+        const bounds = this.forceDimensions || {
+            width: this.container.offsetWidth,
+            height: this.container.offsetHeight,
+        };
+        if (this.options.showStatus && !this.forceDimensions) {
+            const toolbarElement = this.ui.components.toolbar.getElement();
+            const toolbarHeight = toolbarElement.offsetHeight;
+            if (toolbarHeight) {
+                bounds.height -= toolbarHeight;
             }
         }
+        const boundsAspect = bounds.width / bounds.height;
         const sceneDimensions = this.scene.getDimensions();
-        const containerAspect = containerWidth / containerHeight;
-        if (containerAspect > sceneDimensions.aspect) {
-            this.width = Math.floor(containerHeight * sceneDimensions.aspect);
-            this.height = containerHeight;
+        if (boundsAspect > sceneDimensions.aspect) {
+            this.width = Math.floor(bounds.height * sceneDimensions.aspect);
+            this.height = bounds.height;
         }
         else {
-            this.width = containerWidth;
-            this.height = Math.floor(containerWidth / sceneDimensions.aspect);
+            this.width = bounds.width;
+            this.height = Math.floor(bounds.width / sceneDimensions.aspect);
         }
-        this.fieldContainer.style.width = `${this.width}px`;
-        this.fieldContainer.style.height = `${this.height}px`;
-        this.renderer.resize(this.width, this.height);
+        this.fieldElement.style.width = `${this.width}px`;
+        this.fieldElement.style.height = `${this.height}px`;
+        this.sceneRenderer.resize(this.width, this.height);
+        this.toolRenderer.resize(this.width, this.height);
         this.zoomFactor = this.height / sceneDimensions.height;
-        this.renderer.options.strokeWeight = this.zoomFactor * this.scene.strokeWeight;
-        return this.drawCurrentFrame();
+        //this.sceneRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
+        //this.toolRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
+        this.drawCurrentFrame();
+        this.drawTool();
     }
     queueWork(work, afterAll = false) {
         const queueCopy = this.workingOn.map((j) => j); // shallow clone
@@ -5131,8 +5348,10 @@ Penciltest.defaultOptions = {
     background: 'gray',
     strokeColor: 'black',
     strokeOpacity: -1,
+    strokeWidth: 1,
+    eraserWidth: 40,
     container: 'body',
-    hideCursor: false,
+    hideCursor: true,
     onionSkin: true,
     onionSkinFrameRadius: 4,
     renderer: Renderers.CANVAS,
@@ -5140,7 +5359,7 @@ Penciltest.defaultOptions = {
     showStatus: true,
     smoothing: 1,
     onionSkinForwardColor: [0, 200, 50, 0.5],
-    onionSkinBackwardColor: [220, 0, 0, 0.5]
+    onionSkinBackwardColor: [220, 0, 0, 0.5],
 };
 Penciltest.defaultPlayback = {
     heldExposures: 0,
@@ -5152,10 +5371,7 @@ Penciltest.defaultPlayback = {
 Penciltest.defaultState = {
     version: Penciltest.version,
     mode: PenciltestMode.DRAWING,
-    toolStack: [
-        PenciltestTool.PENCIL,
-        PenciltestTool.ERASER,
-    ],
+    toolStack: [],
     pointerMode: PointerMode.AWAY,
     previousMode: null
 };

@@ -5,7 +5,8 @@ class Penciltest {
   static instrumentIdentifier = 'io.lovejoy.penciltest';
 
   // components
-  renderer: CanvasRenderer | SVGRenderer;
+  sceneRenderer: CanvasRenderer | SVGRenderer;
+  toolRenderer: CanvasRenderer;
   scene: PenciltestScene | null;
   ui: PenciltestUI;
   migrator: PenciltestMigrator;
@@ -28,7 +29,7 @@ class Penciltest {
 
   // operation buffers
   copyBuffer: Array<PenciltestFrame>;
-  markBuffer: Array<Mark>;
+  trackBuffer: Array<Mark>;
   redoQueue: Array<Stroke>;
   workingOn: Array<Promise<any>>;
 
@@ -37,8 +38,10 @@ class Penciltest {
     background: 'gray',
     strokeColor: 'black',
     strokeOpacity: -1,
+    strokeWidth: 1,
+    eraserWidth: 40,
     container: 'body',
-    hideCursor: false,
+    hideCursor: true,
     onionSkin: true,
     onionSkinFrameRadius: 4,
     renderer: Renderers.CANVAS,
@@ -46,7 +49,7 @@ class Penciltest {
     showStatus: true,
     smoothing: 1,
     onionSkinForwardColor: [0, 200, 50, 0.5],
-    onionSkinBackwardColor: [220, 0, 0, 0.5]
+    onionSkinBackwardColor: [220, 0, 0, 0.5],
   };
 
   static defaultPlayback: PlaybackState = {
@@ -60,10 +63,7 @@ class Penciltest {
   static defaultState: PenciltestState = {
     version: Penciltest.version,
     mode: PenciltestMode.DRAWING,
-    toolStack: [
-      PenciltestTool.PENCIL,
-      PenciltestTool.ERASER,
-    ],
+    toolStack: [],
     pointerMode: PointerMode.AWAY,
     previousMode: null
   };
@@ -83,7 +83,7 @@ class Penciltest {
       ...storedState,
     };
 
-		this.markBuffer = []
+		this.trackBuffer = []
   
     this.workingOn = [];
 
@@ -102,8 +102,10 @@ class Penciltest {
 
     this.setOptions(this.options)
       .then(() => {
+        //this.prepareRenderers(); // Already called in penciltest-ui reaction to `renderer` setting. Leaving this note here to remember this is when it happens.
         this.resize();
         this.drawCurrentFrame();
+        this.useTool(PenciltestTool.PENCIL);
       });
   };
 
@@ -131,6 +133,30 @@ class Penciltest {
       this.scene.updateState();
     }
     this.resize();
+  }
+
+  prepareRenderers() {
+    const rendererOptions:PenciltestRendererOptions = {
+      strokeColor: this.scene.strokeColor,
+      strokeWidth: this.scene.strokeWidth,
+      strokeOpacity: this.scene.strokeOpacity,
+      container: this.fieldElement,
+      background: this.scene.background,
+      debug: this.options.debug
+    };
+
+    if (this.options.renderer === Renderers.SVG) {
+      this.sceneRenderer = new SVGRenderer(rendererOptions);
+    } else {
+      this.sceneRenderer = new CanvasRenderer(rendererOptions);
+    }
+
+    const toolRendererOptions:PenciltestRendererOptions = {
+      ...rendererOptions,
+      background: 'transparent',
+      alpha: true,
+    };
+    this.toolRenderer = new CanvasRenderer(toolRendererOptions);
   }
 
   setPlayback(newPlayback: PlaybackState) {
@@ -214,11 +240,11 @@ class Penciltest {
     if (this.state.mode === PenciltestMode.DRAWING) {
       if (this.previousMark && this.previousMark !== mark) {
         const previousMark = Utils.clone(this.previousMark); // to enable deferred rendering
-        this.renderer.requestRender(() => {
-          this.renderer.beginPath();
-          this.renderer.moveToPoint(previousMark);
-          this.renderer.lineToPoint(mark);
-          this.renderer.endPath();
+        this.sceneRenderer.requestRender((renderer, timestamp) => {
+          renderer.beginPath({strokeWidth: this.options.strokeWidth * this.zoomFactor});
+          renderer.moveToPoint(previousMark);
+          renderer.lineToPoint(mark);
+          renderer.endPath();
         });
       }
     }
@@ -231,25 +257,24 @@ class Penciltest {
   track(trackMark: Mark) {
     const isDown = this.state.pointerMode === PointerMode.PRESS;
 
-    if (isDown && this.options.smoothing > 0) {
-      this.markBuffer.unshift(trackMark);
-      if (this.markBuffer.length > this.options.smoothing) {
-        this.markBuffer.pop();
-      }
+    this.trackBuffer.unshift(trackMark);
+    if (this.trackBuffer.length > 3) {
+      this.trackBuffer.pop();
     }
+
+    const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
+    this.drawTool({trackPoint: trackMark, down:isDown});
 
     if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
       if (isDown) {
-        this.mark(trackMark);
+        this.mark({ ...trackMark, w: this.options.strokeWidth });
       }
     } else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-      const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
-      const eraserRadius = 20;
       if (isDown) {
         const currentFrame = this.scene.getCurrentFrame();
         let erasures = 0;
         if (currentFrame.strokes?.length > 0) {
-          const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, eraserRadius);
+          const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, this.options.eraserWidth / 2);
           if (erasingStrokeIndexes.length > 0) {
             erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
               currentFrame.strokes.splice(strokeIndex, 1);
@@ -261,22 +286,17 @@ class Penciltest {
           this.drawCurrentFrame();
         }
       }
-      //const toolBounds = PTSpace.boundsAroundPoint(trackMark, eraserRadius);
-      this.renderer.requestRender(() => {
-        if (this.options.debug) { console.log('  track(currentFrame + eraser bounds)'); }
-        this.drawCurrentFrame();
-        //this.renderer.rect(toolBounds, '', {strokeColor: 'red', strokeOpacity: 0.5});
-        this.renderer.circle({center:trackMark, radius:eraserRadius}, {strokeColor: 'red', strokeOpacity: 0.5});
-      });
     }
   }
 
-  findIntersectingStrokes(strokes:Array<Stroke>, scenePoint:Point, radius:number, findAll:boolean = true): Array<number> {
+  findIntersectingStrokes(strokes:Array<Stroke>, scenePoint:Point, radius:number, checkCircle:boolean = true, findAll:boolean = true): Array<number> {
     const matches = [];
-    let doneCheckingStrokes = false;
     for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
       for (let segment of strokes[strokeIndex].path) {
         if (Math.abs(scenePoint.x - segment.x) < radius && Math.abs(scenePoint.y - segment.y) < radius) {
+          if (checkCircle && PTSpace.magnitude(PTSpace.diffPoints(scenePoint, segment)) > radius) {
+            continue;
+          }
           matches.push(strokeIndex);
           if (!findAll) return matches;
           break;
@@ -378,12 +398,12 @@ class Penciltest {
   drawCurrentFrame(overrides: PenciltestRendererOptions = {}) {
     // NOTE: This draws the background, while drawFrame() does not.
     // NOTE: This also calls drawFrame.
-    if (!this.renderer || !this.scene.frames.length) { return; }
+    if (!this.sceneRenderer || !this.scene.frames.length) { return; }
     if (this.options.debug) { console.log('    drawCurrentFrame: REQ'); }
 
-    this.renderer.requestRender((timestamp) => {
+    this.sceneRenderer.requestRender((renderer:PenciltestRenderer, timestamp) => {
       if (this.options.debug) { console.log('    drawCurrentFrame:     HAP'); }
-      this.renderer.clear(true);
+      renderer.clear(true);
 
       if (this.options.onionSkin) {
         for (let i = 1, end = this.options.onionSkinFrameRadius, asc = 1 <= end; asc ? i <= end : i >= end; asc ? i++ : i--) {
@@ -391,6 +411,7 @@ class Penciltest {
           if (previousFrameNumber !== this.scene.current.frameNumber) {
             this.drawFrame(
               previousFrameNumber,
+              renderer,
               {
                 ...overrides,
                 strokeColor: this.options.onionSkinBackwardColor.slice(0,3).concat([Math.pow(this.options.onionSkinBackwardColor[3], i)]) as Color
@@ -401,6 +422,7 @@ class Penciltest {
           if (nextFrameNumber !== this.scene.current.frameNumber) {
             this.drawFrame(
               nextFrameNumber,
+              renderer,
               {
                 ...overrides,
                 strokeColor: this.options.onionSkinForwardColor.slice(0,3).concat([Math.pow(this.options.onionSkinForwardColor[3], i)]) as Color
@@ -409,42 +431,134 @@ class Penciltest {
           }
         }
       }
-      this.renderer.composeOptions();
-      this.drawFrame(this.scene.current.frameNumber, overrides);
+      renderer.composeOptions();
+      this.drawFrame(this.scene.current.frameNumber, renderer, overrides);
       if (this.options.debug) { console.log('    drawCurrentFrame:         END'); }
     });
   }
 
-  drawFrame(frameNumber: number, overrides: PenciltestRendererOptions): PenciltestFrame {
+  drawFrame(frameNumber: number, renderer:PenciltestRenderer, overrides: PenciltestRendererOptions = {}): PenciltestFrame {
     if (!this.width || !this.height) { return; }
     if (this.options.debug) { console.log('   drawFrame: BEGIN'); }
 
-    if (overrides) { this.renderer.composeOptions(overrides); }
-
     const frame = this.scene.frames[frameNumber]
     if (frame?.strokes?.length > 0) {
-      this.renderer.beginPath();
+      renderer.beginPath();
       frame.strokes.forEach((stroke: Stroke) => {
+        renderer.composeOptions({
+          ...overrides,
+          strokeWidth: (stroke.width || this.scene.strokeWidth || 1) * this.zoomFactor
+        });
         const scaledStroke = this.scaleStroke(stroke, this.zoomFactor)
-        this.renderer.subpath(scaledStroke.path)
+        renderer.subpath(scaledStroke.path)
       });
-      this.renderer.endPath();
+      renderer.endPath();
     }
     if (this.options.debug) { console.log('   drawFrame:       END'); }
     return frame;
+  }
+
+  toolMetaTimeoutId:number;
+  drawTool(state: {trackPoint?:Point, down?:boolean, metadataTimeout?:number} = {}) {
+    const { trackPoint, down: isDown, metadataTimeout } = { trackPoint: this.trackBuffer[0], ...state };
+    if (
+      typeof trackPoint?.x !== 'number'
+      || typeof trackPoint?.y !== 'number'
+    ) { return; }
+    //console.log({trackPoint, buffer: this.trackBuffer, state}); // XXX
+
+    let toolDiameterSceneSpace,
+      outerWidth = 1,
+      innerWidth = 2,
+      crosshairOuterRadius = 12,
+      crosshairInnerRadius = 6,
+      innerColor = 'white',
+      outerColor = 'black';
+    if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
+      toolDiameterSceneSpace = this.options.strokeWidth;
+      innerWidth = 2;
+      innerColor = 'white';
+    } else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
+      toolDiameterSceneSpace = this.options.eraserWidth;
+      innerWidth = 3;
+      innerColor = 'red';
+    } else if (this.state.toolStack[0] === PenciltestTool.PAN) {
+      return;
+    }
+    const toolScreenRadius = Math.max(0.5, toolDiameterSceneSpace / 2 * this.zoomFactor);
+    const innerScreenRadius = Math.max(0.5, toolScreenRadius - innerWidth / 2);
+    if (this.options.debug) {
+      console.log(`  track:${this.state.toolStack[0]} ⊙ ${toolDiameterSceneSpace}`, {toolScreenRadius, innerScreenRadius, innerWidth, innerColor, outerColor});
+    }
+
+    if (metadataTimeout > 0) {
+      if (this.toolMetaTimeoutId) {
+        clearTimeout(this.toolMetaTimeoutId);
+      }
+      this.toolMetaTimeoutId = setTimeout(() => {
+        this.toolMetaTimeoutId = 0;
+        this.drawTool();
+      }, metadataTimeout);
+    }
+
+    this.toolRenderer.requestRender((renderer, timestamp) => {
+      renderer.clear();
+
+      // ID
+      if (innerScreenRadius !== toolScreenRadius) {
+        renderer.beginPath();
+        renderer.circle({center:trackPoint, radius:innerScreenRadius}, {strokeColor: innerColor, strokeWidth: innerWidth});
+        renderer.endPath();
+      }
+      
+      // OD
+      renderer.beginPath();
+      renderer.circle({center:trackPoint, radius:toolScreenRadius}, {strokeColor: outerColor, strokeWidth: outerWidth});
+      renderer.endPath();
+
+      // crosshair
+      renderer.beginPath({
+        lineWidth: 1,
+        strokeColor: 'black'
+      });
+      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:-crosshairOuterRadius}));
+      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:-crosshairInnerRadius}));
+      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:crosshairOuterRadius}));
+      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:crosshairInnerRadius}));
+      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:-crosshairOuterRadius,y:0}));
+      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:-crosshairInnerRadius,y:0}));
+      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:crosshairOuterRadius,y:0}));
+      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:crosshairInnerRadius,y:0}));
+      renderer.endPath();
+
+      // metadata text
+      if (this.toolMetaTimeoutId > 0) {
+        const metadataOutput = `${toolDiameterSceneSpace}px`;
+        const metaTextOptions = {
+          anchor: PTSpace.sumPoints(trackPoint, {x:Math.max(toolScreenRadius, crosshairOuterRadius) + 8, y:0}),
+          fillColor: 'black',
+          font: 'bold 14px monospace',
+          strokeColor: 'white',
+          strokeFirst: true,
+          strokeWidth: 3,
+        };
+        this.toolRenderer.text(metadataOutput, metaTextOptions);
+      }
+    });
   }
 
   scaleStroke(stroke: Stroke, factor: number): Stroke {
     return {
       ...stroke,
       // TODO: scale stroke weight, too?
-      path: stroke.path.map((point: Point) => PTSpace.scalePoint(point, factor))
+      path: stroke.path.map((point: Mark) => PTSpace.scalePoint(point, factor))
     };
   }
 
   useTool(toolName: PenciltestTool) {
     const index = this.state.toolStack.indexOf(toolName);
     const isChanging = index !== 0;
+    if (this.options.debug) { console.log(`   useTool:${toolName} ${isChanging ? 'CHANGE' : 'SAME'}`); }
     if (isChanging) {
       if (index > -1) {
         this.state.toolStack.splice(index, 1);
@@ -452,6 +566,7 @@ class Penciltest {
       this.state.toolStack.unshift(toolName);
       this.container.setAttribute('x-tool', toolName);
       this.ui.updateStatusBar();
+      this.drawTool();
     }
     return isChanging;
   }
@@ -474,20 +589,22 @@ class Penciltest {
   }
 
   cancelStroke() {
-    this.markBuffer = [];
+    this.trackBuffer = [];
     return this.scene.current.strokeNumber = -1;
   }
 
   lift() {
-    if (this.markBuffer && this.markBuffer.length > 0) {
-      const lastMark = this.markBuffer.shift()
-      this.track(lastMark);
-      this.markBuffer = [];
+    //if (this.trackBuffer && this.trackBuffer.length > 0) {
+    //  const lastMark = this.trackBuffer.shift()
+    //  this.track(lastMark);
+    //  this.trackBuffer = [];
+    //}
+    if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
+      this.scene.current.strokeNumber = -1;
     }
-    this.scene.current.strokeNumber = -1;
-    if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-      return this.drawCurrentFrame();
-    }
+    //if (this.state.toolStack[0] === PenciltestTool.ERASER) {
+    //  return this.drawCurrentFrame();
+    //}
   }
 
   getSelectedFrames(frames: Array<PenciltestFrame> = [], cut:boolean = false): [ Array<PenciltestFrame>, number ] {
@@ -579,13 +696,13 @@ class Penciltest {
       this.lift();
       frame.strokes = [];
       this.scene.current.frameNumber = index;
-      this.renderer.clear(true);
+      this.sceneRenderer.clear(true);
 
       const result = [];
       for (let stroke of oldStrokes) {
         for (let segment of stroke.path) {
-          const fieldScalePoint = PTSpace.scalePoint(segment, this.height / this.scene.height);
-          this.track.apply(this, [fieldScalePoint.x, fieldScalePoint.y]);
+          const fieldScalePoint = PTSpace.scalePoint(segment, this.zoomFactor);
+          this.track(fieldScalePoint);
         }
         result.push(this.lift());
       }
@@ -742,11 +859,11 @@ class Penciltest {
       this.destroyAudio();
     }
 
-    if (this.renderer) {
-      if (this.scene.background) { this.renderer.options.background = this.scene.background; }
-      if (this.scene.strokeColor) { this.renderer.options.strokeColor = this.scene.strokeColor; }
-      if (this.scene.strokeOpacity) { this.renderer.options.strokeOpacity = this.scene.strokeOpacity; }
-      if (this.scene.strokeWeight) { this.renderer.options.strokeWeight = this.scene.strokeWeight; }
+    if (this.sceneRenderer) {
+      if (this.scene.background) { this.sceneRenderer.options.background = this.scene.background; }
+      //if (this.scene.strokeColor) { this.sceneRenderer.options.strokeColor = this.scene.strokeColor; }
+      //if (this.scene.strokeOpacity) { this.sceneRenderer.options.strokeOpacity = this.scene.strokeOpacity; }
+      //if (this.scene.strokeWidth) { this.sceneRenderer.options.strokeWidth = this.scene.strokeWidth; }
     }
     this.scene.updateState();
     this.goToFrame(this.scene.current.frameNumber || 0);
@@ -838,7 +955,7 @@ class Penciltest {
     this.playAudio();
     return this.playback.scrubAudioId = setTimeout(
       () => this.pauseAudio(),
-      Math.max(this.scene.current.singleFrameDuration * (frameExposures - exposureOffset), 200)
+      this.scene.current.singleFrameDuration * (frameExposures - exposureOffset)
     );
   }
 
@@ -860,34 +977,37 @@ class Penciltest {
   }
 
   resize() {
-    let containerHeight: number, containerWidth: number;
-    if (this.forceDimensions) {
-      containerWidth = this.forceDimensions.width;
-      containerHeight = this.forceDimensions.height;
-    } else {
-      containerWidth = this.container.offsetWidth;
-      containerHeight = this.container.offsetHeight;
-      if (this.options.showStatus) {
-        containerHeight -= 36;
+    const bounds:Rect = this.forceDimensions || {
+      width: this.container.offsetWidth,
+      height: this.container.offsetHeight,
+    };
+    if (this.options.showStatus && !this.forceDimensions) {
+      const toolbarElement = this.ui.components.toolbar.getElement();
+      const toolbarHeight = toolbarElement.offsetHeight
+      if (toolbarHeight) {
+        bounds.height -= toolbarHeight;
       }
     }
+    const boundsAspect = bounds.width / bounds.height;
     const sceneDimensions = this.scene.getDimensions();
-    const containerAspect = containerWidth / containerHeight;
 
-    if (containerAspect > sceneDimensions.aspect) {
-      this.width = Math.floor(containerHeight * sceneDimensions.aspect);
-      this.height = containerHeight;
+    if (boundsAspect > sceneDimensions.aspect) {
+      this.width = Math.floor(bounds.height * sceneDimensions.aspect);
+      this.height = bounds.height;
     } else {
-      this.width = containerWidth;
-      this.height = Math.floor(containerWidth / sceneDimensions.aspect);
+      this.width = bounds.width;
+      this.height = Math.floor(bounds.width / sceneDimensions.aspect);
     }
 
-    this.fieldContainer.style.width = `${this.width}px`;
-    this.fieldContainer.style.height = `${this.height}px`;
-    this.renderer.resize(this.width, this.height);
+    this.fieldElement.style.width = `${this.width}px`;
+    this.fieldElement.style.height = `${this.height}px`;
+    this.sceneRenderer.resize(this.width, this.height);
+    this.toolRenderer.resize(this.width, this.height);
     this.zoomFactor = this.height / sceneDimensions.height;
-    this.renderer.options.strokeWeight = this.zoomFactor * this.scene.strokeWeight;
-    return this.drawCurrentFrame();
+    //this.sceneRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
+    //this.toolRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
+    this.drawCurrentFrame();
+    this.drawTool();
   }
 
   queueWork(work:Function, afterAll: boolean = false): Promise<any> {
