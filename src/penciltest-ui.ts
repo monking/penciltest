@@ -1540,7 +1540,7 @@ class PenciltestUI extends PenciltestUIComponent {
     const contextMenuListener = (event: AnyPointerEvent) => {
       const targetElement = event.target as HTMLElement;
       //const targetComponent = PenciltestUIComponent.find(targetElement, this.components);
-      if (this.controller.fieldContainer.contains(targetElement)) {
+      if (targetElement === this.components.toggleMenu.getElement() || this.controller.fieldContainer.contains(targetElement)) {
         event.preventDefault();
         this.toggleMenu(Utils.eventPoint(event));
       }
@@ -2069,6 +2069,11 @@ class PenciltestUI extends PenciltestUIComponent {
         coords = {x: 10, y: 10, ...this.pointer};
       }
 
+      // To avoid appearing under the cursor, for an accidental mouseup before
+      // making a selection. +UX uuid:f02e29fc-b820-4a8f-ae5f-c57df8b4d989
+      coords.y++;
+      coords.x++;
+
       this.isMenuVisible = true;
       const menuElement = this.components.contextMenu.getElement();
       Utils.toggleClass(menuElement, 'active', true);
@@ -2080,7 +2085,7 @@ class PenciltestUI extends PenciltestUIComponent {
         menuElement.style.right = `${maxRight}px`;
         menuElement.style.left = "auto";
       } else {
-        menuElement.style.left = `${coords.x + 1}px`;
+        menuElement.style.left = `${coords.x}px`;
         menuElement.style.right = "auto";
       }
 
@@ -2089,7 +2094,7 @@ class PenciltestUI extends PenciltestUIComponent {
         menuElement.style.bottom = `${maxBottom}px`;
         menuElement.style['max-height'] = `${document.body.offsetHeight - maxBottom}px`;
       } else {
-        menuElement.style.top = `${coords.y + 1}px`;
+        menuElement.style.top = `${coords.y}px`;
         menuElement.style.bottom = "auto";
         menuElement.style['max-height'] = `${document.body.offsetHeight-coords.y}px`;
       }
