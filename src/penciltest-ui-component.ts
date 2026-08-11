@@ -20,6 +20,14 @@ class PenciltestUIComponent {
     return new PenciltestUIComponent(options, components);
   }
 
+  static find(element:HTMLElement, components:PenciltestUIComponentDict): PenciltestUIComponent | null {
+    const key = element.getAttribute('x-key');
+    if (key) {
+      return PenciltestUIComponent.restore({key}, components);
+    }
+    return null;
+  }
+
   constructor(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
     this.isPTComponent = true;
 
@@ -36,6 +44,10 @@ class PenciltestUIComponent {
 
     const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
 
+    if (this.options.key) {
+      element.setAttribute('x-key', this.options.key);
+    }
+
     if (this.options.on) {
       for (let eventName in this.options.on) {
         const boundListener = this.options.on[eventName].bind(this.getElement())
@@ -45,13 +57,13 @@ class PenciltestUIComponent {
       }
     }
 
-    if (this.options.children) {
-      this.options.children.forEach(
-        (childConfig:PenciltestUIComponentOptions) => PenciltestUIComponent.restore({...childConfig, parent: this}, this.components)
-      );
-    }
-
     this.setContent(this.options, true);
+
+    //if (this.options.children) {
+    //  this.options.children.forEach(
+    //    (childConfig:PenciltestUIComponentOptions) => PenciltestUIComponent.restore({...childConfig, parent: this}, this.components)
+    //  );
+    //}
 
     this.attach();
 
@@ -129,12 +141,17 @@ class PenciltestUIComponent {
           this.getElement().innerText = this.options.text = config.text;
         }
       }
-    } else if (config.children) {
+    }
+    if (config.children) {
       config.children.forEach((childConfig) => {
-        if (!childConfig.key) { return; } // Avoiding assumptions of persistent child node order.
-        const childComponent = PenciltestUIComponent.restore(childConfig, this.components);
+        const childConfigWithThisAsParent = {
+          ...childConfig,
+          parent: this,
+        };
+        if (!force && !childConfigWithThisAsParent.key) { return; } // Avoiding assumptions of persistent child node order.
+        const childComponent = PenciltestUIComponent.restore(childConfigWithThisAsParent, this.components);
         if (typeof childComponent.setContent !== 'function') { return; }
-        childComponent.setContent(childConfig);
+        //childComponent.setContent(childConfigWithThisAsParent); //restore already calls setContent
       });
     }
 

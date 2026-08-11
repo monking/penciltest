@@ -1,5 +1,5 @@
 /// <reference path="vendor/raphael.js">
-declare function Raphael(first:HTMLElement | Function | null):void;
+declare function Raphael(first:HTMLElement | Function | null): void;
 
 interface RaphaelInterface {
   version: string;
@@ -49,7 +49,7 @@ class SVGRenderer extends BaseRenderer {
     if (this.drawingPath) {
       path = this.field.path(this.drawingPath);
       Object.assign(path.style, {
-        stroke: this.getColorString(this.options.strokeColor)
+        stroke: Utils.getColorString(this.options.strokeColor)
       });
     }
     return super.render();

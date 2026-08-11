@@ -1,7 +1,7 @@
 class Penciltest {
 
-  static version = '0.3.0';
-  static debugVersion = '0.3.1';
+  static version = '0.3.1';
+  static debugVersion = '0.3.2';
   static instrumentIdentifier = 'io.lovejoy.penciltest';
 
   // components
@@ -10,6 +10,7 @@ class Penciltest {
   scene: PenciltestScene | null;
   ui: PenciltestUI;
   migrator: PenciltestMigrator;
+  components: PenciltestUIComponentDict;
 
   // global config/state
   forceDimensions: Rect | null;
@@ -35,8 +36,8 @@ class Penciltest {
 
 
   static defaultOptions: PenciltestOptions = {
-    background: 'gray',
-    strokeColor: 'black',
+    background: ColorHexNames.lightgray,
+    strokeColor: ColorHexNames.black,
     strokeOpacity: -1,
     strokeWidth: 1,
     eraserWidth: 40,
@@ -83,6 +84,8 @@ class Penciltest {
       ...storedState,
     };
 
+    this.components = {};
+
 		this.trackBuffer = []
   
     this.workingOn = [];
@@ -96,7 +99,7 @@ class Penciltest {
 
     this.buildContainer();
 
-    this.ui = new PenciltestUI( this, { parentElement: this.container } );
+    this.ui = new PenciltestUI( this, { parentElement: this.container }, this.components );
 
     this.newScene();
 
@@ -166,18 +169,27 @@ class Penciltest {
         this.ui.handleAppReaction(key);
       }
     }
-    //this.ui.updateStatusBar();
+    this.ui.updateStatusBar();
   }
 
   buildContainer() {
-    const markup = '<div class="field-container">' +
-      '<div class="field"></div>' +
-    '</div>';
+    const fieldDef = {
+      key: 'field',
+      className: "field",
+      style: {
+        'margin-top': '40px'
+      }
+    };
+    const containerDef = {
+      key: 'fieldContainer',
+      parentElement: this.container,
+      className: 'field-container',
+      children: [ fieldDef ]
+    };
+    new PenciltestUIComponent(containerDef, this.components);
 
-    this.container.innerHTML = markup;
-
-    this.fieldContainer = this.container.querySelector('.field-container');
-    return this.fieldElement = this.container.querySelector('.field');
+    this.fieldContainer = this.components.fieldContainer.getElement();
+    this.fieldElement = this.components.field.getElement();
   }
 
   setMode(mode:PenciltestMode): boolean {
@@ -232,21 +244,29 @@ class Penciltest {
   mark(mark: Mark) {
     const stroke = this.scene.getCurrentStroke(true);
     const isNewStroke = stroke.path.length === 0;
-    if (isNewStroke) { delete this.previousMark; }
+    if (isNewStroke) {
+      delete this.previousMark;
+      stroke.provisional = true;
+      stroke.width = this.options.strokeWidth;
+      stroke.strokeColor = this.options.strokeColor;
+    }
     stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
 
     if (this.options.debug) { console.log(`  mark ${this.previousMark?.x || '_'},${this.previousMark?.y || '_'}-->${mark.x},${mark.y}`); }
 
     if (this.state.mode === PenciltestMode.DRAWING) {
-      if (this.previousMark && this.previousMark !== mark) {
-        const previousMark = Utils.clone(this.previousMark); // to enable deferred rendering
-        this.sceneRenderer.requestRender((renderer, timestamp) => {
-          renderer.beginPath({strokeWidth: this.options.strokeWidth * this.zoomFactor});
-          renderer.moveToPoint(previousMark);
-          renderer.lineToPoint(mark);
-          renderer.endPath();
+      // Rendering new line in toolRenderer layer.
+      // It gets drawn in the sceneRenderer upon lift().
+      this.toolRenderer.requestRender((renderer, timestamp) => {
+        if (this.options.debug) { console.log(`stroke width: ${stroke.width}, @ canvas: ${(this.sceneRenderer as CanvasRenderer).context.lineWidth}`); }
+        renderer.composeOptions({
+          strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
+          strokeWidth: stroke.width * this.zoomFactor
         });
-      }
+        renderer.beginPath();
+        renderer.subpath(PTSpace.scalePath(stroke.path, this.zoomFactor));
+        renderer.endPath();
+      });
     }
 
     this.clearRedo();
@@ -267,7 +287,7 @@ class Penciltest {
 
     if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
       if (isDown) {
-        this.mark({ ...trackMark, w: this.options.strokeWidth });
+        this.mark({ ...trackMark });
       }
     } else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
       if (isDown) {
@@ -292,15 +312,12 @@ class Penciltest {
   findIntersectingStrokes(strokes:Array<Stroke>, scenePoint:Point, radius:number, checkCircle:boolean = true, findAll:boolean = true): Array<number> {
     const matches = [];
     for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
-      for (let segment of strokes[strokeIndex].path) {
-        if (Math.abs(scenePoint.x - segment.x) < radius && Math.abs(scenePoint.y - segment.y) < radius) {
-          if (checkCircle && PTSpace.magnitude(PTSpace.diffPoints(scenePoint, segment)) > radius) {
-            continue;
-          }
-          matches.push(strokeIndex);
-          if (!findAll) return matches;
-          break;
-        }
+      const area:Circle | Rect = checkCircle
+        ? {center: scenePoint, radius}
+        : PTSpace.boundsAroundPoint(scenePoint, radius);
+      if (PTSpace.doesPathIntersect(strokes[strokeIndex].path, area)) {
+        matches.push(strokeIndex);
+        if (!findAll) { return matches; }
       }
     }
     return matches;
@@ -443,16 +460,17 @@ class Penciltest {
 
     const frame = this.scene.frames[frameNumber]
     if (frame?.strokes?.length > 0) {
-      renderer.beginPath();
       frame.strokes.forEach((stroke: Stroke) => {
+        renderer.beginPath();
         renderer.composeOptions({
+          strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
           ...overrides,
           strokeWidth: (stroke.width || this.scene.strokeWidth || 1) * this.zoomFactor
         });
         const scaledStroke = this.scaleStroke(stroke, this.zoomFactor)
         renderer.subpath(scaledStroke.path)
+        renderer.endPath();
       });
-      renderer.endPath();
     }
     if (this.options.debug) { console.log('   drawFrame:       END'); }
     return frame;
@@ -465,7 +483,6 @@ class Penciltest {
       typeof trackPoint?.x !== 'number'
       || typeof trackPoint?.y !== 'number'
     ) { return; }
-    //console.log({trackPoint, buffer: this.trackBuffer, state}); // XXX
 
     let toolDiameterSceneSpace,
       outerWidth = 1,
@@ -482,7 +499,7 @@ class Penciltest {
       toolDiameterSceneSpace = this.options.eraserWidth;
       innerWidth = 3;
       innerColor = 'red';
-    } else if (this.state.toolStack[0] === PenciltestTool.PAN) {
+    } else {
       return;
     }
     const toolScreenRadius = Math.max(0.5, toolDiameterSceneSpace / 2 * this.zoomFactor);
@@ -594,17 +611,29 @@ class Penciltest {
   }
 
   lift() {
-    //if (this.trackBuffer && this.trackBuffer.length > 0) {
-    //  const lastMark = this.trackBuffer.shift()
-    //  this.track(lastMark);
-    //  this.trackBuffer = [];
-    //}
     if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
-      this.scene.current.strokeNumber = -1;
+      if (this.scene.current.strokeNumber !== -1) {
+        const lastStroke = this.scene.getCurrentStroke();
+        const frame = this.scene.getCurrentFrame();
+        debugger;
+        if (lastStroke.provisional) {
+          const fieldPlusStrokeRadius = PTSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
+          if (PTSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
+            delete lastStroke.provisional;
+          } else {
+            // Don't record mark if it (TODO including its width) are off the
+            // field. This enables both beginning a mark from outside the
+            // field, but also clicking outside the field to blur/cancel other
+            // elements.  uuid:0051f2f1-ec80-4377-9dee-a32d47ecf185
+            frame.strokes.splice(this.scene.current.strokeNumber, 1);
+          }
+        }
+
+        this.scene.current.strokeNumber = -1;
+      }
+      this.drawCurrentFrame();
+      this.drawTool();
     }
-    //if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-    //  return this.drawCurrentFrame();
-    //}
   }
 
   getSelectedFrames(frames: Array<PenciltestFrame> = [], cut:boolean = false): [ Array<PenciltestFrame>, number ] {
@@ -782,7 +811,7 @@ class Penciltest {
     return sceneNames;
   }
 
-  encodeStorageReference(namespace: string, name: any):string {
+  encodeStorageReference(namespace: string, name: any): string {
     return `${namespace}:${name}`;
   }
 
@@ -861,9 +890,6 @@ class Penciltest {
 
     if (this.sceneRenderer) {
       if (this.scene.background) { this.sceneRenderer.options.background = this.scene.background; }
-      //if (this.scene.strokeColor) { this.sceneRenderer.options.strokeColor = this.scene.strokeColor; }
-      //if (this.scene.strokeOpacity) { this.sceneRenderer.options.strokeOpacity = this.scene.strokeOpacity; }
-      //if (this.scene.strokeWidth) { this.sceneRenderer.options.strokeWidth = this.scene.strokeWidth; }
     }
     this.scene.updateState();
     this.goToFrame(this.scene.current.frameNumber || 0);
@@ -959,7 +985,7 @@ class Penciltest {
     );
   }
 
-  pan(deltaPoint: Point, selection:Array<PenciltestFrame> = []) {
+  moveFrameContents(deltaPoint: Point, selection:Array<PenciltestFrame> = []) {
     if (selection.length === 0) {
       [ selection ] = this.getSelectedFrames()
     }
@@ -977,9 +1003,10 @@ class Penciltest {
   }
 
   resize() {
+    const fieldMargin = 40;
     const bounds:Rect = this.forceDimensions || {
-      width: this.container.offsetWidth,
-      height: this.container.offsetHeight,
+      width: this.container.offsetWidth - 40 * 2,
+      height: this.container.offsetHeight - 40 * 2,
     };
     if (this.options.showStatus && !this.forceDimensions) {
       const toolbarElement = this.ui.components.toolbar.getElement();
@@ -1004,8 +1031,6 @@ class Penciltest {
     this.sceneRenderer.resize(this.width, this.height);
     this.toolRenderer.resize(this.width, this.height);
     this.zoomFactor = this.height / sceneDimensions.height;
-    //this.sceneRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
-    //this.toolRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
     this.drawCurrentFrame();
     this.drawTool();
   }

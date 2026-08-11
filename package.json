@@ -1,10 +1,10 @@
 {
   "name": "Penciltest",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "repository": "git@github.com:monking/penciltest.git",
   "scripts": {
     "start": "tsc && node node_modules/grunt-cli/bin/grunt",
-    "debug": ">&2 echo -n \"ENTER to run and paginate \\`tsc --pretty --noEmit\\`. Ctrl+D to end. > \"; i=0; while [[ $i == 0 ]] || read -s; do let i++; tsc --pretty --noEmit | less -R; done; >&2 echo DONE;"
+    "debug": "clear; >&2 echo -n \"ENTER to run and paginate \\`tsc --pretty --noEmit\\`. Ctrl+D to end. > \"; i=0; while [[ $i == 0 ]] || read -s; do let i++; tsc --pretty --noEmit | less -R; done; >&2 echo DONE;"
   },
   "devDependencies": {
     "grunt": "^1.6.3",

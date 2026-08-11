@@ -3,10 +3,16 @@
 .penciltest-ui {
   .toolbar {
     $toolbarMinHeight: 2em;
+    background-color: colors.$darkgray;
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
+
+    .icon {
+      background-color: green; /* XXX @1786388554 */
+      font-size: 0.7rem;
+    }
 
     .status {
       font-family: monospace;
@@ -53,7 +59,6 @@
         color: inherit;
         border-width: 0;
         padding: 0 0.5em;
-        font-size: 1.2em;
       }
     }
 

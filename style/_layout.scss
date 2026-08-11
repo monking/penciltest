@@ -12,6 +12,10 @@
     }
   }
 
+  &[x-tool="flip"] .field-container {
+    cursor: ew-resize;
+  }
+
   &[x-tool="pan"] .field-container {
     cursor: grab;
 
@@ -66,6 +70,12 @@
   &.hide-cursor:not([x-tool=pan]) {
     .field {
       cursor: none;
+    }
+  }
+
+  form.config {
+    label {
+      margin: 0 0.5em 0 1.0em;
     }
   }
 }

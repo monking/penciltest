@@ -106,7 +106,9 @@ class PenciltestScene implements PenciltestSceneData {
       width: this.width,
       height: this.height,
       aspect: ratioParts[0] / ratioParts[1],
-      aspectRatio
+      aspectRatio,
+      x: 0,
+      y: 0,
     };
     if (!dimensions.width && !dimensions.height) {
       throw new Error('Either width or height must be defined.');
@@ -194,7 +196,7 @@ class PenciltestScene implements PenciltestSceneData {
     this.setCurrentFrameNumber(
       insertFrameNumber + (
           jumpToOffset < 0
-            ? frames.length - jumpToOffset
+            ? frames.length + jumpToOffset
             : jumpToOffset
         )
     );

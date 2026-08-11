@@ -21,6 +21,8 @@ interface Arc {
   resolution?:number;
 };
 
+interface Circle extends Arc {}; // Identity with Arc, but a distinct name to clarify expectation no gap between start and end (end === start + 1).
+
 class PTSpace {
 
   static zeroPoint:Point = {x:0, y:0};
@@ -97,7 +99,7 @@ class PTSpace {
     };
   }
 
-  static traceArc(config:Arc):Array<Point> {
+  static traceArc(config:Arc): Array<Point> {
     const arc = { ...PTSpace.defaultArc, ...config };
     const points:Array<Point> = [];
     const arcStep = (arc.start < arc.end ? 1 : -1)/arc.resolution;
@@ -140,20 +142,73 @@ class PTSpace {
   };
 
   static scalePoint(point: Point, factor: number): Point {
-    const scaledPoint:Mark = {
+    const scaledPoint:Point = {
       ...point, // for overloaded types like Mark
       x: point.x * factor,
       y: point.y * factor
     };
-    if ("w" in scaledPoint) {
-      scaledPoint.w *= factor;
-    }
     return scaledPoint;
   };
+
+  static scalePath(path:Path, factor:number): Path {
+    return path.map((p) => PTSpace.scalePoint(p, factor));
+  }
 
   static magnitude(point: Point): number {
     return Math.sqrt(point.x * point.x + point.y * point.y);
   };
+
+  static doesPathIntersect(path:Path, area:Rect | Circle): boolean {
+    const isCircle = "radius" in area;
+    const radiusX = isCircle ? area.radius : area.width / 2;
+    const radiusY = isCircle ? area.radius : area.height / 2;
+    const center = isCircle ? area.center : {x: area.x + radiusX, y: area.y + radiusY};
+    const subdivisionLength = Math.max(radiusX, radiusY, 0.5) * 1.9; // A little less than the diameter, to make it more likely to intersect an edge of the area. Throwing in a non-zero literal, just in case.
+
+    // TODO Test LINE segment intersection with area. #77af0b21-5b34-4831-b6e9-946de3146597
+    // WORKAROUND(31e33644-5677-4cf7-ba3f-660befeb662c): Simulate midpoints along the line.
+    // Performance is not terrible, even when the radius approaches 1.
+    // Slowdown occurs around (with a radius of 5px on an 8-core Intel i7, 1.2GHz-3GHz):
+    // * 10k points on eco (1.2GHz × 8)
+    // * 30k points on performance (3.0 GHz × 8)
+    //
+    // Larger test area has better performance (as fewer midpoints are made).
+
+    let lastPoint, midpoint, midpointStep = 1/2;
+    for (let point of path) {
+      midpointStep = lastPoint
+        ? subdivisionLength / PTSpace.magnitude(PTSpace.diffPoints(point, lastPoint))
+        : 1;
+      for (let midPosition = 0; midPosition < 1; midPosition += midpointStep) {
+        midpoint = midPosition === 0 || !lastPoint
+          ? point
+          : PTSpace.lerpPoint(point, lastPoint, midPosition); // Lerping backward*
+        // * Somewhat counterintuitively, I'm making midpoints BACK from the
+        //   current point. This is to serve a simpler intuition that we're
+        //   testing THIS point NOW, rather than waiting for the next
+        //   iteration.
+        if (Math.abs(center.x - midpoint.x) < radiusX && Math.abs(center.y - midpoint.y) < radiusY) {
+          if (isCircle && PTSpace.magnitude(PTSpace.diffPoints(center, midpoint)) > radiusX) {
+            continue;
+          }
+          return true;
+        }
+      }
+      lastPoint = point;
+    }
+
+    return false;
+  }
+
+  static expandRect(rect:Rect, radius:number): Rect {
+    return {
+      ...rect,
+      x: (rect.x || 0) - radius,
+      y: (rect.y || 0) - radius,
+      width: rect.width + radius * 2,
+      height: rect.height + radius * 2,
+    };
+  }
 
   static lerpPoint(a:Point, b:Point, weight:number = 0.5): Point {
     return {

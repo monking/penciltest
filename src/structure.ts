@@ -12,7 +12,8 @@ enum PenciltestMode {
 enum PenciltestTool {
   PENCIL = "pencil",
   ERASER = "eraser",
-  PAN = "pan",
+  MOVE = "move",
+  FLIP = "flip",
   /**
    * Not yet implemented. TODO 2026-08-05
   SCALE = "scale",
@@ -25,6 +26,10 @@ enum PointerMode {
   HOVER = "hover",
   AWAY = "away",
 };
+
+type ColorHex = string; // hex RGBA with leading '#'
+
+type Weight = number; // 0-1, e.g. scale factor for strokeWidth
 
 type Color = [number, number, number, number] | [number, number, number];
 
@@ -132,7 +137,10 @@ interface PenciltestSceneData extends PenciltestSceneOptions {
   name?: string;
   uuid?: string;
   getDimensions?(): Rect;
-  packedScale?: number;
+  pack?: {
+    scale?: number;
+    colors?: Array<ColorHex>;
+  }
 };
 
 interface PlaybackState {
@@ -167,39 +175,39 @@ interface PenciltestRenderer {
   width: number;
   height: number;
 
-  resize(width: number, height: number):void;
+  resize(width: number, height: number): void;
 
-  moveTo(x: number, y: number):void
+  moveTo(x: number, y: number): void
 
-  lineTo(x: number, y: number):void
+  lineTo(x: number, y: number): void
 
-  rect(config:Rect, options:PenciltestLineOptions):void
+  rect(config:Rect, options:PenciltestLineOptions): void
 
-  composeOptions(overrides?: PenciltestRendererOptions, persist?: boolean | null):void;
+  composeOptions(overrides?: PenciltestRendererOptions, persist?: boolean | null): void;
 
-  beginPath():void;
+  beginPath(): void;
 
-  endPath():void;
+  endPath(): void;
 
-  subpath(path: Path):void;
+  subpath(path: Path): void;
 
-  render():void
+  render(): void
 
-  requestRender():void
+  requestRender(): void
 
-  getColorString(color: Color | string, opacity:number):string
+  clear(redrawBackground:boolean): void
 
-  clear(redrawBackground:boolean):void
-
-  destroy():void
+  destroy(): void
 }
 
-
-interface Mark extends Vector { w?: number; }
+interface Mark extends Vector {
+  weight?: Weight;
+}
 
 interface Stroke extends PenciltestLineOptions {
-  width?: number;
+  width?: number; // any number, multiplied by path[].mark weight
   path: Path;
+  provisional?: boolean;
 };
 
 interface PositionDescription { x: string; y: string; };
@@ -243,4 +251,9 @@ type PenciltestUIComponentDict = { [key: string]: PenciltestUIComponent; };
 
 interface PenciltestStatusMessageOptions {
   messageTimeout: number;
+};
+
+enum ColorHexNames {
+  black = '#000000',
+  lightgray = '#d3d3d3'
 };

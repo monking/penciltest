@@ -13,7 +13,7 @@ class CanvasRenderer extends BaseRenderer {
     super(options);
 
     this.field = document.createElement('canvas') as HTMLCanvasElement;
-    this.field.style.backgroundColor = this.getColorString(this.options.background);
+    this.field.style.backgroundColor = Utils.getColorString(this.options.background);
     this.context = this.field.getContext('2d', {alpha: options.alpha});
 
     this.resize(this.options.width, this.options.height);
@@ -23,18 +23,18 @@ class CanvasRenderer extends BaseRenderer {
     this.applyStyle(); // Was skipped over in super's composeOptions, because this.context can't be set before super() is called.
   }
 
-  beginPath():void {
+  beginPath(): void {
     super.beginPath();
     this.context.beginPath();
   }
 
-  endPath():void {
+  endPath(): void {
     this.context.strokeStyle = this.currentCanvasStyle.strokeStyle;
     super.endPath();
     this.context.stroke();
   }
 
-  moveTo(x: number, y: number):void {
+  moveTo(x: number, y: number): void {
     super.moveTo(x, y);
     this.context.moveTo(x, y);
   }
@@ -44,7 +44,7 @@ class CanvasRenderer extends BaseRenderer {
     return this.context.lineTo(x, y);
   }
   
-  rect(rect:Rect, options: PenciltestLineOptions):void {
+  rect(rect:Rect, options: PenciltestLineOptions): void {
     const { x, y, width, height } = rect;
     //this.beginPath();
     this.composeOptions(options);
@@ -70,8 +70,14 @@ class CanvasRenderer extends BaseRenderer {
   composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null) {
     super.composeOptions(overrides);
     this.currentCanvasStyle = {
-      fillStyle: this.getColorString(this.currentStyle.fillColor, this.currentStyle.fillOpacity),
-      strokeStyle: this.getColorString(this.currentStyle.strokeColor, this.currentStyle.strokeOpacity),
+      fillStyle: Utils.getColorString(
+        this.currentStyle.fillColor,
+        "fillOpacity" in this.currentStyle ? this.currentStyle.fillOpacity : -1
+      ),
+      strokeStyle: Utils.getColorString(
+        this.currentStyle.strokeColor,
+        "strokeOpacity" in this.currentStyle ? this.currentStyle.strokeOpacity : -1
+      ),
       lineJoin: this.currentStyle.strokeCorner,
       lineWidth: this.currentStyle.strokeWidth,
     };

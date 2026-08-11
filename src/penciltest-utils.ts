@@ -1,6 +1,7 @@
 interface PromptOptions {
   inputKeys?: Array<string>;
   onOpen?: Function;
+  className?: string;
 }
 interface PromptSingleInputOptions extends PromptOptions {
   input?: HTMLInputElement | HTMLSelectElement | PenciltestUIComponent | PenciltestUIComponentOptions | string;
@@ -36,6 +37,63 @@ class Utils {
     return added;
   };
 
+  static getColorString(color: Color | string | null, opacity:number = -1): string {
+    // TODO: I suppose I'm permitting `null` values for `color` so that this
+    // method can be called in a `.map()` without modification. Is that
+    // necessary?
+    if (!color) { return ''; }
+
+    const channels = Array.isArray(color)
+      ? color.slice(0)
+      : Utils.getColorChannels(color);
+
+    if (channels.length === 0 && typeof color === 'string') {
+      if (opacity !== -1) {
+        return `rgb(from ${color} r g b / ${Utils.toDecimal(opacity, 3)})`;
+      }
+      return color;
+    }
+
+    if (channels.length === 3) {
+      channels.push(1);
+    }
+    channels[3] *= 255;
+    if (opacity !== -1) {
+      channels[3] *= opacity
+    }
+    return '#'+channels
+      .map((n) => {
+        const hex = Math.floor(n).toString(16)
+        return (hex.length === 1 ? '0' : '')+hex;
+      })
+      .join('');
+  };
+
+  static getColorChannels(color:string): Array<number> {
+    const channels = [];
+    if (color[0] === '#') {
+      for (let i = 1; i < color.length; i += 2) {
+        const hex = color.substr(i, 2);
+        channels.push(Number(`0x${hex}`));
+      }
+      if (channels[3]) {
+        channels[3] /= 255;
+      }
+    } else if (color.substr(0,3) === 'rgb') {
+      const pattern = /rgba?\( *([0-9]+) *, *([0-9]+) *, *([0-9]+)( *[,\/] *([0-9.]+))?/;
+      const groups = color.match(pattern);
+      if (groups) {
+        channels.push(Number(groups[1]));
+        channels.push(Number(groups[2]));
+        channels.push(Number(groups[3]));
+        if (groups[5]) {
+          channels.push(Number(groups[5]));
+        }
+      }
+    }
+    return channels as Color;
+  };
+
   static inherit(child: {} | Array<any>, ...ancestors: Array<{}>): any {
     if (child == null) { child = {}; }
     for (let ancestor of ancestors) {
@@ -66,7 +124,6 @@ class Utils {
 
   static async promptForm(message:string, formComponentDefs: Array<PenciltestUIComponentOptions>, options: PromptOptions = {}): Promise<Dictionary> {
     const promptPromise:Promise<Dictionary> = new Promise((resolve, reject) => {
-
       const promptComponents:PenciltestUIComponentDict = {};
 
       const promptKeyListener = function(event: KeyboardEvent): any {
@@ -143,6 +200,9 @@ class Utils {
         html: message,
         parent: 'modal'
       };
+      if (options.className) {
+        formDef.className = options.className;
+      }
       promptComponentDefinitions.push(formDef);
       promptComponentDefinitions.push({
         key: 'formBody',
@@ -183,7 +243,7 @@ class Utils {
       if (typeof options.onOpen === 'function') {
         options.onOpen();
       } else {
-        promptComponents.input.getElement().focus();
+        promptComponents[options.inputKeys[0]].getElement().focus();
       }
     });
 
@@ -417,7 +477,7 @@ class Utils {
 
   static lerp(a:number, b:number, weight:number = 0.5): number { return a + weight * (b - a); };
 
-  static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: AnyPointerScope = "client"):Point {
+  static touchPoint(event: TouchEvent, touchLimit: number = 1, scope: AnyPointerScope = "client"): Point {
     const points = Array.from(event.touches)
       .slice(0, touchLimit)
       .map((touch) => {
@@ -433,7 +493,7 @@ class Utils {
     }
   };
 
-  static eventPoint(event: AnyPointerEvent, scope: AnyPointerScope = "client", touchLimit: number = 1):Point {
+  static eventPoint(event: AnyPointerEvent, scope: AnyPointerScope = "client", touchLimit: number = 1): Point {
     if (event.type.substr(5) === 'touch') {
       return Utils.touchPoint(event as TouchEvent);
     }
@@ -443,33 +503,33 @@ class Utils {
     };
   };
 
-  static toDecimal(input:number, precision:number, options:{string?:boolean, pad?:number, prefix?:boolean} = {string: false, pad: 0, prefix: false}): string | number {
+  static toDecimal(input:number, precision:number, options:{strict?:boolean, pad?:number, prefix?:boolean} = {strict: true, pad: 0, prefix: false}): string {
     const {
-      string: toString,
+      strict,
       pad: leftPad,
       prefix: literalPositive
     } = options;
     const factor = Math.pow(10, precision);
     const value = Math.round(input * factor) / factor;
 
-    if (toString) {
-      const parts = String(value).split('.');
-      const prefix = literalPositive && value > 0 ? '+' : '';
-      if (precision > 0) {
-        if (parts.length === 1) {
-          parts.push('0');
-        }
-        while (parts[1].length < precision) { parts[1] += '0'; }
-      }
-      while (parts[0].length < leftPad) { parts[0] = `0${parts[0]}`; }
-      if (precision > 0) {
-        return prefix + parts.join('.');
-      } else {
-        return prefix + parts[0];
-      }
+    if (!strict) {
+      return String(value);
     }
 
-    return value;
+    const parts = String(value).split('.');
+    const prefix = literalPositive && value > 0 ? '+' : '';
+    if (precision > 0) {
+      if (parts.length === 1) {
+        parts.push('0');
+      }
+      while (parts[1].length < precision) { parts[1] += '0'; }
+    }
+    while (parts[0].length < leftPad) { parts[0] = `0${parts[0]}`; }
+    if (precision > 0) {
+      return prefix + parts.join('.');
+    } else {
+      return prefix + parts[0];
+    }
   };
 
   static toTimecode(milliseconds:number, precision:number = 2, minimumUnits:number = 2): string {
@@ -485,14 +545,14 @@ class Utils {
           segment %= factors[index + 1];
         }
         remainderMs -= segment * cumulativeFactor;
-        return Utils.toDecimal(segment, index === 0 ? precision : 0, {string:true, pad:2});
+        return Utils.toDecimal(segment, index === 0 ? precision : 0, {pad:2});
       })
       .filter((x) => typeof x === 'string')
       .reverse()
       .join(':');
   };
 
-  static isMultiple(a:number, b:number, precision:number = 0.001):[boolean, number, number, boolean] {
+  static isMultiple(a:number, b:number, precision:number = 0.001): [boolean, number, number, boolean] {
     let isALarger = a > b
     let factor = isALarger ? a / b : b / a;
     let wholeFactor = Math.round(factor);

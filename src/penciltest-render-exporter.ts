@@ -1,5 +1,5 @@
 /// <reference path="vendor/GIFEncoder.js">
-declare function GIFEncoder():GIFEncoderInterface;
+declare function GIFEncoder(): GIFEncoderInterface;
 
 interface GIFEncoderInterface {
   setDelay(ms: number): void;

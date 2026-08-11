@@ -1,52 +1,37 @@
-(A) 2026-08-08 +BUG | The status bar is not always (ever?) updated after pasting frames.   uuid:2cf96860-75fb-4730-b58b-c7cee5049334
-(B) 2026-08-03 Show key combo references along the right edge of the context menu. +UX  uuid:0b91ecd3-83ae-4957-8545-9f7ba97f8870
-(B) 2026-08-05 Stroke selection tool, 'S'  uuid:e5850700-c29c-463f-ad46-e22c9420893d
-(B) 2026-08-06 Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb  | This is nearly done 2026-08-07, but I want to finish a variant implementation of the pack/unpack to verify, before I mark this as done.
-(B) 2026-08-06 Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
-(C) 2026-04-22 (canvas) Render line uniform darkness first and always. Fixes faint line appearing darker on subsequent renders.  uuid:610aa833-5351-4014-8fd2-edd12ddb6118 +quality
-(C) 2026-08-04 +BUG | GIF export is in pieces.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c
-(C) 2026-08-06 +BUG | If a scene is longer than its audio, the audio doesn't begin playing again upon loop.  uuid:262f1925-4ae7-45e9-8c2f-ad622acd5d96
-2026-04-22 Save unnamed draft automatically, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)
-2026-07-30 LAYERS.  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
-2026-07-30 More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb  hasPart:0f14c213-3134-49cd-978f-9f9cf385b20c
-2026-08-01 SVG render engine? This copy of Raphael is porting badly.
-2026-08-03 Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>  |  2026-08-05 Instead of making it more standard, I've hacked filters into its string substitution. That'll lock me in down the line. But it was fun.
-2026-08-05 Adjustable eraser size.  uuid:092764d8-9676-4f40-8fde-c206ce6024b9
-2026-08-05 Rename 'PAN' to 'MOVE'.  uuid:aea750cb-b0c5-471f-87aa-6f6817f24f01
-2026-08-05 Select specific strokes to move.  dependsOn:e5850700-c29c-463f-ad46-e22c9420893d uuid:f063eb1f-b09a-44c1-8582-83711b2d10e8
-2026-08-06 After pasting multiple frames, go to last frame, so that the action can be repeated.  uuid:69e6449f-810f-400c-92d3-08383a443b28  +UX
-2026-08-06 Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gabs between frames on the timeline.
-2026-08-06 ROTATE tool.  uuid:3f275aee-90de-445d-90c3-d40a72364227 +feature
-2026-08-06 SCALE tool.  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023 +feature
-2026-08-06 Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
-2026-08-06 Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
-2026-08-06 TIMELINE.  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c +feature
-2026-08-08 +FIXME +UX | The frame selection can persist longer than I'm aware, so when I mean to copy from the current frame and paste strokes (shift+v), it pastes frames instead? This report may not be 100% accurate, but something like this is happening.  uuid:bc2987a7-d2da-4759-93ff-19c7a86e79e7
-2026-08-08 +UX | Modify pointer events with Shift, Control, Alt. Maybe PAN, SCALE?, and SCRUB (flip), respectively.  uuid:f3f7e638-6bd4-40b9-9703-ce1bfc9b493e
-2026-08-08 Adjust pencil tool's line width.  uuid:ecf45063-6513-4b52-86bc-070e3e625fe8
-x 2026-08-08 2026-08-08 Allow beginning a mark off the field/stage, so that drawing right on the edge isn't awkward. Perhaps a click anywhere on the stage or backdrop registers as a click in the field.  uuid:18474b41-18c8-47ea-9fd9-f8b3d1beb027
-2026-08-08 Alt+Tabbing back to the app, the 'Tab' shortcut is triggered. Less so if I disregard while `altKey` is pressed, but it still happens, since I'm listening for keyup. Maybe I should be listening for keydown for this one, at least. But my listeners for that event currently don't have a good way of avoiding repetition.  uuid:faa42646-1b8c-407d-a97b-3e9d0290e013
-2026-08-08 Make the eraser look and behave as a circle.  uuid:6abad1f8-8d06-4702-8e56-dc88eafa5c27
-2026-08-08 Middle click should pan the view by default, rather than move content. Perhaps restrict middle click to view manipulation.  uuid:b893c73a-fcf1-4f7a-8c08-bd8df156cdf4  +UX
-2026-08-08 The "Delete Scene" prompt should have the current scene selected by default.  uuid:1ea72d1a-f77f-4849-9a2a-a2f5b3fdd115
-2026-08-08 User-controllable zoom. (Ctrl+middle_drag, Ctrl+wheel, Ctrl+=, Ctrl+-)  uuid:43f4e755-c09c-4c68-9074-82506dfea69e  +UX
-x 2026-06-05 2026-07-30 +BUG FIX(preferred other tools when toggling/resetting)  |  `state.mode` can become stuck in WORKING. (WORKAROUND Settings>Reset)  uuid:8db91e0b-f80a-4482-84c3-a3fa53c1adea  |  Confusing. Seems only `smoothScene` and `panScene` set `state.mode`.  WORKAROUND(Settings > reset.)
-x 2026-08-03 2026-08-01 Pack and unpack scene data: strings encoding stroke paths. isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb uuid:248ddc5d-7079-400c-b515-a08bdae1b76e
-x 2026-08-04 2026-04-22 Port from CoffeeScript to TypeScript  uuid:265aea6e-2e7e-4946-960f-00f733691231 (Still buggy, but it's all TS, now)
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 +WONTFIX src/coffee/video-encoder.coffee  | Unused. Re-implement.
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/app.coffee pri:A
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/canvas-renderer.coffee  pri:B
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-legacy.coffee 
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-menu.coffee  pri:B
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-timeline.coffee  pri:B
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest-ui-component.coffee  pri:A
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/penciltest.coffee  pri:A
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/renderer-interface.coffee  pri:B
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/svg-renderer.coffee  pri:B
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 2026-07-30 src/coffee/utils.coffee  pri:A
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 When .ts ports are functional, move them from src/coffee/ to src/
-x 2026-08-04 2026-07-30  isPartOf:265aea6e-2e7e-4946-960f-00f733691231 src/coffee/penciltest-ui.coffee  uuid:060ce763-274d-49e8-8c0e-7a03ebf4c16e  |  VSCode.toTypeScript() ERROR: "Debug Failure. False expression: Token end is is child end" | SOLUTION: Manually transcode appActions. pri:A
-x 2026-08-04 2026-07-30 Pick audio file, and create blob.  uuid:1ecb31f3-898d-483e-8ac8-87dabfb13797 branch:feature/load-audio-file  pri:A
-x 2026-08-04? Update the application core to handle async prompts (e.g. selectSceneNames)  uuid:5db317d1-a065-416f-a923-faa7e74c3aa2
-x 2026-08-05 2026-08-05 Show eraser size always, not juse during mouseDown.  uuid:4e294534-dff1-4a73-95f1-95924b9d7ba9  +UX pri:A
-x 2026-08-06 2026-04-24 +BUG FIX(0.3.0, TS port) +CANT_REPLICATE  First time toggling onion skin will reset line & bg color.  uuid:4daf3ff3-7c68-459f-909a-8fd9be6db111
+(A) 2026-08-03 +UX | Show key combo references along the right edge of the context menu.  uuid:0b91ecd3-83ae-4957-8545-9f7ba97f8870
+(A) 2026-08-06 +feature | +TIMELINE.  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
+(B) 2026-08-04 +BUG | GIF export is in pieces.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c
+(B) 2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
+(B) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
+(B) 2026-08-06 +feature | +SCALE tool.  complexity:2  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023
+(B) 2026-08-08 +BUG | Alt+Tabbing back to the app, the 'Tab' shortcut is triggered. Less so if I disregard while `altKey` is pressed, but it still happens, since I'm listening for keyup. Maybe I should be listening for keydown for this one, at least. But my listeners for that event currently don't have a good way of avoiding repetition.  uuid:faa42646-1b8c-407d-a97b-3e9d0290e013
+(B) 2026-08-08 +BUG | The status bar is not always (ever?) updated after pasting frames.   uuid:2cf96860-75fb-4730-b58b-c7cee5049334
+(B) 2026-08-08 +UX | Middle click should pan the view by default, rather than move content. Perhaps restrict middle click to view manipulation.  uuid:b893c73a-fcf1-4f7a-8c08-bd8df156cdf4  +UX
+(B) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
+(B) 2026-08-09 +feature | Proper +UNDO/REDO, storing actions + data to restore. Current undo only removes the latest stroke, and redo puts it back. There is at least a stack buffer of those, but other actions CANNOT currently be un-/redone.  uuid:a7398e21-b0a8-4f27-800a-64981716a822
+(B) 2026-08-10 +maintainability +UX | Ensure that gestures are relative to the viewport, not the drawing field.  uuid:4916793a-1e30-4e3e-b1be-8ee2c1074842
+(C) 2026-04-22 +UX | Save working draft automatically, in a dedicated LocalStorage key, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)
+(C) 2026-07-30 +feature | +LAYERS.  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
+(C) 2026-07-30 v:0.3.1 | More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb  hasPart:0f14c213-3134-49cd-978f-9f9cf385b20c
+(C) 2026-08-05 +feature | Stroke selection tool (for transform, copy, delete).  complexity:2 (rectangle)  uuid:e5850700-c29c-463f-ad46-e22c9420893d  |  Perhaps an eraser-like tool that selects by painting. Maybe not the best implementation, but using components already implemented, as an intermediate measure.
+(C) 2026-08-06 +TIMELINE | Show +LAYERS.  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
+(C) 2026-08-06 +TIMELINE | Zoom with Ctrl+wheel.  uuid:43d39470-ccb7-4a2b-8e77-b474f72eed78
+(C) 2026-08-06 +WIP | Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb  | This is nearly done 2026-08-07, but I want to finish a variant implementation of the pack/unpack to verify, before I mark this as done.
+(C) 2026-08-06 +feature | +ROTATE tool.  complexity:3  uuid:3f275aee-90de-445d-90c3-d40a72364227
+(C) 2026-08-08 +UX +clarity | The "Delete Scene" prompt should have the current scene selected by default.  uuid:1ea72d1a-f77f-4849-9a2a-a2f5b3fdd115
+(C) 2026-08-09 +UX +storage | Prompt user for confirmation if RENAMED scene would overwrite existing OTHER scene in LocalStorage. Perhaps note storage name upon loading. If saving as a different name, and if there is a record by that name already, ask for user confirmation.  uuid:9a0b3d29-ae0c-42f7-9728-0a79c2f2c186
+(D) 2026-08-06 +BUG | If a scene is longer than its audio, the audio doesn't begin playing again upon loop.  uuid:262f1925-4ae7-45e9-8c2f-ad622acd5d96
+(D) 2026-08-06 +TIMELINE | Zoom with pinch.  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
+(D) 2026-08-06 +feature | Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gaps between frames on the timeline.
+(D) 2026-08-09 +QUIRK +LATER Range input value must be assigned after min/max attributes are set. Components' attributes are being assigned in definition order, for now. But object param order is not guaranteed, nor expected, right?  uuid:b315c501-ad79-4f92-8bd6-6cbd0f29e852
+(D) 2026-08-09 +storage | Option to Export/Import multiple scenes to/from JSON. Let export format be an array of scenes. Perhaps an object with application state around that. e.g. {instrument,state,content:[scene,…]}  uuid:13d8cfa9-72de-4a29-b9b5-c84993919c1f
+(E) 2026-08-08 +FIXME +UX | The frame selection can persist longer than I'm aware, so when I mean to copy from the current frame and paste strokes (shift+v), it pastes frames instead? This report may not be 100% accurate, but something like this is happening.  uuid:bc2987a7-d2da-4759-93ff-19c7a86e79e7
+(E) 2026-08-08 +UX | Modify pointer events with Shift, Control, Alt. Maybe PAN, SCALE?, and SCRUB (flip), respectively.  uuid:f3f7e638-6bd4-40b9-9703-ce1bfc9b493e
+(E) 2026-08-09 +feature | Choose to erase(/select) segments of strokes, rather than whole strokes. If this is implemented, it would become the default. Ideally, it would cut segments where the eraser/selection was, not only removing the intersecting points, which would leave a ragged erasure.  uuid:7e8fd261-704d-4778-a9fc-c3a240375907
+(E) 2026-08-10 Improve performance of testing path/area intersection.  uuid:343fb0fa-6271-4049-a0ee-9fa27ae3e5ce isPartOf:77af0b21-5b34-4831-b6e9-946de3146597
+(F) 2026-08-03 +maintainability | Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>  |  2026-08-05 Instead of making it more standard, I've hacked filters into its string substitution. That'll lock me in down the line. But it was fun.
+(F) 2026-08-08 +feature | User-controllable zoom. (Ctrl+middle_drag, Ctrl+wheel, Ctrl+=, Ctrl+-)  uuid:43f4e755-c09c-4c68-9074-82506dfea69e  +UX
+(R) 2026-08-01 +reconsider | SVG render engine? This copy of Raphael is porting badly.  |  Being able to export a series of SVGs may be a good means of integrating Penciltest into a production pipeline... Maybe a different (version of the) library.
+(R) 2026-08-06 +reconsider | +UX +feature | Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
+(R) 2026-08-06 +reconsider | +UX | Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
+(R) 2026-08-10 +reconsider | Should my Arc interface use 2*Math.PI for a circle, as Canvas2DContext.arc does? I like the implicit tau in my implementation, so it'll stay for now. Food for thought.  uuid:8de1bdf1-9449-4813-933a-0c41260dc079

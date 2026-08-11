@@ -164,24 +164,24 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     };
   }
 
-  packCoord(coord:number):string {
-    return Utils.toDecimal(coord, 2, {string:true}) as string;
+  packNumber(value:number): string {
+    return Utils.toDecimal(value, 2) as string;
   }
 
-  unpackCoord(coord:string):number {
-    return Number(coord);
+  unpackNumber(value:string): number {
+    return Number(value);
   }
 
-  packPoint(point:Point):string {
-    return `${this.packCoord(point.x)}${this.packSeparators.coord}${this.packCoord(point.y)}`;
+  packPoint(point:Point): string {
+    return `${this.packNumber(point.x)}${this.packSeparators.coord}${this.packNumber(point.y)}`;
   }
 
   unpackPoint(packedPoint) {
-    const coords = packedPoint.split(this.packSeparators.coord).map(this.unpackCoord.bind(this));
+    const coords = packedPoint.split(this.packSeparators.coord).map(this.unpackNumber.bind(this));
     return {x:coords[0], y:coords[1]};
   }
 
-  packStroke(stroke:Stroke, scene:PenciltestScene):string {
+  packStroke(stroke:Stroke, scene:PenciltestScene): string {
     const packedStrokeObject = { ...stroke };
     delete packedStrokeObject.path;
     let packedStrokeString = stroke.path
@@ -193,7 +193,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return packedStrokeString;
   }
 
-  unpackStroke(packedStroke:string):Stroke {
+  unpackStroke(packedStroke:string): Stroke {
     const jsonIndex = packedStroke.indexOf('{');
     const stroke:Stroke = {} as Stroke;
     if (jsonIndex !== -1) {
@@ -209,7 +209,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return stroke;
   }
 
-  packFrame(frame:PenciltestFrame, scene:PenciltestScene):PenciltestFrame {
+  packFrame(frame:PenciltestFrame, scene:PenciltestScene): PenciltestFrame {
     const packedFrame:PenciltestFrame = {
       ...frame,
     };
@@ -225,7 +225,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return packedFrame;
   }
 
-  unpackFrame(frame:PenciltestFrame, scene:PenciltestSceneData):PenciltestFrame {
+  unpackFrame(frame:PenciltestFrame, scene:PenciltestSceneData): PenciltestFrame {
     if (!frame.packedStrokes?.length) { return frame; }
 
     const unpackedFrame:PenciltestFrame = {
@@ -239,7 +239,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return unpackedFrame;
   }
 
-  packScene(scene:PenciltestScene):PenciltestSceneData {
+  packScene(scene:PenciltestScene): PenciltestSceneData {
     const packedScene:PenciltestSceneData = {
       ...scene,
       frames: scene.frames.map((frame) => this.packFrame(frame, scene))
@@ -247,15 +247,23 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return packedScene;
   }
 
-  unpackScene(packedScene:PenciltestSceneData):PenciltestSceneData {
+  unpackScene(packedScene:PenciltestSceneData): PenciltestSceneData {
     const scene = new PenciltestScene(packedScene);
     scene.frames = scene.frames.map((frame) => this.unpackFrame(frame, scene));
     return scene;
   }
 };
 
+interface SceneAnalysis {
+  // descending order
+  colorCount?:{[key:ColorHex | string]:number};
+  colors?:Array<ColorHex | string>;
+  widthCount?:{[key:string]:number};
+  widths?:Array<string>;
+};
 class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
   packedScale:number;
+  analysis:SceneAnalysis
 
   constructor() {
     super();
@@ -263,27 +271,137 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
     this.packedScale = 100;
   }
 
-  packScene(scene:PenciltestScene):PenciltestSceneData {
+  analyzeScene(scene:PenciltestScene): SceneAnalysis {
+    const analysis:SceneAnalysis = {
+      colorCount: {},
+      widthCount:{},
+    };
+
+    const sceneStrokeWidth = scene.strokeWidth || 1;
+    const sceneStrokeColor = Utils.getColorString(
+      scene.strokeColor || ColorHexNames.black,
+      scene.strokeOpacity || -1
+    );
+    if (!(sceneStrokeColor in analysis.colorCount)) {
+      analysis.colorCount[sceneStrokeColor] = 0;
+    }
+    analysis.colorCount[sceneStrokeColor]++;
+
+    scene.frames.forEach((frame) => {
+      frame.strokes.forEach((stroke) => {
+        const strokeWidth = "width" in stroke
+          ? stroke.width
+          : sceneStrokeWidth;
+        const widthString = String(strokeWidth);
+        if (!(widthString in analysis.widthCount)) {
+          analysis.widthCount[widthString] = 0;
+        }
+        analysis.widthCount[widthString]++;
+
+        const colorString = Utils.getColorString(stroke.strokeColor) || sceneStrokeColor;
+        // Sounds redundant, but a stroke COULD also have a fill color.
+        if (!(colorString in analysis.colorCount)) {
+          analysis.colorCount[colorString] = 0;
+        }
+        analysis.colorCount[colorString]++;
+      });
+    });
+
+    analysis.colors = Object.keys(analysis.colorCount)
+      .filter((key) => analysis.colorCount[key] !== 1) // omit singletons
+      .sort((a,b) => analysis.colorCount[b] - analysis.colorCount[a]) // descending
+
+    analysis.widths = Object.keys(analysis.widthCount)
+      .filter((key) => analysis.widthCount[key] !== 1) // omit singletons
+      .sort((a,b) => analysis.widthCount[b] - analysis.widthCount[a]) // descending
+
+    return analysis;
+  }
+
+  packScene(scene:PenciltestScene): PenciltestSceneData {
+    this.analysis = this.analyzeScene(scene);
     const packedScene:any = super.packScene(scene);
-    packedScene.packedScale = this.packedScale;
+    packedScene.pack = {
+      scale: this.packedScale,
+    }
+    packedScene.strokeWidth = Number(this.analysis.widths[0]);
+    packedScene.strokeColor = this.analysis.colors[0];
     return packedScene;
   }
 
-  unpackScene(packedScene:PenciltestSceneData):PenciltestSceneData {
-    if ("packedScale" in packedScene) {
-      this.packedScale = packedScene.packedScale;
-      delete packedScene.packedScale;
+  unpackScene(packedScene:PenciltestSceneData): PenciltestSceneData {
+    if ("pack" in packedScene) {
+      this.packedScale = packedScene.pack.scale;
+      this.analysis = {
+        colors: packedScene.pack.colors || [],
+      }
     }
     const sceneData = super.unpackScene(packedScene);
     return sceneData;
   }
 
-  packCoord(coord:number):string {
-    return Utils.toDecimal(coord * this.packedScale, 0, {string:true}) as string;
+  packStroke(stroke:Stroke, scene:PenciltestScene): string {
+    const packedStrokeObject = { ...stroke };
+
+    if (!("width" in packedStrokeObject)) {
+      packedStrokeObject.width = scene.strokeWidth;
+    }
+    if (String(packedStrokeObject.width) === this.analysis.widths[0]) {
+      delete packedStrokeObject.width
+    }
+
+    if (!("strokeColor" in packedStrokeObject)) {
+      packedStrokeObject.strokeColor = scene.strokeColor || ColorHexNames.black;
+    }
+    if (packedStrokeObject.strokeColor === this.analysis.colors[0]) {
+      delete packedStrokeObject.strokeColor
+    }
+
+    return super.packStroke(packedStrokeObject, scene);
   }
 
-  unpackCoord(coord:string):number {
-    return Number(coord) / this.packedScale;
+  unpackStroke(packedStroke:string): Stroke {
+    const jsonIndex = packedStroke.indexOf('{');
+    const stroke:Stroke = {} as Stroke;
+    if (jsonIndex !== -1) {
+      try {
+        Object.assign(stroke, JSON.parse(packedStroke.slice(jsonIndex)))
+      } catch(e) {
+        console.error(e);
+      }
+    }
+    stroke.path = (jsonIndex > -1 ? packedStroke.substr(0, jsonIndex) : packedStroke)
+      .split(this.packSeparators.point)
+      .map(this.unpackPoint.bind(this));
+    return stroke;
+  }
+
+  packPoint(point:Mark): string {
+    const coords = [point.x, point.y].map(this.packNumber);
+    if ("weight" in point && point.weight !== 1) {
+      coords.push('w' + this.packNumber(point.weight));
+    }
+    return coords.join(this.packSeparators.coord);
+  }
+
+  unpackPoint(packedPoint) {
+    const coords = packedPoint.split(this.packSeparators.coord)
+    const mark:Mark = {
+      x: this.unpackNumber(coords[0]),
+      y: this.unpackNumber(coords[1]),
+    };
+    if (coords[2] && coords[2][0] === 'w') {
+      mark.weight = this.unpackNumber(coords[2].substr(1))
+    }
+    return mark;
+  }
+
+  packNumber(value:number): string {
+    return String(Math.floor(value * this.packedScale));
+  }
+
+  unpackNumber(value:string): number {
+    return Number(value) / this.packedScale;
   }
 };
 
@@ -304,7 +422,7 @@ class PenciltestMigrator {
   constructor() {
     this.mungers = [
       new PTMunger_V0_3_0(),
-      //new PTMunger_V0_3_1(), // not ready yet to test this iteration of pack/unpack
+      new PTMunger_V0_3_1(),
     ];
 
     this.migrations = [
@@ -331,7 +449,7 @@ class PenciltestMigrator {
     }, 0) as comparisonTrinary;
   }
 
-  static filterByMethods(methodNames:Array<string>):(value: PenciltestMigrationInterface, index: number, array: PenciltestMigrationInterface[]) => boolean {
+  static filterByMethods(methodNames:Array<string>): (value: PenciltestMigrationInterface, index: number, array: PenciltestMigrationInterface[]) => boolean {
     return (migration:PenciltestMigrationInterface) => {
       for (let methodName of methodNames) {
         if (typeof migration[methodName] !== 'function') {
@@ -346,7 +464,7 @@ class PenciltestMigrator {
     return sceneData.instrument?.version || sceneData.version;
   }
 
-  getMigrationsByVersion(fromVersion:string, toVersion:string):Array<PenciltestMigrationInterface> {
+  getMigrationsByVersion(fromVersion:string, toVersion:string): Array<PenciltestMigrationInterface> {
     let start:number = -Infinity, end:number = Infinity;
     this.migrations.forEach((migration, i) => {
       if (this.compareVersions(fromVersion, migration.fromVersion) != -1) {
@@ -359,7 +477,7 @@ class PenciltestMigrator {
     return this.migrations.slice(start, end + 1); // Include end index in slice.
   }
 
-  getMunger(sceneData:any):PenciltestSceneMunger | null {
+  getMunger(sceneData:any): PenciltestSceneMunger | null {
     const sceneDataVersion = this.getSceneVersion(sceneData);
     for (let i = this.mungers.length - 1; i >= 0; i--) {
       const mungerIsTooNew = this.compareVersions(sceneDataVersion, this.mungers[i].version) === -1
@@ -373,27 +491,31 @@ class PenciltestMigrator {
 
   async packScene(scene:PenciltestScene): Promise<PenciltestScene> {
     return new Promise((resolve, reject) => {
-      const munger = this.getMunger(scene);
-      if (typeof munger?.packScene === 'function') {
-        try {
-          const packedScene = munger.packScene(Utils.clone(scene));
-          if (packedScene.current?.frames) {
-            delete packedScene.current.frames;
+      try {
+        const munger = this.getMunger(scene);
+        if (typeof munger?.packScene === 'function') {
+          try {
+            const packedScene = munger.packScene(Utils.clone(scene));
+            if (packedScene.current?.frames) {
+              delete packedScene.current.frames;
+            }
+            debugger;if (packedScene.current?.singleFrameDuration) {
+              packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
+            }
+            if (packedScene.current?.duration) {
+              packedScene.current.duration = Utils.toDecimal(packedScene.current.duration, 3);
+            }
+            resolve(packedScene);
+            return;
+          } catch(e) {
+            console.error(e);
+            reject(`Error packing scene: ${e.message}`);
           }
-          if (packedScene.current?.singleFrameDuration) {
-            packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
-          }
-          if (packedScene.current?.duration) {
-            packedScene.current.duration = Utils.toDecimal(packedScene.current.duration, 3);
-          }
-          resolve(packedScene);
-          return;
-        } catch(e) {
-          console.error(e);
-          reject(`Error packing scene: ${e.message}`);
+        } else {
+          console.warn(`No packScene method found for scene version ${scene.instrument.version}.`);
         }
-      } else {
-        console.warn(`No packScene method found for scene version ${scene.instrument.version}.`);
+      } catch(e) {
+        console.error(e);
       }
       resolve(scene);
     });

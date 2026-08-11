@@ -58,28 +58,6 @@ class BaseRenderer implements PenciltestRenderer {
     Object.assign(this.options, options);
   }
 
-  getColorString(color: Color | string | null, opacity:number = -1): string {
-    if (!color) {
-      return '';
-    }
-    let rgb:string;
-    let opacityValue:string = '';
-    if (opacity !== -1) {
-      opacityValue = String(opacity);
-    }
-    if (Array.isArray(color)) {
-      rgb = color.slice(0,3).join(' ');
-      if (opacityValue.length === 0 && color.length === 4) {
-        opacityValue = String(color[3]);
-      }
-    } else if (opacityValue) {
-      rgb = `from ${String(color)} r g b`;
-    } else {
-      return String(color);
-    }
-    return `rgb(${rgb}${opacityValue ? ' / '+opacityValue : ''})`;
-  }
-
   resize(width: number, height: number): void {
     if (this.options.debug) { console.log('  resize'); }
     this.width = width;
@@ -126,7 +104,7 @@ class BaseRenderer implements PenciltestRenderer {
     this.lineTo(point.x, point.y);
   }
 
-  rect(rect:Rect, options: PenciltestLineOptions):void {
+  rect(rect:Rect, options: PenciltestLineOptions): void {
     if (this.options.debug) { console.log('rect'); }
   }
 
@@ -154,24 +132,23 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
 
-
-  getFieldRect():Rect {
+  getFieldRect(): Rect {
     if (this.options.debug) { console.log('  getFieldRect'); }
     return {x:0, y:0, width:this.width, height:this.height};
   }
 
-  beginPath(options:PenciltestLineOptions | null = null):void {
+  beginPath(options:PenciltestLineOptions | null = null): void {
     if (this.options.debug) { console.log('beginPath'); }
     if (options !== null) {
       this.composeOptions(options);
     }
   }
 
-  endPath():void {
+  endPath(): void {
     if (this.options.debug) { console.log('endPath'); }
   }
 
-  clear(redrawBackground:boolean = true):void {
+  clear(redrawBackground:boolean = true): void {
     if (this.options.debug) { console.log(` clear${redrawBackground ? ' BACK' : ''}`); }
     if (redrawBackground && this.options.background !== 'transparent') {
       const fieldRect = this.getFieldRect();

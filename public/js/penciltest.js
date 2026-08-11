@@ -16,7 +16,8 @@ var PenciltestTool;
 (function (PenciltestTool) {
     PenciltestTool["PENCIL"] = "pencil";
     PenciltestTool["ERASER"] = "eraser";
-    PenciltestTool["PAN"] = "pan";
+    PenciltestTool["MOVE"] = "move";
+    PenciltestTool["FLIP"] = "flip";
     /**
      * Not yet implemented. TODO 2026-08-05
     SCALE = "scale",
@@ -40,6 +41,12 @@ var PointerMode;
 ;
 ;
 ;
+;
+var ColorHexNames;
+(function (ColorHexNames) {
+    ColorHexNames["black"] = "#000000";
+    ColorHexNames["lightgray"] = "#d3d3d3";
+})(ColorHexNames || (ColorHexNames = {}));
 ;
 
 "use strict";
@@ -65,6 +72,63 @@ class Utils {
             added = true;
         }
         return added;
+    }
+    ;
+    static getColorString(color, opacity = -1) {
+        // TODO: I suppose I'm permitting `null` values for `color` so that this
+        // method can be called in a `.map()` without modification. Is that
+        // necessary?
+        if (!color) {
+            return '';
+        }
+        const channels = Array.isArray(color)
+            ? color.slice(0)
+            : Utils.getColorChannels(color);
+        if (channels.length === 0 && typeof color === 'string') {
+            if (opacity !== -1) {
+                return `rgb(from ${color} r g b / ${Utils.toDecimal(opacity, 3)})`;
+            }
+            return color;
+        }
+        if (channels.length === 3) {
+            channels.push(1);
+        }
+        channels[3] *= 255;
+        if (opacity !== -1) {
+            channels[3] *= opacity;
+        }
+        return '#' + channels
+            .map((n) => {
+            const hex = Math.floor(n).toString(16);
+            return (hex.length === 1 ? '0' : '') + hex;
+        })
+            .join('');
+    }
+    ;
+    static getColorChannels(color) {
+        const channels = [];
+        if (color[0] === '#') {
+            for (let i = 1; i < color.length; i += 2) {
+                const hex = color.substr(i, 2);
+                channels.push(Number(`0x${hex}`));
+            }
+            if (channels[3]) {
+                channels[3] /= 255;
+            }
+        }
+        else if (color.substr(0, 3) === 'rgb') {
+            const pattern = /rgba?\( *([0-9]+) *, *([0-9]+) *, *([0-9]+)( *[,\/] *([0-9.]+))?/;
+            const groups = color.match(pattern);
+            if (groups) {
+                channels.push(Number(groups[1]));
+                channels.push(Number(groups[2]));
+                channels.push(Number(groups[3]));
+                if (groups[5]) {
+                    channels.push(Number(groups[5]));
+                }
+            }
+        }
+        return channels;
     }
     ;
     static inherit(child, ...ancestors) {
@@ -175,6 +239,9 @@ class Utils {
                 html: message,
                 parent: 'modal'
             };
+            if (options.className) {
+                formDef.className = options.className;
+            }
             promptComponentDefinitions.push(formDef);
             promptComponentDefinitions.push({
                 key: 'formBody',
@@ -213,7 +280,7 @@ class Utils {
                 options.onOpen();
             }
             else {
-                promptComponents.input.getElement().focus();
+                promptComponents[options.inputKeys[0]].getElement().focus();
             }
         });
         Utils.registerGlobalPromise(promptPromise);
@@ -414,32 +481,32 @@ class Utils {
         };
     }
     ;
-    static toDecimal(input, precision, options = { string: false, pad: 0, prefix: false }) {
-        const { string: toString, pad: leftPad, prefix: literalPositive } = options;
+    static toDecimal(input, precision, options = { strict: true, pad: 0, prefix: false }) {
+        const { strict, pad: leftPad, prefix: literalPositive } = options;
         const factor = Math.pow(10, precision);
         const value = Math.round(input * factor) / factor;
-        if (toString) {
-            const parts = String(value).split('.');
-            const prefix = literalPositive && value > 0 ? '+' : '';
-            if (precision > 0) {
-                if (parts.length === 1) {
-                    parts.push('0');
-                }
-                while (parts[1].length < precision) {
-                    parts[1] += '0';
-                }
+        if (!strict) {
+            return String(value);
+        }
+        const parts = String(value).split('.');
+        const prefix = literalPositive && value > 0 ? '+' : '';
+        if (precision > 0) {
+            if (parts.length === 1) {
+                parts.push('0');
             }
-            while (parts[0].length < leftPad) {
-                parts[0] = `0${parts[0]}`;
-            }
-            if (precision > 0) {
-                return prefix + parts.join('.');
-            }
-            else {
-                return prefix + parts[0];
+            while (parts[1].length < precision) {
+                parts[1] += '0';
             }
         }
-        return value;
+        while (parts[0].length < leftPad) {
+            parts[0] = `0${parts[0]}`;
+        }
+        if (precision > 0) {
+            return prefix + parts.join('.');
+        }
+        else {
+            return prefix + parts[0];
+        }
     }
     ;
     static toTimecode(milliseconds, precision = 2, minimumUnits = 2) {
@@ -457,7 +524,7 @@ class Utils {
                 segment %= factors[index + 1];
             }
             remainderMs -= segment * cumulativeFactor;
-            return Utils.toDecimal(segment, index === 0 ? precision : 0, { string: true, pad: 2 });
+            return Utils.toDecimal(segment, index === 0 ? precision : 0, { pad: 2 });
         })
             .filter((x) => typeof x === 'string')
             .reverse()
@@ -589,6 +656,7 @@ Utils.shiftKeyNameCodes = {
 
 "use strict";
 ;
+; // Identity with Arc, but a distinct name to clarify expectation no gap between start and end (end === start + 1).
 class PTSpace {
     static boundsAroundPoint(point, radiusX, radiusY = NaN) {
         if (isNaN(radiusY)) {
@@ -700,16 +768,63 @@ class PTSpace {
             x: point.x * factor,
             y: point.y * factor
         };
-        if ("w" in scaledPoint) {
-            scaledPoint.w *= factor;
-        }
         return scaledPoint;
     }
     ;
+    static scalePath(path, factor) {
+        return path.map((p) => PTSpace.scalePoint(p, factor));
+    }
     static magnitude(point) {
         return Math.sqrt(point.x * point.x + point.y * point.y);
     }
     ;
+    static doesPathIntersect(path, area) {
+        const isCircle = "radius" in area;
+        const radiusX = isCircle ? area.radius : area.width / 2;
+        const radiusY = isCircle ? area.radius : area.height / 2;
+        const center = isCircle ? area.center : { x: area.x + radiusX, y: area.y + radiusY };
+        const subdivisionLength = Math.max(radiusX, radiusY, 0.5) * 1.9; // A little less than the diameter, to make it more likely to intersect an edge of the area. Throwing in a non-zero literal, just in case.
+        // TODO Test LINE segment intersection with area. #77af0b21-5b34-4831-b6e9-946de3146597
+        // WORKAROUND(31e33644-5677-4cf7-ba3f-660befeb662c): Simulate midpoints along the line.
+        // Performance is not terrible, even when the radius approaches 1.
+        // Slowdown occurs around (with a radius of 5px on an 8-core Intel i7, 1.2GHz-3GHz):
+        // * 10k points on eco (1.2GHz × 8)
+        // * 30k points on performance (3.0 GHz × 8)
+        //
+        // Larger test area has better performance (as fewer midpoints are made).
+        let lastPoint, midpoint, midpointStep = 1 / 2;
+        for (let point of path) {
+            midpointStep = lastPoint
+                ? subdivisionLength / PTSpace.magnitude(PTSpace.diffPoints(point, lastPoint))
+                : 1;
+            for (let midPosition = 0; midPosition < 1; midPosition += midpointStep) {
+                midpoint = midPosition === 0 || !lastPoint
+                    ? point
+                    : PTSpace.lerpPoint(point, lastPoint, midPosition); // Lerping backward*
+                // * Somewhat counterintuitively, I'm making midpoints BACK from the
+                //   current point. This is to serve a simpler intuition that we're
+                //   testing THIS point NOW, rather than waiting for the next
+                //   iteration.
+                if (Math.abs(center.x - midpoint.x) < radiusX && Math.abs(center.y - midpoint.y) < radiusY) {
+                    if (isCircle && PTSpace.magnitude(PTSpace.diffPoints(center, midpoint)) > radiusX) {
+                        continue;
+                    }
+                    return true;
+                }
+            }
+            lastPoint = point;
+        }
+        return false;
+    }
+    static expandRect(rect, radius) {
+        return {
+            ...rect,
+            x: (rect.x || 0) - radius,
+            y: (rect.y || 0) - radius,
+            width: rect.width + radius * 2,
+            height: rect.height + radius * 2,
+        };
+    }
     static lerpPoint(a, b, weight = 0.5) {
         return {
             x: Utils.lerp(a.x, b.x, weight),
@@ -806,7 +921,9 @@ class PenciltestScene {
             width: this.width,
             height: this.height,
             aspect: ratioParts[0] / ratioParts[1],
-            aspectRatio
+            aspectRatio,
+            x: 0,
+            y: 0,
         };
         if (!dimensions.width && !dimensions.height) {
             throw new Error('Either width or height must be defined.');
@@ -886,7 +1003,7 @@ class PenciltestScene {
         Array.prototype.splice.apply(this.frames, [insertFrameNumber, 0].concat(frames));
         this.updateState();
         this.setCurrentFrameNumber(insertFrameNumber + (jumpToOffset < 0
-            ? frames.length - jumpToOffset
+            ? frames.length + jumpToOffset
             : jumpToOffset));
     }
     setModified(date = null) {
@@ -1108,17 +1225,17 @@ class PTMunger_V0_3_0 {
             coord: ','
         };
     }
-    packCoord(coord) {
-        return Utils.toDecimal(coord, 2, { string: true });
+    packNumber(value) {
+        return Utils.toDecimal(value, 2);
     }
-    unpackCoord(coord) {
-        return Number(coord);
+    unpackNumber(value) {
+        return Number(value);
     }
     packPoint(point) {
-        return `${this.packCoord(point.x)}${this.packSeparators.coord}${this.packCoord(point.y)}`;
+        return `${this.packNumber(point.x)}${this.packSeparators.coord}${this.packNumber(point.y)}`;
     }
     unpackPoint(packedPoint) {
-        const coords = packedPoint.split(this.packSeparators.coord).map(this.unpackCoord.bind(this));
+        const coords = packedPoint.split(this.packSeparators.coord).map(this.unpackNumber.bind(this));
         return { x: coords[0], y: coords[1] };
     }
     packStroke(stroke, scene) {
@@ -1193,30 +1310,125 @@ class PTMunger_V0_3_0 {
     }
 }
 ;
+;
 class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
     constructor() {
         super();
         this.version = '0.3.1';
         this.packedScale = 100;
     }
+    analyzeScene(scene) {
+        const analysis = {
+            colorCount: {},
+            widthCount: {},
+        };
+        const sceneStrokeWidth = scene.strokeWidth || 1;
+        const sceneStrokeColor = Utils.getColorString(scene.strokeColor || ColorHexNames.black, scene.strokeOpacity || -1);
+        if (!(sceneStrokeColor in analysis.colorCount)) {
+            analysis.colorCount[sceneStrokeColor] = 0;
+        }
+        analysis.colorCount[sceneStrokeColor]++;
+        scene.frames.forEach((frame) => {
+            frame.strokes.forEach((stroke) => {
+                const strokeWidth = "width" in stroke
+                    ? stroke.width
+                    : sceneStrokeWidth;
+                const widthString = String(strokeWidth);
+                if (!(widthString in analysis.widthCount)) {
+                    analysis.widthCount[widthString] = 0;
+                }
+                analysis.widthCount[widthString]++;
+                const colorString = Utils.getColorString(stroke.strokeColor) || sceneStrokeColor;
+                // Sounds redundant, but a stroke COULD also have a fill color.
+                if (!(colorString in analysis.colorCount)) {
+                    analysis.colorCount[colorString] = 0;
+                }
+                analysis.colorCount[colorString]++;
+            });
+        });
+        analysis.colors = Object.keys(analysis.colorCount)
+            .filter((key) => analysis.colorCount[key] !== 1) // omit singletons
+            .sort((a, b) => analysis.colorCount[b] - analysis.colorCount[a]); // descending
+        analysis.widths = Object.keys(analysis.widthCount)
+            .filter((key) => analysis.widthCount[key] !== 1) // omit singletons
+            .sort((a, b) => analysis.widthCount[b] - analysis.widthCount[a]); // descending
+        return analysis;
+    }
     packScene(scene) {
+        this.analysis = this.analyzeScene(scene);
         const packedScene = super.packScene(scene);
-        packedScene.packedScale = this.packedScale;
+        packedScene.pack = {
+            scale: this.packedScale,
+        };
+        packedScene.strokeWidth = Number(this.analysis.widths[0]);
+        packedScene.strokeColor = this.analysis.colors[0];
         return packedScene;
     }
     unpackScene(packedScene) {
-        if ("packedScale" in packedScene) {
-            this.packedScale = packedScene.packedScale;
-            delete packedScene.packedScale;
+        if ("pack" in packedScene) {
+            this.packedScale = packedScene.pack.scale;
+            this.analysis = {
+                colors: packedScene.pack.colors || [],
+            };
         }
         const sceneData = super.unpackScene(packedScene);
         return sceneData;
     }
-    packCoord(coord) {
-        return Utils.toDecimal(coord * this.packedScale, 0, { string: true });
+    packStroke(stroke, scene) {
+        const packedStrokeObject = { ...stroke };
+        if (!("width" in packedStrokeObject)) {
+            packedStrokeObject.width = scene.strokeWidth;
+        }
+        if (String(packedStrokeObject.width) === this.analysis.widths[0]) {
+            delete packedStrokeObject.width;
+        }
+        if (!("strokeColor" in packedStrokeObject)) {
+            packedStrokeObject.strokeColor = scene.strokeColor || ColorHexNames.black;
+        }
+        if (packedStrokeObject.strokeColor === this.analysis.colors[0]) {
+            delete packedStrokeObject.strokeColor;
+        }
+        return super.packStroke(packedStrokeObject, scene);
     }
-    unpackCoord(coord) {
-        return Number(coord) / this.packedScale;
+    unpackStroke(packedStroke) {
+        const jsonIndex = packedStroke.indexOf('{');
+        const stroke = {};
+        if (jsonIndex !== -1) {
+            try {
+                Object.assign(stroke, JSON.parse(packedStroke.slice(jsonIndex)));
+            }
+            catch (e) {
+                console.error(e);
+            }
+        }
+        stroke.path = (jsonIndex > -1 ? packedStroke.substr(0, jsonIndex) : packedStroke)
+            .split(this.packSeparators.point)
+            .map(this.unpackPoint.bind(this));
+        return stroke;
+    }
+    packPoint(point) {
+        const coords = [point.x, point.y].map(this.packNumber);
+        if ("weight" in point && point.weight !== 1) {
+            coords.push('w' + this.packNumber(point.weight));
+        }
+        return coords.join(this.packSeparators.coord);
+    }
+    unpackPoint(packedPoint) {
+        const coords = packedPoint.split(this.packSeparators.coord);
+        const mark = {
+            x: this.unpackNumber(coords[0]),
+            y: this.unpackNumber(coords[1]),
+        };
+        if (coords[2] && coords[2][0] === 'w') {
+            mark.weight = this.unpackNumber(coords[2].substr(1));
+        }
+        return mark;
+    }
+    packNumber(value) {
+        return String(Math.floor(value * this.packedScale));
+    }
+    unpackNumber(value) {
+        return Number(value) / this.packedScale;
     }
 }
 ;
@@ -1233,7 +1445,7 @@ class PenciltestMigrator {
     constructor() {
         this.mungers = [
             new PTMunger_V0_3_0(),
-            //new PTMunger_V0_3_1(), // not ready yet to test this iteration of pack/unpack
+            new PTMunger_V0_3_1(),
         ];
         this.migrations = [
             new PTMigration_v0_to_v0_0_4(),
@@ -1305,29 +1517,35 @@ class PenciltestMigrator {
     async packScene(scene) {
         return new Promise((resolve, reject) => {
             var _a, _b, _c;
-            const munger = this.getMunger(scene);
-            if (typeof (munger === null || munger === void 0 ? void 0 : munger.packScene) === 'function') {
-                try {
-                    const packedScene = munger.packScene(Utils.clone(scene));
-                    if ((_a = packedScene.current) === null || _a === void 0 ? void 0 : _a.frames) {
-                        delete packedScene.current.frames;
+            try {
+                const munger = this.getMunger(scene);
+                if (typeof (munger === null || munger === void 0 ? void 0 : munger.packScene) === 'function') {
+                    try {
+                        const packedScene = munger.packScene(Utils.clone(scene));
+                        if ((_a = packedScene.current) === null || _a === void 0 ? void 0 : _a.frames) {
+                            delete packedScene.current.frames;
+                        }
+                        debugger;
+                        if ((_b = packedScene.current) === null || _b === void 0 ? void 0 : _b.singleFrameDuration) {
+                            packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
+                        }
+                        if ((_c = packedScene.current) === null || _c === void 0 ? void 0 : _c.duration) {
+                            packedScene.current.duration = Utils.toDecimal(packedScene.current.duration, 3);
+                        }
+                        resolve(packedScene);
+                        return;
                     }
-                    if ((_b = packedScene.current) === null || _b === void 0 ? void 0 : _b.singleFrameDuration) {
-                        packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
+                    catch (e) {
+                        console.error(e);
+                        reject(`Error packing scene: ${e.message}`);
                     }
-                    if ((_c = packedScene.current) === null || _c === void 0 ? void 0 : _c.duration) {
-                        packedScene.current.duration = Utils.toDecimal(packedScene.current.duration, 3);
-                    }
-                    resolve(packedScene);
-                    return;
                 }
-                catch (e) {
-                    console.error(e);
-                    reject(`Error packing scene: ${e.message}`);
+                else {
+                    console.warn(`No packScene method found for scene version ${scene.instrument.version}.`);
                 }
             }
-            else {
-                console.warn(`No packScene method found for scene version ${scene.instrument.version}.`);
+            catch (e) {
+                console.error(e);
             }
             resolve(scene);
         });
@@ -1425,6 +1643,13 @@ class PenciltestUIComponent {
         }
         return new PenciltestUIComponent(options, components);
     }
+    static find(element, components) {
+        const key = element.getAttribute('x-key');
+        if (key) {
+            return PenciltestUIComponent.restore({ key }, components);
+        }
+        return null;
+    }
     constructor(options, components = {}) {
         this.isPTComponent = true;
         this.options = {
@@ -1436,6 +1661,9 @@ class PenciltestUIComponent {
         this.el = {};
         //this.refreshHandlers = [];
         const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
+        if (this.options.key) {
+            element.setAttribute('x-key', this.options.key);
+        }
         if (this.options.on) {
             for (let eventName in this.options.on) {
                 const boundListener = this.options.on[eventName].bind(this.getElement());
@@ -1444,10 +1672,12 @@ class PenciltestUIComponent {
                 });
             }
         }
-        if (this.options.children) {
-            this.options.children.forEach((childConfig) => PenciltestUIComponent.restore({ ...childConfig, parent: this }, this.components));
-        }
         this.setContent(this.options, true);
+        //if (this.options.children) {
+        //  this.options.children.forEach(
+        //    (childConfig:PenciltestUIComponentOptions) => PenciltestUIComponent.restore({...childConfig, parent: this}, this.components)
+        //  );
+        //}
         this.attach();
         if (this.options.key) {
             this.key = this.options.key;
@@ -1519,16 +1749,20 @@ class PenciltestUIComponent {
                 }
             }
         }
-        else if (config.children) {
+        if (config.children) {
             config.children.forEach((childConfig) => {
-                if (!childConfig.key) {
+                const childConfigWithThisAsParent = {
+                    ...childConfig,
+                    parent: this,
+                };
+                if (!force && !childConfigWithThisAsParent.key) {
                     return;
                 } // Avoiding assumptions of persistent child node order.
-                const childComponent = PenciltestUIComponent.restore(childConfig, this.components);
+                const childComponent = PenciltestUIComponent.restore(childConfigWithThisAsParent, this.components);
                 if (typeof childComponent.setContent !== 'function') {
                     return;
                 }
-                childComponent.setContent(childConfig);
+                //childComponent.setContent(childConfigWithThisAsParent); //restore already calls setContent
             });
         }
         if (config.className) {
@@ -1590,29 +1824,6 @@ class BaseRenderer {
             console.log('   setOptions');
         }
         Object.assign(this.options, options);
-    }
-    getColorString(color, opacity = -1) {
-        if (!color) {
-            return '';
-        }
-        let rgb;
-        let opacityValue = '';
-        if (opacity !== -1) {
-            opacityValue = String(opacity);
-        }
-        if (Array.isArray(color)) {
-            rgb = color.slice(0, 3).join(' ');
-            if (opacityValue.length === 0 && color.length === 4) {
-                opacityValue = String(color[3]);
-            }
-        }
-        else if (opacityValue) {
-            rgb = `from ${String(color)} r g b`;
-        }
-        else {
-            return String(color);
-        }
-        return `rgb(${rgb}${opacityValue ? ' / ' + opacityValue : ''})`;
     }
     resize(width, height) {
         if (this.options.debug) {
@@ -1778,7 +1989,7 @@ class CanvasRenderer extends BaseRenderer {
     constructor(options) {
         super(options);
         this.field = document.createElement('canvas');
-        this.field.style.backgroundColor = this.getColorString(this.options.background);
+        this.field.style.backgroundColor = Utils.getColorString(this.options.background);
         this.context = this.field.getContext('2d', { alpha: options.alpha });
         this.resize(this.options.width, this.options.height);
         this.container.appendChild(this.field);
@@ -1826,8 +2037,8 @@ class CanvasRenderer extends BaseRenderer {
     composeOptions(overrides = {}, persist = null) {
         super.composeOptions(overrides);
         this.currentCanvasStyle = {
-            fillStyle: this.getColorString(this.currentStyle.fillColor, this.currentStyle.fillOpacity),
-            strokeStyle: this.getColorString(this.currentStyle.strokeColor, this.currentStyle.strokeOpacity),
+            fillStyle: Utils.getColorString(this.currentStyle.fillColor, "fillOpacity" in this.currentStyle ? this.currentStyle.fillOpacity : -1),
+            strokeStyle: Utils.getColorString(this.currentStyle.strokeColor, "strokeOpacity" in this.currentStyle ? this.currentStyle.strokeOpacity : -1),
             lineJoin: this.currentStyle.strokeCorner,
             lineWidth: this.currentStyle.strokeWidth,
         };
@@ -1911,7 +2122,7 @@ class SVGRenderer extends BaseRenderer {
         if (this.drawingPath) {
             path = this.field.path(this.drawingPath);
             Object.assign(path.style, {
-                stroke: this.getColorString(this.options.strokeColor)
+                stroke: Utils.getColorString(this.options.strokeColor)
             });
         }
         return super.render();
@@ -1966,13 +2177,14 @@ class PenciltestUI extends PenciltestUIComponent {
                             'offsetAudio',
                         ],
                     },
+                    'config',
                     'loop',
                     'framerate',
                     'frameHold',
                     'background',
                     'strokeColor',
                     'resizeScene',
-                    'panScene',
+                    'moveFrameContents',
                 ],
                 Tools: [
                     'scrubAudio',
@@ -2098,7 +2310,7 @@ class PenciltestUI extends PenciltestUIComponent {
             firstFrame: {
                 label: "First Frame",
                 text: '\u23EE',
-                hotkey: ['1', '0', 'Home', 'PgUp'],
+                hotkey: ['Home', 'PgUp'],
                 hotkeyModifiers: ['Shift'],
                 gesture: /2 left from .* (bottom|middle)/,
                 cancelComplementKeyEvent: true,
@@ -2209,23 +2421,23 @@ class PenciltestUI extends PenciltestUIComponent {
             undo: {
                 label: "Undo",
                 title: "Remove the last line drawn",
-                hotkey: ['Z'],
+                hotkey: ['Z', 'Ctrl+Z'],
                 gesture: /3 still from left/,
                 repeat: true,
                 listener() {
                     this.undo();
-                    this.ui.showFeedback({ text: `undo` });
+                    this.ui.showFeedback({ text: `Undo` });
                 }
             },
             redo: {
                 label: "Redo",
                 title: "Put back a line removed by 'Undo'",
-                hotkey: ['Shift+Z'],
+                hotkey: ['Shift+Z', 'Ctrl+Shift+Z', 'Ctrl+Y'],
                 gesture: /3 still from right/,
                 repeat: true,
                 listener() {
                     this.redo();
-                    this.ui.showFeedback({ text: `redo` });
+                    this.ui.showFeedback({ text: `Redo` });
                 }
             },
             strokeColor: {
@@ -2240,10 +2452,10 @@ class PenciltestUI extends PenciltestUIComponent {
                     if (this.scene) {
                         this.scene.strokeColor = this.options.strokeColor;
                     }
-                    if (this.sceneRenderer) {
-                        this.sceneRenderer.options.strokeColor = this.options.strokeColor;
-                        this.drawCurrentFrame();
-                    }
+                    //if (this.sceneRenderer) {
+                    //  this.sceneRenderer.options.strokeColor = this.options.strokeColor;
+                    //  this.drawCurrentFrame();
+                    //}
                 }
             },
             background: {
@@ -2693,12 +2905,12 @@ class PenciltestUI extends PenciltestUIComponent {
                 title: lc('explainTool_pan'),
                 hotkey: ['P'],
                 async listener() {
-                    this.toggleTool(PenciltestTool.PAN, [PenciltestTool.PENCIL]);
-                    if (this.state.toolStack[0] !== PenciltestTool.PAN) {
+                    this.toggleTool(PenciltestTool.MOVE, [PenciltestTool.PENCIL]);
+                    if (this.state.toolStack[0] !== PenciltestTool.MOVE) {
                         return;
                     }
                     const offset = await this.ui.interactivePan();
-                    this.ui.showFeedback({ text: `Panned this frame: ${Utils.toDecimal(offset.x, 0, { string: true })}, ${Utils.toDecimal(offset.y, 0, { string: true })}` });
+                    this.ui.showFeedback({ text: `Panned this frame: ${Utils.toDecimal(offset.x, 0)}, ${Utils.toDecimal(offset.y, 0)}` });
                 }
             },
             rescueFrame: {
@@ -2710,17 +2922,17 @@ class PenciltestUI extends PenciltestUIComponent {
                     const fieldCenter = PTSpace.rectCenter(this.scene.getDimensions());
                     const contentCenter = PTSpace.rectCenter(selectionBounds);
                     const deltaPoint = PTSpace.diffPoints(fieldCenter, contentCenter);
-                    this.pan(deltaPoint, frames);
+                    this.moveFrameContents(deltaPoint, frames);
                     this.drawCurrentFrame();
                 }
             },
-            panScene: {
-                label: "Pan Scene",
-                title: "Move the contents of all the frames in the scene. Useful after resizing.",
+            moveFrameContents: {
+                label: "Move frame contents",
+                title: "Move the contents of ALL the frames in the scene. Useful after resizing.",
                 hotkey: ['Shift+P'],
                 async listener() {
                     const offset = await this.ui.interactivePan(this.scene.frames);
-                    this.ui.showFeedback({ text: `Panned whole scene: ${Utils.toDecimal(offset.x, 0, { string: true })}, ${Utils.toDecimal(offset.y, 0, { string: true })}` });
+                    this.ui.showFeedback({ text: `Panned whole scene: ${Utils.toDecimal(offset.x, 0)}, ${Utils.toDecimal(offset.y, 0)}` });
                 }
             },
             deleteScene: {
@@ -2808,7 +3020,7 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             volume: {
                 label: "Volume",
-                hotkey: ['v', '9', '0'],
+                hotkey: ['v'],
                 async listener(event) {
                     const combo = Utils.describeKeyCombo(event);
                     const promptOptions = {
@@ -2831,6 +3043,7 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             volumeStep: {
                 hotkey: ['9', '0'],
+                repeat: true,
                 async listener(event) {
                     const combo = Utils.describeKeyCombo(event);
                     let change = 0;
@@ -2899,7 +3112,7 @@ class PenciltestUI extends PenciltestUIComponent {
                     }
                     this.scene.audio.offset -= 0.1;
                     this.ui.updateStatusBar();
-                    this.ui.showFeedback({ text: `Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, { string: true, prefix: true })} s` });
+                    this.ui.showFeedback({ text: `Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, { prefix: true })} s` });
                     this.scrubAudio();
                 }
             },
@@ -2915,15 +3128,160 @@ class PenciltestUI extends PenciltestUIComponent {
                     }
                     this.scene.audio.offset += 0.1;
                     this.ui.updateStatusBar();
-                    this.ui.showFeedback({ text: `Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, { string: true, prefix: true })} s` });
+                    this.ui.showFeedback({ text: `Audio shift: ${Utils.toDecimal(this.scene.audio.offset, 1, { prefix: true })} s` });
                     this.scrubAudio();
                 }
             },
             config: {
                 label: "Configuration",
                 hotkey: ['Ctrl+,'],
-                listener() {
-                    //const inputConfig = Utils.prompt(); // TODO
+                async listener() {
+                    // Range input param order: value after min/max
+                    // FIXME: Object parameters are not reliably in order, so perhaps the
+                    // `value` param should be held for last assignment... Unless doing
+                    // so would trigger an `onchange` event.
+                    const onionColorDef = {
+                        text: 'Onion skin color',
+                        children: [
+                            {
+                                tagName: 'label',
+                                attr: {
+                                    for: 'onionSkinBackwardColor',
+                                },
+                                text: 'backward:',
+                            },
+                            {
+                                key: 'onionSkinBackwardColor',
+                                tagName: 'input',
+                                attr: {
+                                    id: 'onionSkinBackwardColor',
+                                    type: 'color',
+                                    value: Utils.getColorString(this.options.onionSkinBackwardColor),
+                                },
+                            },
+                            {
+                                tagName: 'label',
+                                attr: {
+                                    for: 'onionSkinForwardColor',
+                                },
+                                text: 'forward:',
+                            },
+                            {
+                                key: 'onionSkinForwardColor',
+                                tagName: 'input',
+                                attr: {
+                                    id: 'onionSkinForwardColor',
+                                    type: 'color',
+                                    value: Utils.getColorString(this.options.onionSkinForwardColor),
+                                },
+                            },
+                        ],
+                    };
+                    const onionOpacityDef = {
+                        text: 'Onion skin opacity',
+                        children: [
+                            {
+                                tagName: 'label',
+                                attr: {
+                                    for: 'onionSkinBackwardOpacity',
+                                },
+                                text: 'backward:',
+                            },
+                            {
+                                key: 'onionSkinBackwardOpacity',
+                                tagName: 'input',
+                                attr: {
+                                    id: 'onionSkinBackwardOpacity',
+                                    type: 'range',
+                                    min: '0',
+                                    max: '255',
+                                    step: 'any',
+                                    value: Utils.toDecimal(this.options.onionSkinBackwardColor[3] * 255, 0),
+                                },
+                            },
+                            {
+                                tagName: 'label',
+                                attr: {
+                                    for: 'onionSkinForwardOpacity',
+                                },
+                                text: 'forward:',
+                            },
+                            {
+                                key: 'onionSkinForwardOpacity',
+                                tagName: 'input',
+                                attr: {
+                                    id: 'onionSkinForwardOpacity',
+                                    type: 'range',
+                                    min: '0',
+                                    max: '255',
+                                    value: Utils.toDecimal(this.options.onionSkinForwardColor[3] * 255, 0),
+                                },
+                            },
+                        ],
+                    };
+                    const onionRadiusDef = {
+                        text: 'Onion skin frame count',
+                        children: [
+                            {
+                                tagName: 'label',
+                                key: 'onionSkinFrameRadiusLabel',
+                                text: String(this.options.onionSkinFrameRadius),
+                                attr: {
+                                    for: 'onionSkinFrameRadius',
+                                },
+                            },
+                            {
+                                key: 'onionSkinFrameRadius',
+                                tagName: 'input',
+                                attr: {
+                                    id: 'onionSkinFrameRadius',
+                                    type: 'range',
+                                    min: '1',
+                                    max: '10',
+                                    value: String(this.options.onionSkinFrameRadius),
+                                },
+                                on: {
+                                    'input': (e, components) => {
+                                        debugger;
+                                        const label = components.onionSkinFrameRadiusLabel.getElement();
+                                        const input = e.target;
+                                        if (label && input) {
+                                            label.innerText = input.value;
+                                        }
+                                    },
+                                },
+                            },
+                        ],
+                    };
+                    const configInputDef = [
+                        onionColorDef,
+                        onionOpacityDef,
+                        onionRadiusDef,
+                    ];
+                    const promptOptions = {
+                        inputKeys: [
+                            'onionSkinBackwardColor',
+                            'onionSkinForwardColor',
+                            'onionSkinBackwardOpacity',
+                            'onionSkinForwardOpacity',
+                            'onionSkinFrameRadius',
+                        ],
+                        className: 'config',
+                    };
+                    const configInput = await Utils.promptForm('<h3>Configuration</h3>', configInputDef, promptOptions);
+                    if (configInput === null) {
+                        return;
+                    }
+                    const options = {
+                        onionSkinFrameRadius: Number(configInput.onionSkinFrameRadius),
+                    };
+                    options.onionSkinBackwardColor = Utils.getColorChannels(configInput.onionSkinBackwardColor);
+                    options.onionSkinBackwardColor[3] = Number(configInput.onionSkinBackwardOpacity) / 255;
+                    options.onionSkinForwardColor = Utils.getColorChannels(configInput.onionSkinForwardColor);
+                    options.onionSkinForwardColor[3] = Number(configInput.onionSkinForwardOpacity) / 255;
+                    this.setOptions(options);
+                    this.drawCurrentFrame();
+                    console.log(`   oso: ${options.onionSkinBackwardColor}:${options.onionSkinForwardColor}`); // XXX
                 }
             },
             toggleInterfaceHelp: {
@@ -2946,10 +3304,6 @@ class PenciltestUI extends PenciltestUIComponent {
                 hotkey: ['E'],
                 listener() {
                     this.toggleTool(PenciltestTool.ERASER, [PenciltestTool.PENCIL]);
-                    if (this.state.pointerMode !== PointerMode.PRESS) {
-                        this.track(this.ui.pointer);
-                    }
-                    this.drawCurrentFrame();
                 }
             },
             hideMenu: {
@@ -3000,16 +3354,16 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             {
                 key: 'toggleMenu',
+                text: "\u2699\ufe0f", /* gear emoji */
                 tagName: 'button',
-                className: 'toggle-menu',
+                className: 'toggle-menu icon',
                 parent: 'statusRight',
-                text: '\u2699'
             },
             {
                 key: 'toggleHelp',
+                text: '\u2754', /* white question mark */
                 tagName: 'button',
-                text: '🯄',
-                className: 'toggle-help',
+                className: 'toggle-help icon',
                 parent: 'statusRight'
             },
             {
@@ -3118,6 +3472,10 @@ class PenciltestUI extends PenciltestUIComponent {
                 return;
             }
             this.previousEvent = event;
+            const focusedInput = document.querySelector(':focus');
+            if (focusedInput) {
+                focusedInput.blur();
+            }
             if (this.controller.state.mode !== PenciltestMode.DRAWING) {
                 return;
             }
@@ -3153,12 +3511,6 @@ class PenciltestUI extends PenciltestUIComponent {
                 globalThis.addEventListener('mouseup', globalPointerUpListener);
                 globalThis.addEventListener('touchend', globalPointerUpListener);
                 fieldPointerMoveListener(event);
-                //const pagePoint = Utils.eventPoint(pointerEvent);
-                //const offsetPoint = {
-                //  x: this.controller.fieldElement.offsetLeft,
-                //  y: this.controller.fieldElement.offsetTop
-                //};
-                //this.controller.track(PTSpace.diffPoints(pagePoint, offsetPoint));
             }
         };
         const fieldPointerMoveListener = (event) => {
@@ -3175,6 +3527,10 @@ class PenciltestUI extends PenciltestUIComponent {
                     y: this.controller.fieldElement.offsetTop
                 };
                 const trackPoint = PTSpace.diffPoints(pagePoint, offsetPoint);
+                const pointerEvent = event;
+                if ("pressure" in pointerEvent) {
+                    trackPoint.weight = pointerEvent.pressure;
+                }
                 Object.assign(this.pointer, trackPoint);
                 if (this.controller.state.mode === PenciltestMode.DRAWING) {
                     this.controller.track(trackPoint);
@@ -3203,9 +3559,11 @@ class PenciltestUI extends PenciltestUIComponent {
             }
         };
         const contextMenuListener = (event) => {
-            event.preventDefault();
-            if (!this.previousEvent || !this.previousEvent.type.match(/^touch/)) {
-                return this.toggleMenu(Utils.eventPoint(event));
+            const targetElement = event.target;
+            //const targetComponent = PenciltestUIComponent.find(targetElement, this.components);
+            if (this.controller.fieldContainer.contains(targetElement)) {
+                event.preventDefault();
+                this.toggleMenu(Utils.eventPoint(event));
             }
         };
         const globalPointerPressListener = (event) => {
@@ -3476,8 +3834,6 @@ class PenciltestUI extends PenciltestUIComponent {
         const helpElement = this.components.help.getElement();
         const open = Utils.toggleClass(helpElement, 'active');
         helpElement.innerHTML = '';
-        //for child in helpElement.children
-        //  helpElement.removeChild(child)
         if (open) {
             const gesturesHeadingElement = document.createElement('h3');
             gesturesHeadingElement.innerText = 'Gestures:';
@@ -3573,7 +3929,9 @@ class PenciltestUI extends PenciltestUIComponent {
                             key: "statusSceneNameLabel",
                             tagName: 'label',
                             html: '<small>SCN: </small>',
-                            attr: { 'for': 'statusSceneNameEditable' }
+                            on: {
+                                'click': () => this.components.statusSceneNameEditable.getElement().focus(),
+                            }
                         },
                         {
                             tagName: 'span',
@@ -3681,7 +4039,7 @@ class PenciltestUI extends PenciltestUIComponent {
                     key: 'statusAudioOffset',
                     tagName: 'span',
                     parent: 'sceneStatus',
-                    text: ((_f = this.controller.scene.audio) === null || _f === void 0 ? void 0 : _f.offset) ? `${this.controller.scene.audio.offset >= 0 ? '+' : ''}${Utils.toDecimal(this.controller.scene.audio.offset, 1, { string: true })}` : '-',
+                    text: ((_f = this.controller.scene.audio) === null || _f === void 0 ? void 0 : _f.offset) ? `${this.controller.scene.audio.offset >= 0 ? '+' : ''}${Utils.toDecimal(this.controller.scene.audio.offset, 1)}` : '-',
                     attr: {
                         title: lc('audioOffset')
                     }
@@ -3725,12 +4083,14 @@ class PenciltestUI extends PenciltestUIComponent {
                 }
             });
         }
+        return this.isMenuVisible;
     }
     hideMenu() {
         if (this.isMenuVisible) {
             this.isMenuVisible = false;
-            return Utils.toggleClass(this.components.contextMenu.getElement(), 'active', false);
+            Utils.toggleClass(this.components.contextMenu.getElement(), 'active', false);
         }
+        return this.isMenuVisible;
     }
     toggleMenu(coords) {
         if (this.isMenuVisible) {
@@ -3739,6 +4099,7 @@ class PenciltestUI extends PenciltestUIComponent {
         else {
             return this.showMenu(coords);
         }
+        return this.isMenuVisible;
     }
     showFeedback(config, duration = 0) {
         if (!duration) {
@@ -3785,7 +4146,7 @@ class PenciltestUI extends PenciltestUIComponent {
         if (this.controller.state.frameSelection) {
             delete this.controller.state.frameSelection;
             if (showFeedback) {
-                this.showFeedback({ text: `Cleared selection` });
+                this.showFeedback({ text: `Cleared selectedFrameNumbers` });
             }
         }
     }
@@ -3839,19 +4200,18 @@ class PenciltestUI extends PenciltestUIComponent {
             startTarget.addEventListener('mousedown', dragStart);
         }
     }
-    async interactivePan(selection = [], alreadyStartedEvent = null) {
+    async interactivePan(selectedFrameNumbers = [], alreadyStartedEvent = null) {
         // TODO Select specific strokes to move.  #f063eb1f-b09a-44c1-8582-83711b2d10e8
-        // TODO Rename 'PAN' to 'MOVE'.  #aea750cb-b0c5-471f-87aa-6f6817f24f01
         return new Promise((resolve, reject) => {
-            this.controller.useTool(PenciltestTool.PAN);
+            this.controller.useTool(PenciltestTool.MOVE);
             this.controller.resize();
             let frameScale = this.controller.width / this.controller.scene.getDimensions().width;
-            if (selection.length === 0) {
-                [selection] = this.controller.getSelectedFrames();
+            if (selectedFrameNumbers.length === 0) {
+                [selectedFrameNumbers] = this.controller.getSelectedFrames();
             }
-            const previewSelection = Utils.getIntersection(this.controller.getVisibleFrames(), selection);
-            if (previewSelection.length === 0) {
-                previewSelection.push(selection[0]);
+            const previewFrameSelection = Utils.getIntersection(this.controller.getVisibleFrames(), selectedFrameNumbers);
+            if (previewFrameSelection.length === 0) {
+                previewFrameSelection.push(selectedFrameNumbers[0]);
             }
             this.handleDrag({
                 alreadyStartedEvent,
@@ -3862,16 +4222,16 @@ class PenciltestUI extends PenciltestUIComponent {
                 },
                 onmove: (event, immediateDeltaPoint, totalDeltaPoint) => {
                     const scaledDelta = PTSpace.scalePoint(immediateDeltaPoint, 1 / frameScale);
-                    this.controller.pan(scaledDelta, previewSelection);
+                    this.controller.moveFrameContents(scaledDelta, previewFrameSelection);
                     this.controller.drawCurrentFrame();
                 },
                 onend: (event, totalDeltaPoint) => {
                     this.controller.setPreviousMode();
                     this.controller.usePreviousTool();
                     const scaledTotalDelta = PTSpace.scalePoint(totalDeltaPoint, 1 / frameScale);
-                    if (previewSelection !== selection) {
-                        this.controller.pan(PTSpace.negatePoint(scaledTotalDelta), previewSelection);
-                        this.controller.pan(scaledTotalDelta, selection);
+                    if (previewFrameSelection !== selectedFrameNumbers) {
+                        this.controller.moveFrameContents(PTSpace.negatePoint(scaledTotalDelta), previewFrameSelection);
+                        this.controller.moveFrameContents(scaledTotalDelta, selectedFrameNumbers);
                     }
                     resolve(scaledTotalDelta);
                 }
@@ -4440,6 +4800,7 @@ class Penciltest {
             ...Penciltest.defaultState,
             ...storedState,
         };
+        this.components = {};
         this.trackBuffer = [];
         this.workingOn = [];
         this.playback = { ...Penciltest.defaultPlayback };
@@ -4447,7 +4808,7 @@ class Penciltest {
         this.container = globalThis.document.querySelector(this.options.container);
         this.container.className = 'penciltest-app';
         this.buildContainer();
-        this.ui = new PenciltestUI(this, { parentElement: this.container });
+        this.ui = new PenciltestUI(this, { parentElement: this.container }, this.components);
         this.newScene();
         this.setOptions(this.options)
             .then(() => {
@@ -4509,15 +4870,25 @@ class Penciltest {
                 this.ui.handleAppReaction(key);
             }
         }
-        //this.ui.updateStatusBar();
+        this.ui.updateStatusBar();
     }
     buildContainer() {
-        const markup = '<div class="field-container">' +
-            '<div class="field"></div>' +
-            '</div>';
-        this.container.innerHTML = markup;
-        this.fieldContainer = this.container.querySelector('.field-container');
-        return this.fieldElement = this.container.querySelector('.field');
+        const fieldDef = {
+            key: 'field',
+            className: "field",
+            style: {
+                'margin-top': '40px'
+            }
+        };
+        const containerDef = {
+            key: 'fieldContainer',
+            parentElement: this.container,
+            className: 'field-container',
+            children: [fieldDef]
+        };
+        new PenciltestUIComponent(containerDef, this.components);
+        this.fieldContainer = this.components.fieldContainer.getElement();
+        this.fieldElement = this.components.field.getElement();
     }
     setMode(mode) {
         if (mode !== this.state.mode) {
@@ -4569,21 +4940,29 @@ class Penciltest {
         const isNewStroke = stroke.path.length === 0;
         if (isNewStroke) {
             delete this.previousMark;
+            stroke.provisional = true;
+            stroke.width = this.options.strokeWidth;
+            stroke.strokeColor = this.options.strokeColor;
         }
         stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
         if (this.options.debug) {
             console.log(`  mark ${((_a = this.previousMark) === null || _a === void 0 ? void 0 : _a.x) || '_'},${((_b = this.previousMark) === null || _b === void 0 ? void 0 : _b.y) || '_'}-->${mark.x},${mark.y}`);
         }
         if (this.state.mode === PenciltestMode.DRAWING) {
-            if (this.previousMark && this.previousMark !== mark) {
-                const previousMark = Utils.clone(this.previousMark); // to enable deferred rendering
-                this.sceneRenderer.requestRender((renderer, timestamp) => {
-                    renderer.beginPath({ strokeWidth: this.options.strokeWidth * this.zoomFactor });
-                    renderer.moveToPoint(previousMark);
-                    renderer.lineToPoint(mark);
-                    renderer.endPath();
+            // Rendering new line in toolRenderer layer.
+            // It gets drawn in the sceneRenderer upon lift().
+            this.toolRenderer.requestRender((renderer, timestamp) => {
+                if (this.options.debug) {
+                    console.log(`stroke width: ${stroke.width}, @ canvas: ${this.sceneRenderer.context.lineWidth}`);
+                }
+                renderer.composeOptions({
+                    strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
+                    strokeWidth: stroke.width * this.zoomFactor
                 });
-            }
+                renderer.beginPath();
+                renderer.subpath(PTSpace.scalePath(stroke.path, this.zoomFactor));
+                renderer.endPath();
+            });
         }
         this.clearRedo();
         this.hasUnsavedChanges = true;
@@ -4600,7 +4979,7 @@ class Penciltest {
         this.drawTool({ trackPoint: trackMark, down: isDown });
         if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
             if (isDown) {
-                this.mark({ ...trackMark, w: this.options.strokeWidth });
+                this.mark({ ...trackMark });
             }
         }
         else if (this.state.toolStack[0] === PenciltestTool.ERASER) {
@@ -4625,15 +5004,13 @@ class Penciltest {
     findIntersectingStrokes(strokes, scenePoint, radius, checkCircle = true, findAll = true) {
         const matches = [];
         for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
-            for (let segment of strokes[strokeIndex].path) {
-                if (Math.abs(scenePoint.x - segment.x) < radius && Math.abs(scenePoint.y - segment.y) < radius) {
-                    if (checkCircle && PTSpace.magnitude(PTSpace.diffPoints(scenePoint, segment)) > radius) {
-                        continue;
-                    }
-                    matches.push(strokeIndex);
-                    if (!findAll)
-                        return matches;
-                    break;
+            const area = checkCircle
+                ? { center: scenePoint, radius }
+                : PTSpace.boundsAroundPoint(scenePoint, radius);
+            if (PTSpace.doesPathIntersect(strokes[strokeIndex].path, area)) {
+                matches.push(strokeIndex);
+                if (!findAll) {
+                    return matches;
                 }
             }
         }
@@ -4778,16 +5155,17 @@ class Penciltest {
         }
         const frame = this.scene.frames[frameNumber];
         if (((_a = frame === null || frame === void 0 ? void 0 : frame.strokes) === null || _a === void 0 ? void 0 : _a.length) > 0) {
-            renderer.beginPath();
             frame.strokes.forEach((stroke) => {
+                renderer.beginPath();
                 renderer.composeOptions({
+                    strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
                     ...overrides,
                     strokeWidth: (stroke.width || this.scene.strokeWidth || 1) * this.zoomFactor
                 });
                 const scaledStroke = this.scaleStroke(stroke, this.zoomFactor);
                 renderer.subpath(scaledStroke.path);
+                renderer.endPath();
             });
-            renderer.endPath();
         }
         if (this.options.debug) {
             console.log('   drawFrame:       END');
@@ -4800,7 +5178,6 @@ class Penciltest {
             || typeof (trackPoint === null || trackPoint === void 0 ? void 0 : trackPoint.y) !== 'number') {
             return;
         }
-        //console.log({trackPoint, buffer: this.trackBuffer, state}); // XXX
         let toolDiameterSceneSpace, outerWidth = 1, innerWidth = 2, crosshairOuterRadius = 12, crosshairInnerRadius = 6, innerColor = 'white', outerColor = 'black';
         if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
             toolDiameterSceneSpace = this.options.strokeWidth;
@@ -4812,7 +5189,7 @@ class Penciltest {
             innerWidth = 3;
             innerColor = 'red';
         }
-        else if (this.state.toolStack[0] === PenciltestTool.PAN) {
+        else {
             return;
         }
         const toolScreenRadius = Math.max(0.5, toolDiameterSceneSpace / 2 * this.zoomFactor);
@@ -4916,17 +5293,29 @@ class Penciltest {
         return this.scene.current.strokeNumber = -1;
     }
     lift() {
-        //if (this.trackBuffer && this.trackBuffer.length > 0) {
-        //  const lastMark = this.trackBuffer.shift()
-        //  this.track(lastMark);
-        //  this.trackBuffer = [];
-        //}
         if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
-            this.scene.current.strokeNumber = -1;
+            if (this.scene.current.strokeNumber !== -1) {
+                const lastStroke = this.scene.getCurrentStroke();
+                const frame = this.scene.getCurrentFrame();
+                debugger;
+                if (lastStroke.provisional) {
+                    const fieldPlusStrokeRadius = PTSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
+                    if (PTSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
+                        delete lastStroke.provisional;
+                    }
+                    else {
+                        // Don't record mark if it (TODO including its width) are off the
+                        // field. This enables both beginning a mark from outside the
+                        // field, but also clicking outside the field to blur/cancel other
+                        // elements.  uuid:0051f2f1-ec80-4377-9dee-a32d47ecf185
+                        frame.strokes.splice(this.scene.current.strokeNumber, 1);
+                    }
+                }
+                this.scene.current.strokeNumber = -1;
+            }
+            this.drawCurrentFrame();
+            this.drawTool();
         }
-        //if (this.state.toolStack[0] === PenciltestTool.ERASER) {
-        //  return this.drawCurrentFrame();
-        //}
     }
     getSelectedFrames(frames = [], cut = false) {
         if (frames.length > 0) {
@@ -5171,9 +5560,6 @@ class Penciltest {
             if (this.scene.background) {
                 this.sceneRenderer.options.background = this.scene.background;
             }
-            //if (this.scene.strokeColor) { this.sceneRenderer.options.strokeColor = this.scene.strokeColor; }
-            //if (this.scene.strokeOpacity) { this.sceneRenderer.options.strokeOpacity = this.scene.strokeOpacity; }
-            //if (this.scene.strokeWidth) { this.sceneRenderer.options.strokeWidth = this.scene.strokeWidth; }
         }
         this.scene.updateState();
         this.goToFrame(this.scene.current.frameNumber || 0);
@@ -5265,7 +5651,7 @@ class Penciltest {
         this.playAudio();
         return this.playback.scrubAudioId = setTimeout(() => this.pauseAudio(), this.scene.current.singleFrameDuration * (frameExposures - exposureOffset));
     }
-    pan(deltaPoint, selection = []) {
+    moveFrameContents(deltaPoint, selection = []) {
         if (selection.length === 0) {
             [selection] = this.getSelectedFrames();
         }
@@ -5285,9 +5671,10 @@ class Penciltest {
         });
     }
     resize() {
+        const fieldMargin = 40;
         const bounds = this.forceDimensions || {
-            width: this.container.offsetWidth,
-            height: this.container.offsetHeight,
+            width: this.container.offsetWidth - 40 * 2,
+            height: this.container.offsetHeight - 40 * 2,
         };
         if (this.options.showStatus && !this.forceDimensions) {
             const toolbarElement = this.ui.components.toolbar.getElement();
@@ -5311,8 +5698,6 @@ class Penciltest {
         this.sceneRenderer.resize(this.width, this.height);
         this.toolRenderer.resize(this.width, this.height);
         this.zoomFactor = this.height / sceneDimensions.height;
-        //this.sceneRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
-        //this.toolRenderer.options.strokeWidth = this.zoomFactor * this.scene.strokeWidth;
         this.drawCurrentFrame();
         this.drawTool();
     }
@@ -5341,12 +5726,12 @@ class Penciltest {
         return job;
     }
 }
-Penciltest.version = '0.3.0';
-Penciltest.debugVersion = '0.3.1';
+Penciltest.version = '0.3.1';
+Penciltest.debugVersion = '0.3.2';
 Penciltest.instrumentIdentifier = 'io.lovejoy.penciltest';
 Penciltest.defaultOptions = {
-    background: 'gray',
-    strokeColor: 'black',
+    background: ColorHexNames.lightgray,
+    strokeColor: ColorHexNames.black,
     strokeOpacity: -1,
     strokeWidth: 1,
     eraserWidth: 40,
