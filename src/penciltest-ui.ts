@@ -36,6 +36,8 @@ class PenciltestUI extends PenciltestUIComponent {
           'nextFrame',
           'lastFrame',
         ],
+      },
+      {
         Scene: [
           {
             'open/new': [
@@ -56,7 +58,6 @@ class PenciltestUI extends PenciltestUIComponent {
               'offsetAudio',
             ],
           },
-          'config',
           'loop',
           'framerate',
           'frameHold',
@@ -91,7 +92,6 @@ class PenciltestUI extends PenciltestUIComponent {
           'dropFrames',
         ],
         Settings: [
-          'toggleInterfaceHelp',
           'config',
           'renderer',
           'reset',
@@ -99,6 +99,7 @@ class PenciltestUI extends PenciltestUIComponent {
           'showStatus',
         ],
       },
+      'toggleInterfaceHelp',
     ];
 
     this.appActions = {
@@ -291,7 +292,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
       insertFrameAfter: {
         label: "Insert Frame After",
-        hotkey: ['Shift+D', 'I'],
+        hotkey: ['I', 'Shift+D'],
         gesture: /2 still from right top/,
         listener(this: Penciltest) {
           const newIndex = this.scene.current.frameNumber + 1;
@@ -828,7 +829,7 @@ class PenciltestUI extends PenciltestUIComponent {
       },
 
       panFrame: {
-        label: "Pan Frame",
+        label: "Move frame contents",
         title: lc('explainTool_pan'),
         hotkey: ['P'],
         async listener(this: Penciltest) {
@@ -842,7 +843,7 @@ class PenciltestUI extends PenciltestUIComponent {
       },
 
       rescueFrame: {
-        label: "Rescue Frames",
+        label: "Rescue frame(s') contents",
         title: "Move the contents of the selected frames to the center of the canvas. Useful after resizing or panning them out of view.",
         async listener(this: Penciltest) {
           const [ frames ] = this.getSelectedFrames();
@@ -2072,7 +2073,7 @@ class PenciltestUI extends PenciltestUIComponent {
       const menuElement = this.components.contextMenu.getElement();
       Utils.toggleClass(menuElement, 'active', true);
 
-      const maxRight = this.components.contextMenu.getElement().offsetWidth;
+      const maxRight = 0;
       const maxBottom = 0;
 
       if (coords.x > (document.body.offsetWidth - maxRight - menuElement.offsetWidth)) {
@@ -2088,7 +2089,7 @@ class PenciltestUI extends PenciltestUIComponent {
         menuElement.style.bottom = `${maxBottom}px`;
         menuElement.style['max-height'] = `${document.body.offsetHeight - maxBottom}px`;
       } else {
-        menuElement.style.top = `${coords.y}px`;
+        menuElement.style.top = `${coords.y + 1}px`;
         menuElement.style.bottom = "auto";
         menuElement.style['max-height'] = `${document.body.offsetHeight-coords.y}px`;
       }
