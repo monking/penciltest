@@ -9,6 +9,7 @@
     left: 0;
     width: 100%;
 
+
     .icon {
       background-color: green; /* XXX @1786388554 */
       font-size: 0.7rem;
@@ -110,12 +111,30 @@
     li {
       position: relative;
 
-      label {
+      > label {
         display: block;
         padding: 0 0.5em 0 1.5em;
         line-height: 2.0em;
         color: colors.$gray;
         cursor: pointer;
+
+        > .hotkey {
+					float: right;
+					font-size: 0.8rem;
+					line-height: 1.0em;
+					margin: 0.4em 0 0 0.5em;
+					border: 1px gray;
+					border-radius: 0.5em;
+					background: darkgray;
+					color: white;
+					font-weight: bold;
+					font-family: monospace;
+					padding: 0.3em 0.5em;
+        }
+      }
+
+      &.icons .hotkey {
+        display: none;
       }
 
       &:hover > label {

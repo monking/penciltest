@@ -1,3 +1,4 @@
+x 2026-08-11 2026-08-03 +UX | Show key combo references along the right edge of the context menu.  uuid:0b91ecd3-83ae-4957-8545-9f7ba97f8870  | Show just the first hotkey assignment. The user will need to check the full list to see the variants.  complexity:1 pri:A
 x 2026-08-10 2026-08-10 Test LINE segment intersection with area.  uuid:77af0b21-5b34-4831-b6e9-946de3146597 pri:A
 x 2026-08-10 2026-08-10 +feature | Per-stroke color.  uuid:f6d28b8b-3bc1-455d-9c14-732484a049ae
 x 2026-08-10 2026-08-10 +UX | Don't record mark if it (including its radius) are off the field. This enables both beginning a mark from outside the field, but also clicking outside the field to blur/cancel other elements.  uuid:0051f2f1-ec80-4377-9dee-a32d47ecf185A pri:A

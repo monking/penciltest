@@ -2,9 +2,22 @@
 @use "config";
 
 @include config.penciltest {
-  width: 100%;
 
-  &[x-mode="playing"] .field-container {
+  &[x-mode="drawing"] [x-key="statusMode"][x-progress] {
+    display: inline-block;
+    position: relative;
+    &::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 0.2em;
+      background-color: var(--fg-accent-border);
+      width: attr("x-progress")%;
+    }
+  }
+
+  width: 100%;
+   .field-container {
     cursor: progress;
 
     &.dragging {

@@ -2217,6 +2217,7 @@ class PenciltestUI extends PenciltestUIComponent {
                     'renderer',
                     'reset',
                     'debug',
+                    'showStatus',
                 ],
             },
         ];
@@ -2536,7 +2537,7 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             onionSkin: {
                 label: "Onion Skin",
-                hotkey: ['F', 'O'],
+                hotkey: ['O'],
                 gesture: /2 down from center (bottom|middle)/,
                 title: "show previous and next frames in red and blue",
                 listener() {
@@ -2660,13 +2661,14 @@ class PenciltestUI extends PenciltestUIComponent {
                 }
             },
             showStatus: {
-                label: "Toggle Status",
+                label: "Show status bar",
                 hotkey: ['Tab'],
                 cancelComplementKeyEvent: true,
                 title: "Show/hide the scene status bar",
                 listener(event) {
                     const keyEvent = event;
-                    if (keyEvent.altKey || keyEvent.shiftKey || keyEvent.ctrlKey) {
+                    if (keyEvent && (keyEvent.altKey || keyEvent.shiftKey || keyEvent.ctrlKey)) {
+                        // FIXME Avoid toggling if alt+tabbing into application. This only gets halfway there.
                         return;
                     }
                     this.setOptions({ showStatus: !this.options.showStatus });
@@ -3411,9 +3413,10 @@ class PenciltestUI extends PenciltestUIComponent {
                     key: entry,
                     attr: {
                         rel: entry
-                    }
+                    },
+                    children: []
                 };
-                const { label, text, title } = {
+                const { label, text, title, hotkey } = {
                     ...this.appActions[entry]
                 };
                 if (title) {
@@ -3423,7 +3426,21 @@ class PenciltestUI extends PenciltestUIComponent {
                     entryConfig.text = text;
                 }
                 if (label) {
-                    entryConfig.children = [{ key: `${entry}_label`, tagName: 'label', text: label }];
+                    const labelComponent = {
+                        key: `${entry}_label`,
+                        tagName: 'label',
+                        text: label,
+                        children: [],
+                    };
+                    if (hotkey && hotkey.length > 0) {
+                        labelComponent.children.push({
+                            key: `${entry}_hotkey`,
+                            tagName: 'span',
+                            text: hotkey[0],
+                            className: "hotkey",
+                        });
+                    }
+                    entryConfig.children.push(labelComponent);
                 }
                 new PenciltestUIComponent(entryConfig, this.components);
             }
@@ -3522,6 +3539,7 @@ class PenciltestUI extends PenciltestUIComponent {
             }
             else {
                 const pagePoint = Utils.eventPoint(event, 'page');
+                Object.assign(this.pointer, pagePoint);
                 const offsetPoint = {
                     x: this.controller.fieldElement.offsetLeft,
                     y: this.controller.fieldElement.offsetTop
@@ -3531,7 +3549,6 @@ class PenciltestUI extends PenciltestUIComponent {
                 if ("pressure" in pointerEvent) {
                     trackPoint.weight = pointerEvent.pressure;
                 }
-                Object.assign(this.pointer, trackPoint);
                 if (this.controller.state.mode === PenciltestMode.DRAWING) {
                     this.controller.track(trackPoint);
                 }
