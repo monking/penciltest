@@ -1812,10 +1812,19 @@ class PenciltestUI extends PenciltestUIComponent {
       if (this.isMenuVisible) {
         return;
       }
+      event.preventDefault();
       if (event.deltaY > 0) {
-        return this.triggerAppAction('nextFrame');
+        if (event.ctrlKey) {
+          this.triggerAppAction('largerTool');
+        } else {
+          this.triggerAppAction('nextFrame');
+        }
       } else {
-        return this.triggerAppAction('prevFrame');
+        if (event.ctrlKey) {
+          this.triggerAppAction('smallerTool');
+        } else {
+          this.triggerAppAction('prevFrame');
+        }
       }
     });
     return globalThis.addEventListener('beforeunload', (event: BeforeUnloadEvent) => {
@@ -2077,9 +2086,11 @@ class PenciltestUI extends PenciltestUIComponent {
       if (coords.y > (document.body.offsetHeight - maxBottom - menuElement.offsetHeight)) {
         menuElement.style.top = "auto";
         menuElement.style.bottom = `${maxBottom}px`;
+        menuElement.style['max-height'] = `${document.body.offsetHeight - maxBottom}px`;
       } else {
         menuElement.style.top = `${coords.y}px`;
         menuElement.style.bottom = "auto";
+        menuElement.style['max-height'] = `${document.body.offsetHeight-coords.y}px`;
       }
 
       this.menuItemElements.forEach((option) => {

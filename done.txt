@@ -1,3 +1,4 @@
+x 2026-08-11 2026-08-11 +UX Scroll within context menu. Don't let the context menu get taller than the view, and cause scrolling the whole page. +BUG  uuid:28716d40-2c5e-4d36-9504-d69094cd0a77 pri:B
 x 2026-08-11 2026-08-03 +UX | Show key combo references along the right edge of the context menu.  uuid:0b91ecd3-83ae-4957-8545-9f7ba97f8870  | Show just the first hotkey assignment. The user will need to check the full list to see the variants.  complexity:1 pri:A
 x 2026-08-10 2026-08-10 Test LINE segment intersection with area.  uuid:77af0b21-5b34-4831-b6e9-946de3146597 pri:A
 x 2026-08-10 2026-08-10 +feature | Per-stroke color.  uuid:f6d28b8b-3bc1-455d-9c14-732484a049ae
