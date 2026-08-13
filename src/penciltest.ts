@@ -852,7 +852,7 @@ class Penciltest {
   }
 
   async saveScene(update: boolean = true): Promise<boolean> {
-    const sceneName = this.scene.name || 'Untitled';
+    const sceneName = this.scene.name || lc('untitled');
     let sceneToStore = this.scene;
     try {
       sceneToStore = await this.migrator.packScene(this.scene);
@@ -888,13 +888,15 @@ class Penciltest {
       this.destroyAudio();
     }
 
-    if (this.sceneRenderer) {
-      if (this.scene.background) { this.sceneRenderer.options.background = this.scene.background; }
+    if (this.sceneRenderer && this.scene.background) {
+      this.sceneRenderer.options.background = this.scene.background;
     }
     this.scene.updateState();
     this.goToFrame(this.scene.current.frameNumber || 0);
     this.hasUnsavedChanges = false;
     this.resize();
+    this.ui.handleAppReaction('renameScene');
+
     return [ this.scene, context ];
   }
 

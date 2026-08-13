@@ -61,7 +61,7 @@ class PenciltestScene implements PenciltestSceneData {
     const now = new Date();
     const nowString = now.toISOString();
 
-    this.name = '';
+    this.name = lc('untitled');
     this.dateModified = nowString;
     this.dateCreated = nowString;
     this.uuid = '';

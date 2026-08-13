@@ -881,7 +881,7 @@ class PenciltestScene {
     constructor(sceneData) {
         const now = new Date();
         const nowString = now.toISOString();
-        this.name = '';
+        this.name = lc('untitled');
         this.dateModified = nowString;
         this.dateCreated = nowString;
         this.uuid = '';
@@ -2772,6 +2772,9 @@ class PenciltestUI extends PenciltestUIComponent {
                         this.scene.name = newName;
                         this.ui.updateStatusBar();
                     }
+                },
+                action() {
+                    document.title = `✏️ ${this.scene.name} -- penciltest`;
                 }
             },
             loadScene: {
@@ -3970,11 +3973,14 @@ class PenciltestUI extends PenciltestUIComponent {
                             on: {
                                 input: (e) => this.controller.scene.name = e.target.innerText,
                                 focus: (e) => {
-                                    if (e.target.innerText === 'untitled') {
+                                    if (e.target.innerText === lc('untitled')) {
                                         e.target.innerText = '';
                                     }
                                 },
-                                blur: (e) => this.updateStatusBar()
+                                blur: (e) => {
+                                    this.handleAppReaction('renameScene');
+                                    this.updateStatusBar();
+                                }
                             }
                         },
                     ],
@@ -5554,7 +5560,7 @@ class Penciltest {
         }
     }
     async saveScene(update = true) {
-        const sceneName = this.scene.name || 'Untitled';
+        const sceneName = this.scene.name || lc('untitled');
         let sceneToStore = this.scene;
         try {
             sceneToStore = await this.migrator.packScene(this.scene);
@@ -5591,15 +5597,14 @@ class Penciltest {
         else {
             this.destroyAudio();
         }
-        if (this.sceneRenderer) {
-            if (this.scene.background) {
-                this.sceneRenderer.options.background = this.scene.background;
-            }
+        if (this.sceneRenderer && this.scene.background) {
+            this.sceneRenderer.options.background = this.scene.background;
         }
         this.scene.updateState();
         this.goToFrame(this.scene.current.frameNumber || 0);
         this.hasUnsavedChanges = false;
         this.resize();
+        this.ui.handleAppReaction('renameScene');
         return [this.scene, context];
     }
     async loadScene(sceneName) {

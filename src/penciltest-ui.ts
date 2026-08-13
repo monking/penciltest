@@ -686,6 +686,9 @@ class PenciltestUI extends PenciltestUIComponent {
             this.scene.name = newName;
             this.ui.updateStatusBar();
           }
+        },
+        action() {
+          document.title = `✏️ ${this.scene.name} -- penciltest`;
         }
       },
 
@@ -1953,9 +1956,12 @@ class PenciltestUI extends PenciltestUIComponent {
               on: {
                 input: (e) => this.controller.scene.name = (e.target as HTMLElement).innerText,
                 focus: (e) => {
-                  if ((e.target as HTMLElement).innerText === 'untitled') { (e.target as HTMLElement).innerText = ''; }
+                  if ((e.target as HTMLElement).innerText === lc('untitled')) { (e.target as HTMLElement).innerText = ''; }
                 },
-                blur: (e) => this.updateStatusBar()
+                blur: (e) => {
+                  this.handleAppReaction('renameScene');
+                  this.updateStatusBar();
+                }
               }
             },
           ],
