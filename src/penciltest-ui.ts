@@ -830,7 +830,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
       panFrame: {
         label: "Move frame contents",
-        title: lc('explainTool_pan'),
+        title: lc('explainTool_move'),
         hotkey: ['P'],
         async listener(this: Penciltest) {
           this.toggleTool(PenciltestTool.MOVE, [PenciltestTool.PENCIL]);
@@ -997,7 +997,7 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Smaller tool",
         hotkey: ['['],
         repeat: true,
-        title: "Decrease the radius of the current tool",
+        title: lc('explainSmallerTool'),
         listener(this: Penciltest) {
           if (this.state.mode !== PenciltestMode.DRAWING) { return; }
           switch(this.state.toolStack[0]) {
@@ -1018,7 +1018,7 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Larger tool",
         hotkey: [']'],
         repeat: true,
-        title: "Increase the radius of the current tool",
+        title: lc('explainLargerTool'),
         listener(this: Penciltest) {
           if (this.state.mode !== PenciltestMode.DRAWING) { return; }
           switch(this.state.toolStack[0]) {
@@ -1253,6 +1253,7 @@ class PenciltestUI extends PenciltestUIComponent {
       },
 
       hideMenu: {
+        label: 'Show/Hide menu',
         hotkey: ['Esc'],
         listener(this: Penciltest) {
           this.ui.hideMenu();

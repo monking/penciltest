@@ -35,3 +35,5 @@
 (R) 2026-08-06 +reconsider | +UX +feature | Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
 (R) 2026-08-06 +reconsider | +UX | Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
 (R) 2026-08-10 +reconsider | Should my Arc interface use 2*Math.PI for a circle, as Canvas2DContext.arc does? I like the implicit tau in my implementation, so it'll stay for now. Food for thought.  uuid:8de1bdf1-9449-4813-933a-0c41260dc079
+2026-07-10 penciltest stops responding to input; stuck in playback mode? v:0.2.13  +NEEDS_REPLICATION_STEPS  uuid:7e903c6f-2226-4e4e-bf2c-fd42503bf2f7
+2026-08-13 +UX key re-binding mode: capture all keyboard input, show current binding, and allow rebinding to anything else.

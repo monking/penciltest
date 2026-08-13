@@ -377,7 +377,7 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
   }
 
   packPoint(point:Mark): string {
-    const coords = [point.x, point.y].map(this.packNumber);
+    const coords = [point.x, point.y].map(this.packNumber.bind(this));
     if ("weight" in point && point.weight !== 1) {
       coords.push('w' + this.packNumber(point.weight));
     }
@@ -499,7 +499,7 @@ class PenciltestMigrator {
             if (packedScene.current?.frames) {
               delete packedScene.current.frames;
             }
-            debugger;if (packedScene.current?.singleFrameDuration) {
+            if (packedScene.current?.singleFrameDuration) {
               packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
             }
             if (packedScene.current?.duration) {

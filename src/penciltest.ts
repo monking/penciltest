@@ -615,7 +615,6 @@ class Penciltest {
       if (this.scene.current.strokeNumber !== -1) {
         const lastStroke = this.scene.getCurrentStroke();
         const frame = this.scene.getCurrentFrame();
-        debugger;
         if (lastStroke.provisional) {
           const fieldPlusStrokeRadius = PTSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
           if (PTSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
@@ -662,6 +661,7 @@ class Penciltest {
     if (this.copyBuffer) {
       const insertFrameNumber = this.scene.current.frameNumber + 1;
       this.scene.insertFrames(Utils.clone(this.copyBuffer), insertFrameNumber);
+      this.drawCurrentFrame();
       this.ui.updateStatusBar();
     }
   }

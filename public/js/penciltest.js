@@ -1407,7 +1407,7 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
         return stroke;
     }
     packPoint(point) {
-        const coords = [point.x, point.y].map(this.packNumber);
+        const coords = [point.x, point.y].map(this.packNumber.bind(this));
         if ("weight" in point && point.weight !== 1) {
             coords.push('w' + this.packNumber(point.weight));
         }
@@ -1525,7 +1525,6 @@ class PenciltestMigrator {
                         if ((_a = packedScene.current) === null || _a === void 0 ? void 0 : _a.frames) {
                             delete packedScene.current.frames;
                         }
-                        debugger;
                         if ((_b = packedScene.current) === null || _b === void 0 ? void 0 : _b.singleFrameDuration) {
                             packedScene.current.singleFrameDuration = Utils.toDecimal(packedScene.current.singleFrameDuration, 3);
                         }
@@ -2905,7 +2904,7 @@ class PenciltestUI extends PenciltestUIComponent {
             },
             panFrame: {
                 label: "Move frame contents",
-                title: lc('explainTool_pan'),
+                title: lc('explainTool_move'),
                 hotkey: ['P'],
                 async listener() {
                     this.toggleTool(PenciltestTool.MOVE, [PenciltestTool.PENCIL]);
@@ -3064,7 +3063,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Smaller tool",
                 hotkey: ['['],
                 repeat: true,
-                title: "Decrease the radius of the current tool",
+                title: lc('explainSmallerTool'),
                 listener() {
                     if (this.state.mode !== PenciltestMode.DRAWING) {
                         return;
@@ -3086,7 +3085,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Larger tool",
                 hotkey: [']'],
                 repeat: true,
-                title: "Increase the radius of the current tool",
+                title: lc('explainLargerTool'),
                 listener() {
                     if (this.state.mode !== PenciltestMode.DRAWING) {
                         return;
@@ -3310,6 +3309,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 }
             },
             hideMenu: {
+                label: 'Show/Hide menu',
                 hotkey: ['Esc'],
                 listener() {
                     this.ui.hideMenu();
@@ -5332,7 +5332,6 @@ class Penciltest {
             if (this.scene.current.strokeNumber !== -1) {
                 const lastStroke = this.scene.getCurrentStroke();
                 const frame = this.scene.getCurrentFrame();
-                debugger;
                 if (lastStroke.provisional) {
                     const fieldPlusStrokeRadius = PTSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
                     if (PTSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
@@ -5381,6 +5380,7 @@ class Penciltest {
         if (this.copyBuffer) {
             const insertFrameNumber = this.scene.current.frameNumber + 1;
             this.scene.insertFrames(Utils.clone(this.copyBuffer), insertFrameNumber);
+            this.drawCurrentFrame();
             this.ui.updateStatusBar();
         }
     }
