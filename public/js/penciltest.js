@@ -2882,7 +2882,6 @@ class PenciltestUI extends PenciltestUIComponent {
                         this.setPreviousMode();
                         return;
                     }
-                    console.log({ gifURL });
                     const gifInstructions = PenciltestUIComponent.restore({
                         key: 'gifInstructions',
                         html: "Click/touch image to download.<br>Click/touch outside GIF to close.",
@@ -2956,6 +2955,7 @@ class PenciltestUI extends PenciltestUIComponent {
                     gifContainer.getElement().addEventListener('click', gifCloseHandler);
                     gifContainer.getElement().addEventListener('touchend', gifCloseHandler);
                     globalThis.document.body.addEventListener('keydown', gifCloseHandler);
+                    console.log({ gifURL, gifImage });
                 }
             },
             resizeScene: {
@@ -5532,47 +5532,55 @@ class PenciltestRenderExporter {
         const renderRange = this.controller.state.frameSelection
             ? this.controller.state.frameSelection
             : { start: 0, end: this.controller.scene.frames.length - 1 };
-        const gifConfigInputDefs = [].concat({
-            children: PenciltestUIComponent.makeInputLabel({
-                key: 'maxDimension',
-                'tagName': 'input',
-                attr: {
-                    value: String(this.controller.scene.height)
-                },
-            }, {
-                text: 'largest dimension: ',
-            })
-        }, {
-            children: PenciltestUIComponent.makeInputLabel({
-                key: 'start',
-                'tagName': 'input',
-                attr: {
-                    id: 'start',
-                    type: 'range',
-                    min: '1',
-                    max: String(this.controller.scene.frames.length),
-                    value: String(renderRange.start + 1),
-                },
-            }, {
-                prefix: 'start frame: ',
-                live: true,
-            })
-        }, {
-            children: PenciltestUIComponent.makeInputLabel({
-                key: 'end',
-                'tagName': 'input',
-                attr: {
-                    id: 'end',
-                    type: 'range',
-                    min: '1',
-                    max: String(this.controller.scene.frames.length),
-                    value: String(renderRange.end + 1),
-                },
-            }, {
-                prefix: 'end frame: ',
-                live: true,
-            })
-        });
+        const { width: sceneWidth, height: sceneHeight, aspectRatio: sceneAspectRatio, } = this.controller.scene.getDimensions();
+        const gifConfigInputDefs = [
+            {
+                text: `Scene width: ${sceneWidth}, height: ${sceneHeight} (${sceneAspectRatio})`,
+            },
+            {
+                children: PenciltestUIComponent.makeInputLabel({
+                    key: 'maxDimension',
+                    'tagName': 'input',
+                    attr: {
+                        value: String(Math.min(512, this.controller.scene.height))
+                    },
+                }, {
+                    text: 'render to size: ',
+                })
+            },
+            {
+                children: PenciltestUIComponent.makeInputLabel({
+                    key: 'start',
+                    'tagName': 'input',
+                    attr: {
+                        id: 'start',
+                        type: 'range',
+                        min: '1',
+                        max: String(this.controller.scene.frames.length),
+                        value: String(renderRange.start + 1),
+                    },
+                }, {
+                    prefix: 'start frame: ',
+                    live: true,
+                })
+            },
+            {
+                children: PenciltestUIComponent.makeInputLabel({
+                    key: 'end',
+                    'tagName': 'input',
+                    attr: {
+                        id: 'end',
+                        type: 'range',
+                        min: '1',
+                        max: String(this.controller.scene.frames.length),
+                        value: String(renderRange.end + 1),
+                    },
+                }, {
+                    prefix: 'end frame: ',
+                    live: true,
+                })
+            },
+        ];
         const gifConfigPromptOptions = {
             inputKeys: [
                 'maxDimension',
@@ -5580,7 +5588,7 @@ class PenciltestRenderExporter {
                 'end',
             ]
         };
-        const gifConfig = await Utils.promptForm(`Render settings`, gifConfigInputDefs, gifConfigPromptOptions);
+        const gifConfig = await Utils.promptForm(`<h3>Render settings</h3>`, gifConfigInputDefs, gifConfigPromptOptions);
         console.log({ gifConfig }); // XXX
         if (!gifConfig) {
             return null;
@@ -5600,6 +5608,8 @@ class PenciltestRenderExporter {
         // LATER: Don't reinitialize the renderer if already CANVAS.
         // MEANWHILE: SVG rendering is disabled, and CANVAS is the only choice.
         //// rebuild renderer to ensure correct resolution for capture
+        debugger;
+        this.controller.setOptions({ renderer: Renderers.CANVAS });
         //this.controller.ui.appActions.renderer.action();
         this.controller.resize();
         //this.controller.ui.appActions.renderer.action();
@@ -5611,7 +5621,7 @@ class PenciltestRenderExporter {
         gifEncoder.setDelay(baseFrameDelay);
         gifEncoder.start();
         const start = Number(gifConfig.start) - 1;
-        const end = Number(gifConfig.end) - 1;
+        const end = Math.max(start, Number(gifConfig.end) - 1);
         for (let frameNumber = start; frameNumber <= end; frameNumber++) {
             debugger;
             this.controller.goToFrame(frameNumber);

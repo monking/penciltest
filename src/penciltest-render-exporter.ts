@@ -36,16 +36,24 @@ class PenciltestRenderExporter {
       ? this.controller.state.frameSelection
       : { start: 0, end: this.controller.scene.frames.length - 1 };
 
-    const gifConfigInputDefs: Array<PenciltestUIComponentOptions> = [].concat(
+    const {
+      width: sceneWidth,
+      height: sceneHeight,
+      aspectRatio: sceneAspectRatio,
+    } = this.controller.scene.getDimensions();
+    const gifConfigInputDefs: Array<PenciltestUIComponentOptions> = [
+      {
+        text: `Scene width: ${sceneWidth}, height: ${sceneHeight} (${sceneAspectRatio})`,
+      },
       {
         children: PenciltestUIComponent.makeInputLabel({
           key: 'maxDimension',
           'tagName': 'input',
           attr:{
-            value: String(this.controller.scene.height)
+            value: String(Math.min(512, this.controller.scene.height))
           },
         }, {
-          text: 'largest dimension: ',
+          text: 'render to size: ',
         })
       },
       {
@@ -80,7 +88,7 @@ class PenciltestRenderExporter {
           live: true,
         })
       },
-    );
+    ];
 
     const gifConfigPromptOptions: PromptOptions = {
       inputKeys: [
@@ -89,7 +97,7 @@ class PenciltestRenderExporter {
       'end',
       ]
     };
-    const gifConfig: Dictionary = await Utils.promptForm(`Render settings`, gifConfigInputDefs, gifConfigPromptOptions);
+    const gifConfig: Dictionary = await Utils.promptForm(`<h3>Render settings</h3>`, gifConfigInputDefs, gifConfigPromptOptions);
     console.log({gifConfig}); // XXX
     if (!gifConfig) {
       return null;
@@ -108,14 +116,11 @@ class PenciltestRenderExporter {
     this.controller.forceDimensions = dimensions;
 
     // LATER: Switch to CANVAS renderer if not already using it.
-    // LATER: Don't reinitialize the renderer if already CANVAS.
-    // MEANWHILE: SVG rendering is disabled, and CANVAS is the only choice.
 
-    //// rebuild renderer to ensure correct resolution for capture
-    //this.controller.ui.appActions.renderer.action();
+    // rebuild renderer to ensure correct resolution for capture
+    // FIXME: Is this still necessary?
+    this.controller.setOptions({renderer: Renderers.CANVAS});
     this.controller.resize();
-
-    //this.controller.ui.appActions.renderer.action();
 
     const baseFrameDelay = 1000 / this.controller.scene.framerate;
 
@@ -127,7 +132,7 @@ class PenciltestRenderExporter {
     gifEncoder.start();
 
     const start = Number(gifConfig.start) - 1;
-    const end = Number(gifConfig.end) - 1;
+    const end = Math.max(start, Number(gifConfig.end) - 1);
     for (let frameNumber = start; frameNumber <= end; frameNumber++) {
       debugger;
       this.controller.goToFrame(frameNumber);

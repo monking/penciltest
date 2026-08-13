@@ -745,8 +745,6 @@ class PenciltestUI extends PenciltestUIComponent {
             return;
           }
 
-          console.log({gifURL});
-
           const gifInstructions = PenciltestUIComponent.restore({
             key: 'gifInstructions',
             html: "Click/touch image to download.<br>Click/touch outside GIF to close.",
@@ -823,6 +821,8 @@ class PenciltestUI extends PenciltestUIComponent {
           gifContainer.getElement().addEventListener('click', gifCloseHandler);
           gifContainer.getElement().addEventListener('touchend', gifCloseHandler);
           globalThis.document.body.addEventListener('keydown', gifCloseHandler);
+
+          console.log({gifURL, gifImage});
         }
       },
 
