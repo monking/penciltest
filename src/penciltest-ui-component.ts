@@ -10,11 +10,15 @@ class PenciltestUIComponent {
   isAttached: boolean;
   isPTComponent: boolean;
 
-  static restore(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict): PenciltestUIComponent {
-    if (options.is) { return options.is; }
-    if (options.key && options.key in components) {
-      const component = components[options.key];
+  static restore(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict, forceReattach:boolean = false): PenciltestUIComponent {
+    const component = options.is
+      ? options.is
+      : (options.key && options.key in components)
+        ? components[options.key]
+        : null;
+    if (component !== null) {
       component.setContent(options);
+      component.attach(options, forceReattach);
       return component;
     }
     return new PenciltestUIComponent(options, components);
@@ -73,11 +77,15 @@ class PenciltestUIComponent {
     }
   }
 
-  attach(): boolean {
-    if (this.isAttached) { return true; }
+  attach(newOptions:PenciltestUIComponentOptions = {}, force:boolean = false): boolean {
+    const options = {
+      ...this.options,
+      ...newOptions,
+    };
+    if (this.isAttached && !force) { return true; }
 
-    if (!this.parentElement && this.options.parentElement) {
-      this.parentElement = this.options.parentElement;
+    if (!this.parentElement && options.parentElement) {
+      this.parentElement = options.parentElement;
     }
 
     if (this.parentElement) {
@@ -85,12 +93,12 @@ class PenciltestUIComponent {
       this.isAttached = true;
     } else {
       if (!this.parent) {
-        if (typeof this.options.parent === 'string') {
-          if (this.options.parent in this.components) {
-            this.parent = this.components[this.options.parent];
+        if (typeof options.parent === 'string') {
+          if (options.parent in this.components) {
+            this.parent = this.components[options.parent];
           }
-        } else if (this.options.parent) {
-          this.parent = this.options.parent as PenciltestUIComponent;
+        } else if (options.parent) {
+          this.parent = options.parent as PenciltestUIComponent;
         }
       }
 
@@ -148,9 +156,9 @@ class PenciltestUIComponent {
           ...childConfig,
           parent: this,
         };
-        if (!force && !childConfigWithThisAsParent.key) { return; } // Avoiding assumptions of persistent child node order.
+        //if (!force && !childConfigWithThisAsParent.key) { return; } // Avoiding assumptions of persistent child node order.
         const childComponent = PenciltestUIComponent.restore(childConfigWithThisAsParent, this.components);
-        if (typeof childComponent.setContent !== 'function') { return; }
+        //if (typeof childComponent.setContent !== 'function') { return; }
         //childComponent.setContent(childConfigWithThisAsParent); //restore already calls setContent
       });
     }
@@ -190,6 +198,65 @@ class PenciltestUIComponent {
   attachChild(child:PenciltestUIComponent) {
     this.getElement().appendChild(child.getElement());
     this.children.push(child)
+  }
+
+  static makeInputLabel(inputConfig: PenciltestUIComponentOptions, options:any = {}): Array<PenciltestUIComponentOptions> {
+    const {
+      prefix: labelPrefix,
+      suffix: labelSuffix,
+      labelFirst,
+      text: initialText,
+      live: isLive,
+    }= {
+      live: false,
+      text: '',
+      prefix: '',
+      suffix: '',
+      labelFirst: true,
+      ...options,
+    }
+    const inputKey = `${inputConfig.key || Utils.uid()}`;
+    const inputId = `${inputConfig.attr?.id || inputKey}`;
+    const labelKey = `${inputKey || Utils.uid()}_label`;
+
+    if (isLive) {
+      const previousOnInputListener = inputConfig.on?.input;
+      Object.assign(inputConfig, {
+        key: inputKey,
+        attr: {
+          ...inputConfig.attr,
+          id: inputId,
+        },
+        on: {
+          'input': (e, components) => {
+            const label = components[labelKey].getElement();
+            const input = e.target as HTMLInputElement;
+            if (label && input) {
+              label.innerText = `${labelPrefix}${input.value}${labelSuffix}`;
+            }
+            if (typeof previousOnInputListener === 'function') {
+              previousOnInputListener(e, components);
+            }
+          },
+        },
+      });
+    }
+
+    const initialLabelValue = isLive
+      ? String(inputConfig.attr?.value) || ''
+      : initialText;
+    const labelConfig = {
+      tagName: 'label',
+      key: labelKey,
+      text: `${labelPrefix}${initialLabelValue}${labelSuffix}`,
+      attr: {
+        for: inputId,
+      },
+    };
+
+    const configs = [labelConfig, inputConfig];
+
+    return labelFirst ? configs : configs.reverse();
   }
 
   getElement() { return this.el.container; }

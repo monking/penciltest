@@ -6,7 +6,8 @@ enum Renderers {
 enum PenciltestMode {
   DRAWING = "drawing",
   WORKING = "working",
-  PLAYING = "playing"
+  PLAYING = "playing",
+  RENDERING = "rendering"
 };
 
 enum PenciltestTool {

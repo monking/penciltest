@@ -91,7 +91,7 @@ class CanvasRenderer extends BaseRenderer {
   }
 
   destroy() {
-    this.field.remove();
+    this.field.remove(); // FIXME Doesn't get removed?
     return super.destroy();
   }
 

@@ -10,6 +10,7 @@ var PenciltestMode;
     PenciltestMode["DRAWING"] = "drawing";
     PenciltestMode["WORKING"] = "working";
     PenciltestMode["PLAYING"] = "playing";
+    PenciltestMode["RENDERING"] = "rendering";
 })(PenciltestMode || (PenciltestMode = {}));
 ;
 var PenciltestTool;
@@ -55,6 +56,7 @@ var GlobalPromiseGroup;
     GlobalPromiseGroup["MODAL"] = "modal";
 })(GlobalPromiseGroup || (GlobalPromiseGroup = {}));
 ;
+var PTUtilsUID = 0;
 class Utils {
     static clone(object) {
         return JSON.parse(JSON.stringify(object));
@@ -591,6 +593,9 @@ class Utils {
     static anyGlobalPromises(group = GlobalPromiseGroup.MODAL) {
         var _a;
         return Boolean(globalThis.penciltestGlobalPromises && ((_a = globalThis.penciltestGlobalPromises[group]) === null || _a === void 0 ? void 0 : _a.length) > 0);
+    }
+    static uid() {
+        return ++PTUtilsUID;
     }
 }
 Utils.keyCodeNames = {
@@ -1631,13 +1636,15 @@ class PenciltestMigrator {
 
 "use strict";
 class PenciltestUIComponent {
-    static restore(options, components) {
-        if (options.is) {
-            return options.is;
-        }
-        if (options.key && options.key in components) {
-            const component = components[options.key];
+    static restore(options, components, forceReattach = false) {
+        const component = options.is
+            ? options.is
+            : (options.key && options.key in components)
+                ? components[options.key]
+                : null;
+        if (component !== null) {
             component.setContent(options);
+            component.attach(options, forceReattach);
             return component;
         }
         return new PenciltestUIComponent(options, components);
@@ -1683,12 +1690,16 @@ class PenciltestUIComponent {
             this.components[this.options.key] = this;
         }
     }
-    attach() {
-        if (this.isAttached) {
+    attach(newOptions = {}, force = false) {
+        const options = {
+            ...this.options,
+            ...newOptions,
+        };
+        if (this.isAttached && !force) {
             return true;
         }
-        if (!this.parentElement && this.options.parentElement) {
-            this.parentElement = this.options.parentElement;
+        if (!this.parentElement && options.parentElement) {
+            this.parentElement = options.parentElement;
         }
         if (this.parentElement) {
             this.parentElement.appendChild(this.getElement());
@@ -1696,13 +1707,13 @@ class PenciltestUIComponent {
         }
         else {
             if (!this.parent) {
-                if (typeof this.options.parent === 'string') {
-                    if (this.options.parent in this.components) {
-                        this.parent = this.components[this.options.parent];
+                if (typeof options.parent === 'string') {
+                    if (options.parent in this.components) {
+                        this.parent = this.components[options.parent];
                     }
                 }
-                else if (this.options.parent) {
-                    this.parent = this.options.parent;
+                else if (options.parent) {
+                    this.parent = options.parent;
                 }
             }
             if (this.parent) {
@@ -1754,13 +1765,9 @@ class PenciltestUIComponent {
                     ...childConfig,
                     parent: this,
                 };
-                if (!force && !childConfigWithThisAsParent.key) {
-                    return;
-                } // Avoiding assumptions of persistent child node order.
+                //if (!force && !childConfigWithThisAsParent.key) { return; } // Avoiding assumptions of persistent child node order.
                 const childComponent = PenciltestUIComponent.restore(childConfigWithThisAsParent, this.components);
-                if (typeof childComponent.setContent !== 'function') {
-                    return;
-                }
+                //if (typeof childComponent.setContent !== 'function') { return; }
                 //childComponent.setContent(childConfigWithThisAsParent); //restore already calls setContent
             });
         }
@@ -1794,6 +1801,55 @@ class PenciltestUIComponent {
     attachChild(child) {
         this.getElement().appendChild(child.getElement());
         this.children.push(child);
+    }
+    static makeInputLabel(inputConfig, options = {}) {
+        var _a, _b, _c;
+        const { prefix: labelPrefix, suffix: labelSuffix, labelFirst, text: initialText, live: isLive, } = {
+            live: false,
+            text: '',
+            prefix: '',
+            suffix: '',
+            labelFirst: true,
+            ...options,
+        };
+        const inputKey = `${inputConfig.key || Utils.uid()}`;
+        const inputId = `${((_a = inputConfig.attr) === null || _a === void 0 ? void 0 : _a.id) || inputKey}`;
+        const labelKey = `${inputKey || Utils.uid()}_label`;
+        if (isLive) {
+            const previousOnInputListener = (_b = inputConfig.on) === null || _b === void 0 ? void 0 : _b.input;
+            Object.assign(inputConfig, {
+                key: inputKey,
+                attr: {
+                    ...inputConfig.attr,
+                    id: inputId,
+                },
+                on: {
+                    'input': (e, components) => {
+                        const label = components[labelKey].getElement();
+                        const input = e.target;
+                        if (label && input) {
+                            label.innerText = `${labelPrefix}${input.value}${labelSuffix}`;
+                        }
+                        if (typeof previousOnInputListener === 'function') {
+                            previousOnInputListener(e, components);
+                        }
+                    },
+                },
+            });
+        }
+        const initialLabelValue = isLive
+            ? String((_c = inputConfig.attr) === null || _c === void 0 ? void 0 : _c.value) || ''
+            : initialText;
+        const labelConfig = {
+            tagName: 'label',
+            key: labelKey,
+            text: `${labelPrefix}${initialLabelValue}${labelSuffix}`,
+            attr: {
+                for: inputId,
+            },
+        };
+        const configs = [labelConfig, inputConfig];
+        return labelFirst ? configs : configs.reverse();
     }
     getElement() { return this.el.container; }
     setElement(element) { return this.el.container = element; }
@@ -2049,7 +2105,7 @@ class CanvasRenderer extends BaseRenderer {
         return super.clear(redrawBackground);
     }
     destroy() {
-        this.field.remove();
+        this.field.remove(); // FIXME Doesn't get removed?
         return super.destroy();
     }
     resize(width, height) {
@@ -2818,8 +2874,14 @@ class PenciltestUI extends PenciltestUIComponent {
                 label: "Render GIF (FIXME)",
                 hotkey: ['Shift+G'],
                 async listener() {
+                    this.setMode(PenciltestMode.RENDERING);
+                    this.ui.updateStatusBar();
                     const exporter = new PenciltestRenderExporter(this);
                     const gifURL = await exporter.renderGif();
+                    if (gifURL === null) {
+                        this.setPreviousMode();
+                        return;
+                    }
                     console.log({ gifURL });
                     const gifInstructions = PenciltestUIComponent.restore({
                         key: 'gifInstructions',
@@ -2875,14 +2937,21 @@ class PenciltestUI extends PenciltestUIComponent {
                             right: '0px',
                             backgroundColor: 'rgba(0,0,0,0.5)'
                         }
-                    }, this.ui.components);
-                    const gifCloseHandler = function (event) {
-                        if ((event.target !== gifImage.getElement()) || (event.type === 'keydown' && (event.key === 'escape'))) {
-                            gifContainer.getElement().removeEventListener('click', gifCloseHandler);
-                            gifContainer.getElement().removeEventListener('touchend', gifCloseHandler);
-                            globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
-                            return gifContainer.getElement().remove();
+                    }, this.ui.components, true);
+                    const gifCloseHandler = (event) => {
+                        if (event.type === 'keydown') {
+                            if (event.key !== 'Escape') {
+                                return;
+                            }
                         }
+                        else if (event.target !== gifImage.getElement()) {
+                            return;
+                        }
+                        gifContainer.getElement().removeEventListener('click', gifCloseHandler);
+                        gifContainer.getElement().removeEventListener('touchend', gifCloseHandler);
+                        globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
+                        gifContainer.getElement().remove();
+                        this.setPreviousMode();
                     };
                     gifContainer.getElement().addEventListener('click', gifCloseHandler);
                     gifContainer.getElement().addEventListener('touchend', gifCloseHandler);
@@ -3247,7 +3316,6 @@ class PenciltestUI extends PenciltestUIComponent {
                                 },
                                 on: {
                                     'input': (e, components) => {
-                                        debugger;
                                         const label = components.onionSkinFrameRadiusLabel.getElement();
                                         const input = e.target;
                                         if (label && input) {
@@ -4283,6 +4351,688 @@ class PenciltestUI extends PenciltestUIComponent {
 
 "use strict";
 /**
+ * This class handles LZW encoding
+ * Adapted from Jef Poskanzer's Java port by way of J. M. G. Elliott.
+ * @author Kevin Weiner (original Java version - kweiner@fmsware.com)
+ * @author Thibault Imbert (AS3 version - bytearray.org)
+ * @author Kevin Kwok (JavaScript version - https://github.com/antimatter15/jsgif)
+ * @version 0.1 AS3 implementation
+ */
+LZWEncoder = function () {
+    var exports = {};
+    var EOF = -1;
+    var imgW;
+    var imgH;
+    var pixAry;
+    var initCodeSize;
+    var remaining;
+    var curPixel;
+    // GIFCOMPR.C - GIF Image compression routines
+    // Lempel-Ziv compression based on 'compress'. GIF modifications by
+    // David Rowley (mgardi@watdcsu.waterloo.edu)
+    // General DEFINEs
+    var BITS = 12;
+    var HSIZE = 5003; // 80% occupancy
+    // GIF Image compression - modified 'compress'
+    // Based on: compress.c - File compression ala IEEE Computer, June 1984.
+    // By Authors: Spencer W. Thomas (decvax!harpo!utah-cs!utah-gr!thomas)
+    // Jim McKie (decvax!mcvax!jim)
+    // Steve Davies (decvax!vax135!petsd!peora!srd)
+    // Ken Turkowski (decvax!decwrl!turtlevax!ken)
+    // James A. Woods (decvax!ihnp4!ames!jaw)
+    // Joe Orost (decvax!vax135!petsd!joe)
+    var n_bits; // number of bits/code
+    var maxbits = BITS; // user settable max # bits/code
+    var maxcode; // maximum code, given n_bits
+    var maxmaxcode = 1 << BITS; // should NEVER generate this code
+    var htab = [];
+    var codetab = [];
+    var hsize = HSIZE; // for dynamic table sizing
+    var free_ent = 0; // first unused entry
+    // block compression parameters -- after all codes are used up,
+    // and compression rate changes, start over.
+    var clear_flg = false;
+    // Algorithm: use open addressing double hashing (no chaining) on the
+    // prefix code / next character combination. We do a variant of Knuth's
+    // algorithm D (vol. 3, sec. 6.4) along with G. Knott's relatively-prime
+    // secondary probe. Here, the modular division first probe is gives way
+    // to a faster exclusive-or manipulation. Also do block compression with
+    // an adaptive reset, whereby the code table is cleared when the compression
+    // ratio decreases, but after the table fills. The variable-length output
+    // codes are re-sized at this point, and a special CLEAR code is generated
+    // for the decompressor. Late addition: construct the table according to
+    // file size for noticeable speed improvement on small files. Please direct
+    // questions about this implementation to ames!jaw.
+    var g_init_bits;
+    var ClearCode;
+    var EOFCode;
+    // output
+    // Output the given code.
+    // Inputs:
+    // code: A n_bits-bit integer. If == -1, then EOF. This assumes
+    // that n_bits =< wordsize - 1.
+    // Outputs:
+    // Outputs code to the file.
+    // Assumptions:
+    // Chars are 8 bits long.
+    // Algorithm:
+    // Maintain a BITS character long buffer (so that 8 codes will
+    // fit in it exactly). Use the VAX insv instruction to insert each
+    // code in turn. When the buffer fills up empty it and start over.
+    var cur_accum = 0;
+    var cur_bits = 0;
+    var masks = [0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F, 0x003F, 0x007F, 0x00FF, 0x01FF, 0x03FF, 0x07FF, 0x0FFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF];
+    // Number of characters so far in this 'packet'
+    var a_count;
+    // Define the storage for the packet accumulator
+    var accum = [];
+    var LZWEncoder = exports.LZWEncoder = function LZWEncoder(width, height, pixels, color_depth) {
+        imgW = width;
+        imgH = height;
+        pixAry = pixels;
+        initCodeSize = Math.max(2, color_depth);
+    };
+    // Add a character to the end of the current packet, and if it is 254
+    // characters, flush the packet to disk.
+    var char_out = function char_out(c, outs) {
+        accum[a_count++] = c;
+        if (a_count >= 254)
+            flush_char(outs);
+    };
+    // Clear out the hash table
+    // table clear for block compress
+    var cl_block = function cl_block(outs) {
+        cl_hash(hsize);
+        free_ent = ClearCode + 2;
+        clear_flg = true;
+        output(ClearCode, outs);
+    };
+    // reset code table
+    var cl_hash = function cl_hash(hsize) {
+        for (var i = 0; i < hsize; ++i)
+            htab[i] = -1;
+    };
+    var compress = exports.compress = function compress(init_bits, outs) {
+        var fcode;
+        var i; /* = 0 */
+        var c;
+        var ent;
+        var disp;
+        var hsize_reg;
+        var hshift;
+        // Set up the globals: g_init_bits - initial number of bits
+        g_init_bits = init_bits;
+        // Set up the necessary values
+        clear_flg = false;
+        n_bits = g_init_bits;
+        maxcode = MAXCODE(n_bits);
+        ClearCode = 1 << (init_bits - 1);
+        EOFCode = ClearCode + 1;
+        free_ent = ClearCode + 2;
+        a_count = 0; // clear packet
+        ent = nextPixel();
+        hshift = 0;
+        for (fcode = hsize; fcode < 65536; fcode *= 2)
+            ++hshift;
+        hshift = 8 - hshift; // set hash code range bound
+        hsize_reg = hsize;
+        cl_hash(hsize_reg); // clear hash table
+        output(ClearCode, outs);
+        outer_loop: while ((c = nextPixel()) != EOF) {
+            fcode = (c << maxbits) + ent;
+            i = (c << hshift) ^ ent; // xor hashing
+            if (htab[i] == fcode) {
+                ent = codetab[i];
+                continue;
+            }
+            else if (htab[i] >= 0) { // non-empty slot
+                disp = hsize_reg - i; // secondary hash (after G. Knott)
+                if (i === 0)
+                    disp = 1;
+                do {
+                    if ((i -= disp) < 0)
+                        i += hsize_reg;
+                    if (htab[i] == fcode) {
+                        ent = codetab[i];
+                        continue outer_loop;
+                    }
+                } while (htab[i] >= 0);
+            }
+            output(ent, outs);
+            ent = c;
+            if (free_ent < maxmaxcode) {
+                codetab[i] = free_ent++; // code -> hashtable
+                htab[i] = fcode;
+            }
+            else
+                cl_block(outs);
+        }
+        // Put out the final code.
+        output(ent, outs);
+        output(EOFCode, outs);
+    };
+    // ----------------------------------------------------------------------------
+    var encode = exports.encode = function encode(os) {
+        os.writeByte(initCodeSize); // write "initial code size" byte
+        remaining = imgW * imgH; // reset navigation variables
+        curPixel = 0;
+        compress(initCodeSize + 1, os); // compress and write the pixel data
+        os.writeByte(0); // write block terminator
+    };
+    // Flush the packet to disk, and reset the accumulator
+    var flush_char = function flush_char(outs) {
+        if (a_count > 0) {
+            outs.writeByte(a_count);
+            outs.writeBytes(accum, 0, a_count);
+            a_count = 0;
+        }
+    };
+    var MAXCODE = function MAXCODE(n_bits) {
+        return (1 << n_bits) - 1;
+    };
+    // ----------------------------------------------------------------------------
+    // Return the next pixel from the image
+    // ----------------------------------------------------------------------------
+    var nextPixel = function nextPixel() {
+        if (remaining === 0)
+            return EOF;
+        --remaining;
+        var pix = pixAry[curPixel++];
+        return pix & 0xff;
+    };
+    var output = function output(code, outs) {
+        cur_accum &= masks[cur_bits];
+        if (cur_bits > 0)
+            cur_accum |= (code << cur_bits);
+        else
+            cur_accum = code;
+        cur_bits += n_bits;
+        while (cur_bits >= 8) {
+            char_out((cur_accum & 0xff), outs);
+            cur_accum >>= 8;
+            cur_bits -= 8;
+        }
+        // If the next entry is going to be too big for the code size,
+        // then increase it, if possible.
+        if (free_ent > maxcode || clear_flg) {
+            if (clear_flg) {
+                maxcode = MAXCODE(n_bits = g_init_bits);
+                clear_flg = false;
+            }
+            else {
+                ++n_bits;
+                if (n_bits == maxbits)
+                    maxcode = maxmaxcode;
+                else
+                    maxcode = MAXCODE(n_bits);
+            }
+        }
+        if (code == EOFCode) {
+            // At EOF, write the rest of the buffer.
+            while (cur_bits > 0) {
+                char_out((cur_accum & 0xff), outs);
+                cur_accum >>= 8;
+                cur_bits -= 8;
+            }
+            flush_char(outs);
+        }
+    };
+    LZWEncoder.apply(this, arguments);
+    return exports;
+};
+
+"use strict";
+/*
+ * NeuQuant Neural-Net Quantization Algorithm
+ * ------------------------------------------
+ *
+ * Copyright (c) 1994 Anthony Dekker
+ *
+ * NEUQUANT Neural-Net quantization algorithm by Anthony Dekker, 1994. See
+ * "Kohonen neural networks for optimal colour quantization" in "Network:
+ * Computation in Neural Systems" Vol. 5 (1994) pp 351-367. for a discussion of
+ * the algorithm.
+ *
+ * Any party obtaining a copy of these files from the author, directly or
+ * indirectly, is granted, free of charge, a full and unrestricted irrevocable,
+ * world-wide, paid up, royalty-free, nonexclusive right and license to deal in
+ * this software and documentation files (the "Software"), including without
+ * limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons who
+ * receive copies from any such party to do so, with the only requirement being
+ * that this copyright notice remain intact.
+ */
+/*
+ * This class handles Neural-Net quantization algorithm
+ * @author Kevin Weiner (original Java version - kweiner@fmsware.com)
+ * @author Thibault Imbert (AS3 version - bytearray.org)
+ * @author Kevin Kwok (JavaScript version - https://github.com/antimatter15/jsgif)
+ * @version 0.1 AS3 implementation
+ */
+NeuQuant = function () {
+    var exports = {};
+    var netsize = 256; /* number of colours used */
+    /* four primes near 500 - assume no image has a length so large */
+    /* that it is divisible by all four primes */
+    var prime1 = 499;
+    var prime2 = 491;
+    var prime3 = 487;
+    var prime4 = 503;
+    var minpicturebytes = (3 * prime4); /* minimum size for input image */
+    /*
+     * Program Skeleton ---------------- [select samplefac in range 1..30] [read
+     * image from input file] pic = (unsigned char*) malloc(3*width*height);
+     * initnet(pic,3*width*height,samplefac); learn(); unbiasnet(); [write output
+     * image header, using writecolourmap(f)] inxbuild(); write output image using
+     * inxsearch(b,g,r)
+     */
+    /*
+     * Network Definitions -------------------
+     */
+    var maxnetpos = (netsize - 1);
+    var netbiasshift = 4; /* bias for colour values */
+    var ncycles = 100; /* no. of learning cycles */
+    /* defs for freq and bias */
+    var intbiasshift = 16; /* bias for fractions */
+    var intbias = (1 << intbiasshift);
+    var gammashift = 10; /* gamma = 1024 */
+    var gamma = (1 << gammashift);
+    var betashift = 10;
+    var beta = (intbias >> betashift); /* beta = 1/1024 */
+    var betagamma = (intbias << (gammashift - betashift));
+    /* defs for decreasing radius factor */
+    var initrad = (netsize >> 3); /* for 256 cols, radius starts */
+    var radiusbiasshift = 6; /* at 32.0 biased by 6 bits */
+    var radiusbias = (1 << radiusbiasshift);
+    var initradius = (initrad * radiusbias); /* and decreases by a */
+    var radiusdec = 30; /* factor of 1/30 each cycle */
+    /* defs for decreasing alpha factor */
+    var alphabiasshift = 10; /* alpha starts at 1.0 */
+    var initalpha = (1 << alphabiasshift);
+    var alphadec; /* biased by 10 bits */
+    /* radbias and alpharadbias used for radpower calculation */
+    var radbiasshift = 8;
+    var radbias = (1 << radbiasshift);
+    var alpharadbshift = (alphabiasshift + radbiasshift);
+    var alpharadbias = (1 << alpharadbshift);
+    /*
+     * Types and Global Variables --------------------------
+     */
+    var thepicture; /* the input image itself */
+    var lengthcount; /* lengthcount = H*W*3 */
+    var samplefac; /* sampling factor 1..30 */
+    // typedef int pixel[4]; /* BGRc */
+    var network; /* the network itself - [netsize][4] */
+    var netindex = [];
+    /* for network lookup - really 256 */
+    var bias = [];
+    /* bias and freq arrays for learning */
+    var freq = [];
+    var radpower = [];
+    var NeuQuant = exports.NeuQuant = function NeuQuant(thepic, len, sample) {
+        var i;
+        var p;
+        thepicture = thepic;
+        lengthcount = len;
+        samplefac = sample;
+        network = new Array(netsize);
+        for (i = 0; i < netsize; i++) {
+            network[i] = new Array(4);
+            p = network[i];
+            p[0] = p[1] = p[2] = (i << (netbiasshift + 8)) / netsize;
+            freq[i] = intbias / netsize; /* 1/netsize */
+            bias[i] = 0;
+        }
+    };
+    var colorMap = function colorMap() {
+        var map = [];
+        var index = new Array(netsize);
+        for (var i = 0; i < netsize; i++)
+            index[network[i][3]] = i;
+        var k = 0;
+        for (var l = 0; l < netsize; l++) {
+            var j = index[l];
+            map[k++] = (network[j][0]);
+            map[k++] = (network[j][1]);
+            map[k++] = (network[j][2]);
+        }
+        return map;
+    };
+    /*
+     * Insertion sort of network and building of netindex[0..255] (to do after
+     * unbias)
+     * -------------------------------------------------------------------------------
+     */
+    var inxbuild = function inxbuild() {
+        var i;
+        var j;
+        var smallpos;
+        var smallval;
+        var p;
+        var q;
+        var previouscol;
+        var startpos;
+        previouscol = 0;
+        startpos = 0;
+        for (i = 0; i < netsize; i++) {
+            p = network[i];
+            smallpos = i;
+            smallval = p[1]; /* index on g */
+            /* find smallest in i..netsize-1 */
+            for (j = i + 1; j < netsize; j++) {
+                q = network[j];
+                if (q[1] < smallval) { /* index on g */
+                    smallpos = j;
+                    smallval = q[1]; /* index on g */
+                }
+            }
+            q = network[smallpos];
+            /* swap p (i) and q (smallpos) entries */
+            if (i != smallpos) {
+                j = q[0];
+                q[0] = p[0];
+                p[0] = j;
+                j = q[1];
+                q[1] = p[1];
+                p[1] = j;
+                j = q[2];
+                q[2] = p[2];
+                p[2] = j;
+                j = q[3];
+                q[3] = p[3];
+                p[3] = j;
+            }
+            /* smallval entry is now in position i */
+            if (smallval != previouscol) {
+                netindex[previouscol] = (startpos + i) >> 1;
+                for (j = previouscol + 1; j < smallval; j++)
+                    netindex[j] = i;
+                previouscol = smallval;
+                startpos = i;
+            }
+        }
+        netindex[previouscol] = (startpos + maxnetpos) >> 1;
+        for (j = previouscol + 1; j < 256; j++)
+            netindex[j] = maxnetpos; /* really 256 */
+    };
+    /*
+     * Main Learning Loop ------------------
+     */
+    var learn = function learn() {
+        var i;
+        var j;
+        var b;
+        var g;
+        var r;
+        var radius;
+        var rad;
+        var alpha;
+        var step;
+        var delta;
+        var samplepixels;
+        var p;
+        var pix;
+        var lim;
+        if (lengthcount < minpicturebytes)
+            samplefac = 1;
+        alphadec = 30 + ((samplefac - 1) / 3);
+        p = thepicture;
+        pix = 0;
+        lim = lengthcount;
+        samplepixels = lengthcount / (3 * samplefac);
+        delta = (samplepixels / ncycles) | 0;
+        alpha = initalpha;
+        radius = initradius;
+        rad = radius >> radiusbiasshift;
+        if (rad <= 1)
+            rad = 0;
+        for (i = 0; i < rad; i++)
+            radpower[i] = alpha * (((rad * rad - i * i) * radbias) / (rad * rad));
+        if (lengthcount < minpicturebytes)
+            step = 3;
+        else if ((lengthcount % prime1) !== 0)
+            step = 3 * prime1;
+        else {
+            if ((lengthcount % prime2) !== 0)
+                step = 3 * prime2;
+            else {
+                if ((lengthcount % prime3) !== 0)
+                    step = 3 * prime3;
+                else
+                    step = 3 * prime4;
+            }
+        }
+        i = 0;
+        while (i < samplepixels) {
+            b = (p[pix + 0] & 0xff) << netbiasshift;
+            g = (p[pix + 1] & 0xff) << netbiasshift;
+            r = (p[pix + 2] & 0xff) << netbiasshift;
+            j = contest(b, g, r);
+            altersingle(alpha, j, b, g, r);
+            if (rad !== 0)
+                alterneigh(rad, j, b, g, r); /* alter neighbours */
+            pix += step;
+            if (pix >= lim)
+                pix -= lengthcount;
+            i++;
+            if (delta === 0)
+                delta = 1;
+            if (i % delta === 0) {
+                alpha -= alpha / alphadec;
+                radius -= radius / radiusdec;
+                rad = radius >> radiusbiasshift;
+                if (rad <= 1)
+                    rad = 0;
+                for (j = 0; j < rad; j++)
+                    radpower[j] = alpha * (((rad * rad - j * j) * radbias) / (rad * rad));
+            }
+        }
+    };
+    /*
+     ** Search for BGR values 0..255 (after net is unbiased) and return colour
+     * index
+     * ----------------------------------------------------------------------------
+     */
+    var map = exports.map = function map(b, g, r) {
+        var i;
+        var j;
+        var dist;
+        var a;
+        var bestd;
+        var p;
+        var best;
+        bestd = 1000; /* biggest possible dist is 256*3 */
+        best = -1;
+        i = netindex[g]; /* index on g */
+        j = i - 1; /* start at netindex[g] and work outwards */
+        while ((i < netsize) || (j >= 0)) {
+            if (i < netsize) {
+                p = network[i];
+                dist = p[1] - g; /* inx key */
+                if (dist >= bestd)
+                    i = netsize; /* stop iter */
+                else {
+                    i++;
+                    if (dist < 0)
+                        dist = -dist;
+                    a = p[0] - b;
+                    if (a < 0)
+                        a = -a;
+                    dist += a;
+                    if (dist < bestd) {
+                        a = p[2] - r;
+                        if (a < 0)
+                            a = -a;
+                        dist += a;
+                        if (dist < bestd) {
+                            bestd = dist;
+                            best = p[3];
+                        }
+                    }
+                }
+            }
+            if (j >= 0) {
+                p = network[j];
+                dist = g - p[1]; /* inx key - reverse dif */
+                if (dist >= bestd)
+                    j = -1; /* stop iter */
+                else {
+                    j--;
+                    if (dist < 0)
+                        dist = -dist;
+                    a = p[0] - b;
+                    if (a < 0)
+                        a = -a;
+                    dist += a;
+                    if (dist < bestd) {
+                        a = p[2] - r;
+                        if (a < 0)
+                            a = -a;
+                        dist += a;
+                        if (dist < bestd) {
+                            bestd = dist;
+                            best = p[3];
+                        }
+                    }
+                }
+            }
+        }
+        return (best);
+    };
+    var process = exports.process = function process() {
+        learn();
+        unbiasnet();
+        inxbuild();
+        return colorMap();
+    };
+    /*
+     * Unbias network to give byte values 0..255 and record position i to prepare
+     * for sort
+     * -----------------------------------------------------------------------------------
+     */
+    var unbiasnet = function unbiasnet() {
+        var i;
+        var j;
+        for (i = 0; i < netsize; i++) {
+            network[i][0] >>= netbiasshift;
+            network[i][1] >>= netbiasshift;
+            network[i][2] >>= netbiasshift;
+            network[i][3] = i; /* record colour no */
+        }
+    };
+    /*
+     * Move adjacent neurons by precomputed alpha*(1-((i-j)^2/[r]^2)) in
+     * radpower[|i-j|]
+     * ---------------------------------------------------------------------------------
+     */
+    var alterneigh = function alterneigh(rad, i, b, g, r) {
+        var j;
+        var k;
+        var lo;
+        var hi;
+        var a;
+        var m;
+        var p;
+        lo = i - rad;
+        if (lo < -1)
+            lo = -1;
+        hi = i + rad;
+        if (hi > netsize)
+            hi = netsize;
+        j = i + 1;
+        k = i - 1;
+        m = 1;
+        while ((j < hi) || (k > lo)) {
+            a = radpower[m++];
+            if (j < hi) {
+                p = network[j++];
+                try {
+                    p[0] -= (a * (p[0] - b)) / alpharadbias;
+                    p[1] -= (a * (p[1] - g)) / alpharadbias;
+                    p[2] -= (a * (p[2] - r)) / alpharadbias;
+                }
+                catch (e) { } // prevents 1.3 miscompilation
+            }
+            if (k > lo) {
+                p = network[k--];
+                try {
+                    p[0] -= (a * (p[0] - b)) / alpharadbias;
+                    p[1] -= (a * (p[1] - g)) / alpharadbias;
+                    p[2] -= (a * (p[2] - r)) / alpharadbias;
+                }
+                catch (e) { }
+            }
+        }
+    };
+    /*
+     * Move neuron i towards biased (b,g,r) by factor alpha
+     * ----------------------------------------------------
+     */
+    var altersingle = function altersingle(alpha, i, b, g, r) {
+        /* alter hit neuron */
+        var n = network[i];
+        n[0] -= (alpha * (n[0] - b)) / initalpha;
+        n[1] -= (alpha * (n[1] - g)) / initalpha;
+        n[2] -= (alpha * (n[2] - r)) / initalpha;
+    };
+    /*
+     * Search for biased BGR values ----------------------------
+     */
+    var contest = function contest(b, g, r) {
+        /* finds closest neuron (min dist) and updates freq */
+        /* finds best neuron (min dist-bias) and returns position */
+        /* for frequently chosen neurons, freq[i] is high and bias[i] is negative */
+        /* bias[i] = gamma*((1/netsize)-freq[i]) */
+        var i;
+        var dist;
+        var a;
+        var biasdist;
+        var betafreq;
+        var bestpos;
+        var bestbiaspos;
+        var bestd;
+        var bestbiasd;
+        var n;
+        bestd = ~(1 << 31);
+        bestbiasd = bestd;
+        bestpos = -1;
+        bestbiaspos = bestpos;
+        for (i = 0; i < netsize; i++) {
+            n = network[i];
+            dist = n[0] - b;
+            if (dist < 0)
+                dist = -dist;
+            a = n[1] - g;
+            if (a < 0)
+                a = -a;
+            dist += a;
+            a = n[2] - r;
+            if (a < 0)
+                a = -a;
+            dist += a;
+            if (dist < bestd) {
+                bestd = dist;
+                bestpos = i;
+            }
+            biasdist = dist - ((bias[i]) >> (intbiasshift - netbiasshift));
+            if (biasdist < bestbiasd) {
+                bestbiasd = biasdist;
+                bestbiaspos = i;
+            }
+            betafreq = (freq[i] >> betashift);
+            freq[i] -= betafreq;
+            bias[i] += (betafreq << gammashift);
+        }
+        freq[bestpos] += beta;
+        bias[bestpos] -= betagamma;
+        return (bestbiaspos);
+    };
+    NeuQuant.apply(this, arguments);
+    return exports;
+};
+
+"use strict";
+/**
  * This class lets you encode animated GIF files
  * Base class :  http://www.java2s.com/Code/Java/2D-Graphics-GUI/AnimatedGifEncoder.htm
  * @author Kevin Weiner (original Java version - kweiner@fmsware.com)
@@ -4290,7 +5040,7 @@ class PenciltestUI extends PenciltestUIComponent {
  * @author Kevin Kwok (JavaScript version - https://github.com/antimatter15/jsgif)
  * @version 0.1 AS3 implementation
  */
-globalThis.GIFEncoder = function () {
+GIFEncoder = function () {
     for (var i = 0, chr = {}; i < 256; i++)
         chr[i] = String.fromCharCode(i);
     function ByteArray() {
@@ -4769,24 +5519,73 @@ globalThis.GIFEncoder = function () {
 };
 
 "use strict";
+var LZWEncoder;
+var NeuQuant;
+var GIFEncoder; //GIFEncoderInterface;
 ;
 class PenciltestRenderExporter {
     constructor(controller) {
         this.controller = controller;
     }
     async renderGif() {
+        //debugger;
         const renderRange = this.controller.state.frameSelection
             ? this.controller.state.frameSelection
             : { start: 0, end: this.controller.scene.frames.length - 1 };
-        const gifSize = Math.min(512, this.controller.scene.height);
-        const strokeWidth = 1;
-        const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWidth}`);
-        if (!gifConfigurationString) {
-            return;
+        const gifConfigInputDefs = [].concat({
+            children: PenciltestUIComponent.makeInputLabel({
+                key: 'maxDimension',
+                'tagName': 'input',
+                attr: {
+                    value: String(this.controller.scene.height)
+                },
+            }, {
+                text: 'largest dimension: ',
+            })
+        }, {
+            children: PenciltestUIComponent.makeInputLabel({
+                key: 'start',
+                'tagName': 'input',
+                attr: {
+                    id: 'start',
+                    type: 'range',
+                    min: '1',
+                    max: String(this.controller.scene.frames.length),
+                    value: String(renderRange.start + 1),
+                },
+            }, {
+                prefix: 'start frame: ',
+                live: true,
+            })
+        }, {
+            children: PenciltestUIComponent.makeInputLabel({
+                key: 'end',
+                'tagName': 'input',
+                attr: {
+                    id: 'end',
+                    type: 'range',
+                    min: '1',
+                    max: String(this.controller.scene.frames.length),
+                    value: String(renderRange.end + 1),
+                },
+            }, {
+                prefix: 'end frame: ',
+                live: true,
+            })
+        });
+        const gifConfigPromptOptions = {
+            inputKeys: [
+                'maxDimension',
+                'start',
+                'end',
+            ]
+        };
+        const gifConfig = await Utils.promptForm(`Render settings`, gifConfigInputDefs, gifConfigPromptOptions);
+        console.log({ gifConfig }); // XXX
+        if (!gifConfig) {
+            return null;
         }
-        const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-        const maxGifDimension = parseInt(gifConfiguration[0], 10);
-        const gifLineWidth = parseInt(gifConfiguration[1], 10);
+        const maxGifDimension = parseInt(gifConfig.maxDimension, 10);
         const dimensions = this.controller.scene.getDimensions();
         if (dimensions.width > maxGifDimension) {
             dimensions.width = maxGifDimension;
@@ -4797,13 +5596,13 @@ class PenciltestRenderExporter {
             dimensions.width = maxGifDimension * dimensions.aspect;
         }
         this.controller.forceDimensions = dimensions;
-        const oldRendererType = this.controller.options.renderer;
-        this.controller.setOptions({ renderer: Renderers.CANVAS });
+        // LATER: Switch to CANVAS renderer if not already using it.
+        // LATER: Don't reinitialize the renderer if already CANVAS.
+        // MEANWHILE: SVG rendering is disabled, and CANVAS is the only choice.
         //// rebuild renderer to ensure correct resolution for capture
         //this.controller.ui.appActions.renderer.action();
         this.controller.resize();
         //this.controller.ui.appActions.renderer.action();
-        const gifRenderOverrides = { strokeWidth: gifLineWidth };
         const baseFrameDelay = 1000 / this.controller.scene.framerate;
         // prepare encoder
         const gifEncoder = GIFEncoder();
@@ -4811,16 +5610,20 @@ class PenciltestRenderExporter {
         gifEncoder.setRepeat(0);
         gifEncoder.setDelay(baseFrameDelay);
         gifEncoder.start();
-        ;
-        for (let frameNumber = renderRange.start; frameNumber <= renderRange.end; frameNumber++) {
-            this.controller.goToFrame(frameNumber, gifRenderOverrides);
+        const start = Number(gifConfig.start) - 1;
+        const end = Number(gifConfig.end) - 1;
+        for (let frameNumber = start; frameNumber <= end; frameNumber++) {
+            debugger;
+            this.controller.goToFrame(frameNumber);
             gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
             gifEncoder.addFrame(this.controller.sceneRenderer.context);
         }
         gifEncoder.finish();
-        const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }));
+        const gifBinary = gifEncoder.stream().bin;
+        debugger;
+        const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifBinary).buffer], { type: "image/gif" }));
         // reset to user's configuration
-        this.controller.setOptions({ renderer: oldRendererType });
+        //this.controller.setOptions({renderer: oldRendererType});
         this.controller.forceDimensions = null;
         this.controller.resize();
         return blobUrl;
@@ -4889,7 +5692,8 @@ class Penciltest {
             strokeOpacity: this.scene.strokeOpacity,
             container: this.fieldElement,
             background: this.scene.background,
-            debug: this.options.debug
+            alpha: false,
+            debug: this.options.debug,
         };
         if (this.options.renderer === Renderers.SVG) {
             this.sceneRenderer = new SVGRenderer(rendererOptions);
@@ -4897,12 +5701,11 @@ class Penciltest {
         else {
             this.sceneRenderer = new CanvasRenderer(rendererOptions);
         }
-        const toolRendererOptions = {
+        this.toolRenderer = new CanvasRenderer({
             ...rendererOptions,
             background: 'transparent',
             alpha: true,
-        };
-        this.toolRenderer = new CanvasRenderer(toolRendererOptions);
+        });
     }
     setPlayback(newPlayback) {
         Object.assign(this.playback, newPlayback);
@@ -5060,14 +5863,14 @@ class Penciltest {
     resolveFrameNumber(inputIndex) {
         return this.scene.resolveFrameNumber(inputIndex, this.options.loop);
     }
-    goToFrame(targetFrameNumber, overrides = {}) {
+    goToFrame(targetFrameNumber) {
         const selectedFrameNumber = this.scene.setCurrentFrameNumber(targetFrameNumber, this.options.loop);
-        if (this.state.mode !== PenciltestMode.PLAYING) {
+        if (this.state.mode === PenciltestMode.DRAWING) {
             this.lift();
             this.seekAudioToFrame(selectedFrameNumber);
         }
-        this.ui.updateStatusBar(); // FIXME: Probably too slow, rewriting all status DOM elemets, on each frame of play.
-        return this.drawCurrentFrame(overrides);
+        this.ui.updateStatusBar();
+        return this.drawCurrentFrame();
     }
     seekAudioToFrame(frameNumber, exposureOffset = 0) {
         var _a;

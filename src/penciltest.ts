@@ -145,7 +145,8 @@ class Penciltest {
       strokeOpacity: this.scene.strokeOpacity,
       container: this.fieldElement,
       background: this.scene.background,
-      debug: this.options.debug
+      alpha: false,
+      debug: this.options.debug,
     };
 
     if (this.options.renderer === Renderers.SVG) {
@@ -154,12 +155,11 @@ class Penciltest {
       this.sceneRenderer = new CanvasRenderer(rendererOptions);
     }
 
-    const toolRendererOptions:PenciltestRendererOptions = {
+    this.toolRenderer = new CanvasRenderer({
       ...rendererOptions,
       background: 'transparent',
       alpha: true,
-    };
-    this.toolRenderer = new CanvasRenderer(toolRendererOptions);
+    });
   }
 
   setPlayback(newPlayback: PlaybackState) {
@@ -327,15 +327,15 @@ class Penciltest {
     return this.scene.resolveFrameNumber(inputIndex, this.options.loop);
   }
 
-  goToFrame(targetFrameNumber: number, overrides: PenciltestRendererOptions = {}) {
+  goToFrame(targetFrameNumber: number) {
     const selectedFrameNumber = this.scene.setCurrentFrameNumber(targetFrameNumber, this.options.loop);
 
-    if (this.state.mode !== PenciltestMode.PLAYING) {
+    if (this.state.mode === PenciltestMode.DRAWING) {
       this.lift();
       this.seekAudioToFrame(selectedFrameNumber);
     }
-    this.ui.updateStatusBar(); // FIXME: Probably too slow, rewriting all status DOM elemets, on each frame of play.
-    return this.drawCurrentFrame(overrides);
+    this.ui.updateStatusBar();
+    return this.drawCurrentFrame();
   }
 
   seekAudioToFrame(frameNumber: number, exposureOffset:number = 0) {

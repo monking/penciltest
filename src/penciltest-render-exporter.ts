@@ -1,5 +1,9 @@
-/// <reference path="vendor/GIFEncoder.js">
-declare function GIFEncoder(): GIFEncoderInterface;
+var LZWEncoder: Function;
+var NeuQuant: Function;
+var GIFEncoder: Function; //GIFEncoderInterface;
+/// <reference path="vendor/jsgif/LZWEncoder.js">
+/// <reference path="vendor/jsgif/NeuQuant.js">
+/// <reference path="vendor/jsgif/GIFEncoder.js">
 
 interface GIFEncoderInterface {
   setDelay(ms: number): void;
@@ -26,21 +30,72 @@ class PenciltestRenderExporter {
     this.controller = controller;
   }
 
-  async renderGif(): Promise<string> {
+  async renderGif(): Promise<string | null> {
+    //debugger;
     const renderRange: PenciltestRange = this.controller.state.frameSelection
       ? this.controller.state.frameSelection
       : { start: 0, end: this.controller.scene.frames.length - 1 };
 
-    const gifSize = Math.min(512, this.controller.scene.height);
-    const strokeWidth = 1;
-    const gifConfigurationString = await Utils.prompt(`Rendering ${renderRange.end - renderRange.start + 1} frames, ${renderRange.start} through ${renderRange.end}.\nWhat dimensions (maximum width/height) and line weight would you like?`, `${gifSize} ${strokeWidth}`);
-    if (!gifConfigurationString) {
-      return;
+    const gifConfigInputDefs: Array<PenciltestUIComponentOptions> = [].concat(
+      {
+        children: PenciltestUIComponent.makeInputLabel({
+          key: 'maxDimension',
+          'tagName': 'input',
+          attr:{
+            value: String(this.controller.scene.height)
+          },
+        }, {
+          text: 'largest dimension: ',
+        })
+      },
+      {
+        children: PenciltestUIComponent.makeInputLabel({
+          key: 'start',
+          'tagName': 'input',
+          attr:{
+            id: 'start',
+            type: 'range',
+            min: '1',
+            max: String(this.controller.scene.frames.length),
+            value: String(renderRange.start + 1),
+          },
+        }, {
+          prefix: 'start frame: ',
+          live: true,
+        })
+      },
+      {
+        children: PenciltestUIComponent.makeInputLabel({
+          key: 'end',
+          'tagName': 'input',
+          attr:{
+            id: 'end',
+            type: 'range',
+            min: '1',
+            max: String(this.controller.scene.frames.length),
+            value: String(renderRange.end + 1),
+          },
+        }, {
+          prefix: 'end frame: ',
+          live: true,
+        })
+      },
+    );
+
+    const gifConfigPromptOptions: PromptOptions = {
+      inputKeys: [
+      'maxDimension',
+      'start',
+      'end',
+      ]
+    };
+    const gifConfig: Dictionary = await Utils.promptForm(`Render settings`, gifConfigInputDefs, gifConfigPromptOptions);
+    console.log({gifConfig}); // XXX
+    if (!gifConfig) {
+      return null;
     }
 
-    const gifConfiguration = (gifConfigurationString || '512 2').split(' ');
-    const maxGifDimension = parseInt(gifConfiguration[0], 10);
-    const gifLineWidth = parseInt(gifConfiguration[1], 10);
+    const maxGifDimension = parseInt(gifConfig.maxDimension, 10);
     const dimensions = this.controller.scene.getDimensions();
     if (dimensions.width > maxGifDimension) {
       dimensions.width = maxGifDimension;
@@ -52,15 +107,15 @@ class PenciltestRenderExporter {
 
     this.controller.forceDimensions = dimensions;
 
-    const oldRendererType = this.controller.options.renderer;
-    this.controller.setOptions({renderer: Renderers.CANVAS});
+    // LATER: Switch to CANVAS renderer if not already using it.
+    // LATER: Don't reinitialize the renderer if already CANVAS.
+    // MEANWHILE: SVG rendering is disabled, and CANVAS is the only choice.
+
     //// rebuild renderer to ensure correct resolution for capture
     //this.controller.ui.appActions.renderer.action();
     this.controller.resize();
 
     //this.controller.ui.appActions.renderer.action();
-
-    const gifRenderOverrides = {strokeWidth: gifLineWidth};
 
     const baseFrameDelay = 1000 / this.controller.scene.framerate;
 
@@ -71,19 +126,23 @@ class PenciltestRenderExporter {
     gifEncoder.setDelay(baseFrameDelay);
     gifEncoder.start();
 
-    ;
-    for (let frameNumber = renderRange.start; frameNumber <= renderRange.end; frameNumber++) {
-      this.controller.goToFrame(frameNumber, gifRenderOverrides);
+    const start = Number(gifConfig.start) - 1;
+    const end = Number(gifConfig.end) - 1;
+    for (let frameNumber = start; frameNumber <= end; frameNumber++) {
+      debugger;
+      this.controller.goToFrame(frameNumber);
       gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
       gifEncoder.addFrame((this.controller.sceneRenderer as CanvasRenderer).context);
     }
 
     gifEncoder.finish();
-    const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifEncoder.stream().bin).buffer], { type: "image/gif" }));
+    const gifBinary = gifEncoder.stream().bin;
+    debugger;
+    const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifBinary).buffer], { type: "image/gif" }));
 
 
     // reset to user's configuration
-    this.controller.setOptions({renderer: oldRendererType});
+    //this.controller.setOptions({renderer: oldRendererType});
     this.controller.forceDimensions = null;
     this.controller.resize();
 

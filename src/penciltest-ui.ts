@@ -735,8 +735,16 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Render GIF (FIXME)",
         hotkey: ['Shift+G'],
         async listener(this: Penciltest) {
+          this.setMode(PenciltestMode.RENDERING);
+          this.ui.updateStatusBar();
           const exporter = new PenciltestRenderExporter(this);
           const gifURL = await exporter.renderGif();
+
+          if (gifURL === null) {
+            this.setPreviousMode();
+            return;
+          }
+
           console.log({gifURL});
 
           const gifInstructions = PenciltestUIComponent.restore({
@@ -796,21 +804,25 @@ class PenciltestUI extends PenciltestUIComponent {
               right: '0px',
               backgroundColor: 'rgba(0,0,0,0.5)'
             }
-          }, this.ui.components);
+          }, this.ui.components, true);
 
-          const gifCloseHandler = function(event: AnyPointerEvent | KeyboardEvent) {
-            if ((event.target !== gifImage.getElement()) || ( event.type === 'keydown' && ((event as KeyboardEvent).key === 'escape') )) {
-              gifContainer.getElement().removeEventListener('click', gifCloseHandler);
-              gifContainer.getElement().removeEventListener('touchend', gifCloseHandler);
-              globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
-              return gifContainer.getElement().remove();
+          const gifCloseHandler = (event: AnyPointerEvent | KeyboardEvent) => {
+            if (event.type === 'keydown') {
+              if ((event as KeyboardEvent).key !== 'Escape') { return; }
+            } else if (event.target !== gifImage.getElement()) {
+              return;
             }
+            gifContainer.getElement().removeEventListener('click', gifCloseHandler);
+            gifContainer.getElement().removeEventListener('touchend', gifCloseHandler);
+            globalThis.document.body.removeEventListener('keydown', gifCloseHandler);
+
+            gifContainer.getElement().remove();
+            this.setPreviousMode();
           };
 
           gifContainer.getElement().addEventListener('click', gifCloseHandler);
           gifContainer.getElement().addEventListener('touchend', gifCloseHandler);
           globalThis.document.body.addEventListener('keydown', gifCloseHandler);
-
         }
       },
 
@@ -1182,7 +1194,6 @@ class PenciltestUI extends PenciltestUIComponent {
                 },
                 on: {
                   'input': (e, components) => {
-                    debugger;
                     const label = components.onionSkinFrameRadiusLabel.getElement();
                     const input = e.target as HTMLInputElement;
                     if (label && input) {

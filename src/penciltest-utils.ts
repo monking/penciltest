@@ -20,6 +20,8 @@ enum GlobalPromiseGroup {
   MODAL = "modal",
 };
 
+var PTUtilsUID: number = 0;
+
 class Utils {
 
   static clone(object: any) {
@@ -612,6 +614,10 @@ class Utils {
 
   static anyGlobalPromises(group:GlobalPromiseGroup = GlobalPromiseGroup.MODAL) {
     return Boolean(globalThis.penciltestGlobalPromises && globalThis.penciltestGlobalPromises[group]?.length > 0);
+  }
+
+  static uid(): number {
+    return ++PTUtilsUID;
   }
 
 };
