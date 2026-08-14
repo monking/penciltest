@@ -1,13 +1,13 @@
 class PenciltestUIComponent {
   components: PenciltestUIComponentDict;
+  controller: Penciltest;
   options: PenciltestUIComponentOptions;
   key: string;
   el: { container?: HTMLElement; };
   parent: PenciltestUIComponent;
   parentElement: HTMLElement;
   children: Array<PenciltestUIComponent>;
-  //refreshHandlers: Array<Function>;
-  isAttached: boolean;
+  protected isAttached: boolean;
   isPTComponent: boolean;
 
   static restore(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict, forceReattach:boolean = false): PenciltestUIComponent {
@@ -40,11 +40,10 @@ class PenciltestUIComponent {
       ...options
     };
 
+    this.controller = this.options.controller;
     this.components = components;
-
     this.children = [];
     this.el = {};
-    //this.refreshHandlers = [];
 
     const element = this.setElement(options.el || document.createElement(this.options.tagName || 'div'));
 
@@ -63,12 +62,6 @@ class PenciltestUIComponent {
 
     this.setContent(this.options, true);
 
-    //if (this.options.children) {
-    //  this.options.children.forEach(
-    //    (childConfig:PenciltestUIComponentOptions) => PenciltestUIComponent.restore({...childConfig, parent: this}, this.components)
-    //  );
-    //}
-
     this.attach();
 
     if (this.options.key) {
@@ -84,8 +77,12 @@ class PenciltestUIComponent {
     };
     if (this.isAttached && !force) { return true; }
 
-    if (!this.parentElement && options.parentElement) {
-      this.parentElement = options.parentElement;
+    if (!this.parentElement) {
+      if (options.parentElement) {
+        this.parentElement = options.parentElement;
+      } else if (options.el?.parentElement) {
+        this.parentElement = options.el.parentElement;
+      }
     }
 
     if (this.parentElement) {
@@ -110,6 +107,11 @@ class PenciltestUIComponent {
     }
 
     return this.isAttached;
+  }
+
+  removeElement(): void {
+    const el = this.getElement();
+    if (el) { el.remove(); }
   }
 
   detach(): boolean {

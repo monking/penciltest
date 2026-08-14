@@ -28,7 +28,6 @@ class PenciltestRenderExporter {
   }
 
   async renderGif(): Promise<string | null> {
-    //debugger;
     const renderRange: PenciltestRange = this.controller.state.frameSelection
       ? this.controller.state.frameSelection
       : { start: 0, end: this.controller.scene.frames.length - 1 };
@@ -131,7 +130,6 @@ class PenciltestRenderExporter {
     const start = Number(gifConfig.start) - 1;
     const end = Math.max(start, Number(gifConfig.end) - 1);
     for (let frameNumber = start; frameNumber <= end; frameNumber++) {
-      debugger;
       this.controller.goToFrame(frameNumber);
       gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold());
       // FIXME output image data is fully black, no detail.
@@ -140,7 +138,6 @@ class PenciltestRenderExporter {
 
     gifEncoder.finish();
     const gifBinary = gifEncoder.stream().bin;
-    debugger;
     const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(gifBinary).buffer], { type: "image/gif" }));
 
 

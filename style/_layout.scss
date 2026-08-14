@@ -3,25 +3,45 @@
 
 @include config.penciltest {
 
-  &[x-mode="drawing"] [x-key="statusMode"][x-progress] {
-    display: inline-block;
-    position: relative;
-    &::before {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 0.2em;
-      background-color: var(--fg-accent-border);
-      width: attr("x-progress")%;
+  display: flex;
+  flex-direction: column;
+
+  body > & {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+
+  .field-container {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    top: 0;
+    left: 0;
+
+    .field {
+      margin: 0 auto;
+      box-shadow: 0 1em 4em rgba(0, 0, 0, 0.8);
+      background-color: colors.$white;
+      position: relative;
+      width: 960px;
+      height: 960px;
+
+      & > canvas:first-child {
+        position: absolute;
+      }
+
+      & > canvas:last-child {
+        background-color: transparent;
+        position: relative;
+      }
     }
   }
 
-  width: 100%;
-   .field-container {
-    cursor: progress;
-
-    &.dragging {
-      cursor: ew-resize;
+  &.hide-cursor:not([x-tool=pan]) {
+    .field {
+      cursor: none;
     }
   }
 
@@ -53,42 +73,22 @@
     }
   }
 
-  .field-container {
-    width: 100%;
-    height: 100%;
-    display: block;
-    position: fixed;
-    top: 0;
-    left: 0;
-
-    .field {
-      margin: 0 auto;
-      box-shadow: 0 1em 4em rgba(0, 0, 0, 0.8);
-      background-color: colors.$white;
-      position: relative;
-      width: 960px;
-      height: 960px;
-
-      & > canvas:first-child {
-        position: absolute;
-      }
-
-      & > canvas:last-child {
-        background-color: transparent;
-        position: relative;
-      }
-    }
-  }
-
-  &.hide-cursor:not([x-tool=pan]) {
-    .field {
-      cursor: none;
-    }
-  }
-
   form.config {
     label {
       margin: 0 0.5em 0 1.0em;
+    }
+  }
+
+  &[x-mode="drawing"] [x-key="statusMode"][x-progress] {
+    display: inline-block;
+    position: relative;
+    &::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 0.2em;
+      background-color: var(--fg-accent-border);
+      width: attr("x-progress")%;
     }
   }
 }

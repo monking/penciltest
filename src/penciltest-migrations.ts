@@ -482,7 +482,6 @@ class PenciltestMigrator {
       end = i;
     });
     if (start === -Infinity || end === Infinity) { return []; }
-    debugger;
     return this.migrations.slice(start, end + 1); // Include end index in slice.
   }
 

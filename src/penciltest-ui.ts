@@ -15,17 +15,25 @@ class PenciltestUI extends PenciltestUIComponent {
   // action and listener functions are called in controller scope
 
 
-  constructor(controller:Penciltest, initOptions:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
+  constructor(initOptions:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
     const options = {
       className: 'penciltest-ui',
+      children: [],
       ...initOptions,
+      key: 'penciltestUI',
     };
 
-    super(options);
+    options.children.unshift({
+      key: 'fieldContainer',
+      parent: 'penciltestUI',
+      className: 'field-container',
+      children: [{
+        key: 'field',
+        className: "field",
+      }]
+    });
 
-    this.components = components;
-
-    this.controller = controller;
+    super(options, components);
 
     this.menuOptions = [
       {
@@ -438,7 +446,7 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Hide Cursor",
         hotkey: ['H'],
         listener(this: Penciltest) { this.setOptions({hideCursor: !this.options.hideCursor}); },
-        action(this: Penciltest) { Utils.toggleClass(this.container, 'hide-cursor', this.options.hideCursor); },
+        action(this: Penciltest) { Utils.toggleClass(this.ui.getElement(), 'hide-cursor', this.options.hideCursor); },
       },
 
       onionSkin: {
@@ -584,7 +592,7 @@ class PenciltestUI extends PenciltestUIComponent {
           this.setOptions({showStatus: !this.options.showStatus});
         },
         action(this: Penciltest) {
-          this.ui.components.statusBar.getElement().classList.toggle('hidden', !this.options.showStatus);
+          this.components.statusBar.getElement().classList.toggle('hidden', !this.options.showStatus);
           this.resize();
           this.ui.updateStatusBar();
         },
@@ -754,7 +762,7 @@ class PenciltestUI extends PenciltestUIComponent {
               textAlign: 'center',
               background: 'rgba(0,0,0,0.5)'
             }
-          }, this.ui.components);
+          }, this.components);
 
           const gifImage = PenciltestUIComponent.restore({
             key: 'gifImage',
@@ -770,7 +778,7 @@ class PenciltestUI extends PenciltestUIComponent {
               maxWidth: '80%',
               maxHeight: '80%'
             }
-          }, this.ui.components);
+          }, this.components);
 
           const gifLink = PenciltestUIComponent.restore({
             key: 'gifLink',
@@ -783,7 +791,7 @@ class PenciltestUI extends PenciltestUIComponent {
                 is: gifImage
               }
             ]
-          }, this.ui.components);
+          }, this.components);
 
           const gifContainer = PenciltestUIComponent.restore({
             key: 'gifContainer',
@@ -803,7 +811,7 @@ class PenciltestUI extends PenciltestUIComponent {
               right: '0px',
               backgroundColor: 'rgba(0,0,0,0.5)'
             }
-          }, this.ui.components, true);
+          }, this.components, true);
 
           const gifCloseHandler = (event: AnyPointerEvent | KeyboardEvent) => {
             if (event.type === 'keydown') {
@@ -1278,9 +1286,9 @@ class PenciltestUI extends PenciltestUIComponent {
     };
 
     this.defaultDragOptions = {
-      startTarget: this.controller.container,
-      moveTarget: this.controller.container,
-      endTarget: this.controller.container,
+      startTarget: this.getElement(),
+      moveTarget: this.getElement(),
+      endTarget: this.getElement(),
       coordinateScope: 'page',
       touchLimit: 5,
     };
@@ -1460,6 +1468,7 @@ class PenciltestUI extends PenciltestUIComponent {
     };
 
     const fieldPointerPressListener = (event: AnyPointerEvent) => {
+      if (this.controller.options.debug) { console.log('fieldPointerPressListener', event); }
       if (this.isMenuVisible) { return; }
       this.previousEvent = event;
 
@@ -1506,6 +1515,7 @@ class PenciltestUI extends PenciltestUIComponent {
     };
 
     const fieldPointerMoveListener = (event: AnyPointerEvent) => {
+      if (this.controller.options.debug) { console.log('fieldPointerMoveListener', event); }
       const isDown = this.controller.state.pointerMode === PointerMode.PRESS;
 
       event.preventDefault();
@@ -1517,8 +1527,8 @@ class PenciltestUI extends PenciltestUIComponent {
         const pagePoint = Utils.eventPoint(event, 'page');
         Object.assign(this.pointer, pagePoint);
         const offsetPoint = {
-          x: this.controller.fieldElement.offsetLeft,
-          y: this.controller.fieldElement.offsetTop
+          x: this.components.field.getElement().offsetLeft,
+          y: this.components.field.getElement().offsetTop,
         };
         const trackPoint = PTSpace.diffPoints(pagePoint, offsetPoint) as Mark;
         const pointerEvent = event as PointerEvent;
@@ -1532,6 +1542,7 @@ class PenciltestUI extends PenciltestUIComponent {
     };
 
     const globalPointerUpListener = (event: AnyPointerEvent) => {
+      if (this.controller.options.debug) { console.log('globalPointerUpListener', event); }
       this.controller.state.pointerMode = PointerMode.HOVER;
 
       const mouseEvent = event as MouseEvent;
@@ -1556,7 +1567,7 @@ class PenciltestUI extends PenciltestUIComponent {
     const contextMenuListener = (event: AnyPointerEvent) => {
       const targetElement = event.target as HTMLElement;
       //const targetComponent = PenciltestUIComponent.find(targetElement, this.components);
-      if (targetElement === this.components.toggleMenu.getElement() || this.controller.fieldContainer.contains(targetElement)) {
+      if (targetElement === this.components.toggleMenu.getElement() || this.components.fieldContainer.getElement().contains(targetElement)) {
         event.preventDefault();
         this.toggleMenu(Utils.eventPoint(event));
       }
@@ -1592,21 +1603,21 @@ class PenciltestUI extends PenciltestUIComponent {
     //     event.preventDefault()
     // )
     // globalThis.addEventListener 'touchstart', preventPinchZoomHandler, true
-    // this.controller.container.addEventListener 'touchstart', preventPinchZoomHandler, true
+    // this.getElement().addEventListener 'touchstart', preventPinchZoomHandler, true
     // globalThis.addEventListener 'touchmove', preventPinchZoomHandler, true
-    // this.controller.container.addEventListener 'touchmove', preventPinchZoomHandler, true
+    // this.getElement().addEventListener 'touchmove', preventPinchZoomHandler, true
 
     const helpListener = () => this.triggerAppAction('toggleInterfaceHelp')
 
     this.components.appStatus.getElement().addEventListener('click', statusClickListener);
     this.components.sceneStatus.getElement().addEventListener('click', statusClickListener);
-    this.controller.fieldContainer.addEventListener('mousedown', fieldPointerPressListener);
-    this.controller.fieldContainer.addEventListener('touchstart', fieldPointerPressListener);
+    this.components.fieldContainer.getElement().addEventListener('mousedown', fieldPointerPressListener);
+    this.components.fieldContainer.getElement().addEventListener('touchstart', fieldPointerPressListener);
     globalThis.addEventListener('mousemove', fieldPointerMoveListener);
     globalThis.addEventListener('touchmove', fieldPointerMoveListener);
-    this.controller.container.addEventListener('contextmenu', contextMenuListener);
-    this.controller.container.addEventListener('mousedown', globalPointerPressListener);
-    this.controller.container.addEventListener('touchstart', globalPointerPressListener);
+    this.getElement().addEventListener('contextmenu', contextMenuListener);
+    this.getElement().addEventListener('mousedown', globalPointerPressListener);
+    this.getElement().addEventListener('touchstart', globalPointerPressListener);
     this.components.toggleMenu.getElement().addEventListener('click', contextMenuListener);
     this.components.toggleHelp.getElement().addEventListener('click', helpListener);
   }
@@ -1825,7 +1836,7 @@ class PenciltestUI extends PenciltestUIComponent {
   }
 
   addOtherListeners() {
-    this.controller.fieldContainer.addEventListener('wheel', (event: WheelEvent) => {
+    this.components.fieldContainer.getElement().addEventListener('wheel', (event: WheelEvent) => {
       if (this.isMenuVisible) {
         return;
       }
@@ -2218,7 +2229,7 @@ class PenciltestUI extends PenciltestUIComponent {
       endPoint = startPoint;
       moveTarget.addEventListener('mousemove', dragMove);
       endTarget.addEventListener('mouseup', dragEnd);
-      this.controller.container.classList.add('dragging');
+      this.getElement().classList.add('dragging');
       if (typeof onstart === 'function') {
         onstart.apply(this, [event]);
       }
@@ -2238,7 +2249,7 @@ class PenciltestUI extends PenciltestUIComponent {
     const dragEnd = (event: AnyPointerEvent) => {
       //event.preventDefault();
       event.stopImmediatePropagation();
-      this.controller.container.classList.remove('dragging');
+      this.getElement().classList.remove('dragging');
       endTarget.removeEventListener('mouseup', dragEnd);
       if (!alreadyStartedEvent) {
         startTarget.removeEventListener('mousedown', dragStart);
@@ -2275,7 +2286,7 @@ class PenciltestUI extends PenciltestUIComponent {
       this.handleDrag({
         alreadyStartedEvent,
         coordinateScope: 'page',
-        startTarget: this.controller.fieldElement,
+        startTarget: this.components.field.getElement(),
         onstart: () => {
           this.controller.setMode(PenciltestMode.WORKING);
         },

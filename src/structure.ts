@@ -235,6 +235,7 @@ interface PenciltestUIComponentOptions {
   attr?: Dictionary;
   children?: Array<PenciltestUIComponentOptions>;
   className?: string;
+  controller?: Penciltest;
   el?: HTMLElement;
   html?: string;
   id?: string;

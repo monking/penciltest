@@ -5,12 +5,15 @@ class Penciltest {
   static instrumentIdentifier = 'io.lovejoy.penciltest';
 
   // components
+  components: PenciltestUIComponentDict;
+
+  audioElement: HTMLMediaElement;
+  //audioElement: HTMLMediaElement;
+  migrator: PenciltestMigrator;
+  scene: PenciltestScene | null;
   sceneRenderer: CanvasRenderer | SVGRenderer;
   toolRenderer: CanvasRenderer;
-  scene: PenciltestScene | null;
   ui: PenciltestUI;
-  migrator: PenciltestMigrator;
-  components: PenciltestUIComponentDict;
 
   // global config/state
   forceDimensions: Rect | null;
@@ -23,10 +26,9 @@ class Penciltest {
   zoomFactor: number;
 
   // elements
-  audioElement: HTMLMediaElement;
-  container: HTMLElement;
-  fieldContainer: HTMLElement;
-  fieldElement: HTMLElement;
+  //container: HTMLElement;
+  //fieldContainer: HTMLElement;
+  //fieldElement: HTMLElement;
 
   // operation buffers
   copyBuffer: Array<PenciltestFrame>;
@@ -76,6 +78,7 @@ class Penciltest {
       ...PenciltestScene.defaultOptions,
       ...Penciltest.defaultOptions,
       ...storedOptions,
+      ...options,
     };
   
     const [ storedState ] = this.getStoredData('app', 'state');
@@ -85,21 +88,17 @@ class Penciltest {
     };
 
     this.components = {};
-
 		this.trackBuffer = []
-  
-    this.workingOn = [];
-
+    this.workingOn = []; // Speculative DELME#3cbbacf4-520a-488a-98bb-eadfaa38b497
     this.playback = { ...Penciltest.defaultPlayback };
 
     this.migrator = new PenciltestMigrator();
 
-    this.container = globalThis.document.querySelector(this.options.container);
-    this.container.className = 'penciltest-app';
-
-    this.buildContainer();
-
-    this.ui = new PenciltestUI( this, { parentElement: this.container }, this.components );
+    this.ui = new PenciltestUI({
+      controller: this,
+      el: globalThis.document.querySelector(this.options.container),
+    }, this.components);
+    console.log(this.ui.components === this.components) ; // FIXME
 
     this.newScene();
 
@@ -143,7 +142,7 @@ class Penciltest {
       strokeColor: this.scene.strokeColor,
       strokeWidth: this.scene.strokeWidth,
       strokeOpacity: this.scene.strokeOpacity,
-      container: this.fieldElement,
+      container: this.components.field.getElement(),
       background: this.scene.background,
       alpha: false,
       debug: this.options.debug,
@@ -172,31 +171,11 @@ class Penciltest {
     this.ui.updateStatusBar();
   }
 
-  buildContainer() {
-    const fieldDef = {
-      key: 'field',
-      className: "field",
-      style: {
-        'margin-top': '40px'
-      }
-    };
-    const containerDef = {
-      key: 'fieldContainer',
-      parentElement: this.container,
-      className: 'field-container',
-      children: [ fieldDef ]
-    };
-    new PenciltestUIComponent(containerDef, this.components);
-
-    this.fieldContainer = this.components.fieldContainer.getElement();
-    this.fieldElement = this.components.field.getElement();
-  }
-
   setMode(mode:PenciltestMode): boolean {
     if (mode !== this.state.mode) {
       this.state.previousMode = this.state.mode;
       this.state.mode = mode;
-      this.container.setAttribute('x-mode', mode);
+      this.ui.getElement().setAttribute('x-mode', mode);
       if (this.state.previousMode === PenciltestMode.PLAYING) {
         this.stop();
       }
@@ -395,7 +374,7 @@ class Penciltest {
   }
 
   stop() {
-    if (this.audioElement) { this.pauseAudio(); }
+    if (this.components.audio.getElement()) { this.pauseAudio(); }
     clearInterval(this.playback.stepId);
     if (this.state.mode === PenciltestMode.PLAYING) {
       this.setPreviousMode();
@@ -586,7 +565,7 @@ class Penciltest {
         this.state.toolStack.splice(index, 1);
       }
       this.state.toolStack.unshift(toolName);
-      this.container.setAttribute('x-tool', toolName);
+      this.ui.getElement().setAttribute('x-tool', toolName);
       this.ui.updateStatusBar();
       this.drawTool();
     }
@@ -930,35 +909,38 @@ class Penciltest {
       info: audioInfo,
     };
     this.hasUnsavedChanges = true;
-    if (!this.audioElement) { // TODO: abstract away from browser
-      this.audioElement = globalThis.document.createElement('audio') as HTMLMediaElement;
-      this.audioElement.setAttribute('preload', 'true');
-      this.fieldContainer.appendChild(this.audioElement);
+    if (!this.components.audio || !this.components.audio.getElement()) {
+      const audioComponent = PenciltestUIComponent.restore({
+        key: 'audio',
+        tagName: 'audio',
+        attr: {
+          preload: 'true',
+        },
+        parent: this.components.fieldContainer,
+      }, this.components);
     } else {
       this.pauseAudio();
     }
-    this.audioElement.addEventListener('error', (e: any) => {
+    this.components.audio.getElement().addEventListener('error', (e: any) => {
       console.error('audio file error', e);
       const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
       return self.ui.triggerAppAction('linkAudio', [e, message]);
     });
-    return this.audioElement.setAttribute('src', audioURL);
+    return this.components.audio.getElement().setAttribute('src', audioURL);
   }
 
   destroyAudio() {
     if (this.scene.audio) {
       delete this.scene.audio;
     }
-    if (this.audioElement) {
-      this.pauseAudio();
-      this.audioElement.remove();
-      return this.audioElement = null;
-    }
+    this.pauseAudio();
+    this.components.audio.removeElement();
   }
 
   pauseAudio() {
-    if (this.audioElement && !this.audioElement.paused) {
-      this.audioElement.pause();
+    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    if (audioElement && !audioElement.paused) {
+      audioElement.pause();
     }
     if (this.playback.scrubAudioId) {
       clearTimeout(this.playback.scrubAudioId);
@@ -966,19 +948,22 @@ class Penciltest {
   }
 
   playAudio() {
-    if (this.audioElement && this.audioElement.paused) {
-      this.audioElement.play();
+    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    if (audioElement && audioElement.paused) {
+      audioElement.play();
     }
   }
 
   seekAudio(time: number) {
-    if (this.audioElement) { return ( this.audioElement.currentTime = time ); }
+    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    if (audioElement) { return ( audioElement.currentTime = time ); }
   }
 
   scrubAudio(exposureOffset:number = 0) {
     // If negative, plays that many exposures at the end of the current frame hold.
     // This is useful for quickly previewing frame hold changes relative to audio.
-    if (!this.options.scrubAudio || !this.audioElement) { return; }
+    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    if (!this.options.scrubAudio || !audioElement) { return; }
     const frameExposures = this.scene.getFrameHold();
     if (exposureOffset < 0) {
       exposureOffset += frameExposures;
@@ -1012,8 +997,8 @@ class Penciltest {
   resize() {
     const fieldMargin = 40;
     const bounds:Rect = this.forceDimensions || {
-      width: this.container.offsetWidth - 40 * 2,
-      height: this.container.offsetHeight - 40 * 2,
+      width: this.ui.getElement().offsetWidth - 40 * 2,
+      height: this.ui.getElement().offsetHeight - 40 * 2,
     };
     if (this.options.showStatus && !this.forceDimensions) {
       const toolbarElement = this.ui.components.toolbar.getElement();
@@ -1033,8 +1018,12 @@ class Penciltest {
       this.height = Math.floor(bounds.width / sceneDimensions.aspect);
     }
 
-    this.fieldElement.style.width = `${this.width}px`;
-    this.fieldElement.style.height = `${this.height}px`;
+    this.components.field.setContent({
+      style: {
+        width: `${this.width}px`,
+        height: `${this.height}px`,
+      },
+    });
     this.sceneRenderer.resize(this.width, this.height);
     this.toolRenderer.resize(this.width, this.height);
     this.zoomFactor = this.height / sceneDimensions.height;
@@ -1042,7 +1031,7 @@ class Penciltest {
     this.drawTool();
   }
 
-  queueWork(work:Function, afterAll: boolean = false): Promise<any> {
+  queueWork(work:Function, afterAll: boolean = false): Promise<any> { // Speculative. DELME if not useful.  uuid:3cbbacf4-520a-488a-98bb-eadfaa38b497
     const queueCopy = this.workingOn.map((j)=>j); // shallow clone
     let job: Promise<any>;
     if (afterAll) {
