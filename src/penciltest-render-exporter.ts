@@ -1,6 +1,3 @@
-var LZWEncoder: Function;
-var NeuQuant: Function;
-var GIFEncoder: Function; //GIFEncoderInterface;
 /// <reference path="vendor/jsgif/LZWEncoder.js">
 /// <reference path="vendor/jsgif/NeuQuant.js">
 /// <reference path="vendor/jsgif/GIFEncoder.js">

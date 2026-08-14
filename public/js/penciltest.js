@@ -49,6 +49,10 @@ var ColorHexNames;
     ColorHexNames["lightgray"] = "#d3d3d3";
 })(ColorHexNames || (ColorHexNames = {}));
 ;
+// referenced JS libraries (FIXME)
+var LZWEncoder;
+var NeuQuant;
+var GIFEncoder; //GIFEncoderInterface;
 
 "use strict";
 var GlobalPromiseGroup;
@@ -5519,9 +5523,9 @@ GIFEncoder = function () {
 };
 
 "use strict";
-var LZWEncoder;
-var NeuQuant;
-var GIFEncoder; //GIFEncoderInterface;
+/// <reference path="vendor/jsgif/LZWEncoder.js">
+/// <reference path="vendor/jsgif/NeuQuant.js">
+/// <reference path="vendor/jsgif/GIFEncoder.js">
 ;
 class PenciltestRenderExporter {
     constructor(controller) {
@@ -5605,14 +5609,10 @@ class PenciltestRenderExporter {
         }
         this.controller.forceDimensions = dimensions;
         // LATER: Switch to CANVAS renderer if not already using it.
-        // LATER: Don't reinitialize the renderer if already CANVAS.
-        // MEANWHILE: SVG rendering is disabled, and CANVAS is the only choice.
-        //// rebuild renderer to ensure correct resolution for capture
-        debugger;
+        // rebuild renderer to ensure correct resolution for capture
+        // FIXME: Is this still necessary?
         this.controller.setOptions({ renderer: Renderers.CANVAS });
-        //this.controller.ui.appActions.renderer.action();
         this.controller.resize();
-        //this.controller.ui.appActions.renderer.action();
         const baseFrameDelay = 1000 / this.controller.scene.framerate;
         // prepare encoder
         const gifEncoder = GIFEncoder();

@@ -29,14 +29,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: '24.x'
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - run: npm ci
       - name: Build
         run: npm start

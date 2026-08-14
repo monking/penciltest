@@ -258,3 +258,9 @@ enum ColorHexNames {
   black = '#000000',
   lightgray = '#d3d3d3'
 };
+
+
+// referenced JS libraries (FIXME)
+var LZWEncoder: Function;
+var NeuQuant: Function;
+var GIFEncoder: Function; //GIFEncoderInterface;
