@@ -1,5 +1,6 @@
 (A) 2026-08-06 +feature | +TIMELINE  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
 (A) 2026-08-11 +BUG | Settings > Reset breaks marking and tool rendering  uuid:910188b9-1b6c-47e4-a461-15ea8f8afde4
+(A) 2026-08-14 +BUG +UX | Now that I've centered the field, a changing toolbar height moves the field. Make the toolbar a fixed height, or less directly, make sure its contents have a constant width so that they don't reflow without window resizing.  uuid:7866f36b-5620-4c1f-a979-f8579286c216
 (B) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
 (B) 2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
 (B) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
