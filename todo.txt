@@ -1,6 +1,6 @@
 (A) 2026-08-06 +feature | +TIMELINE  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
 (A) 2026-08-11 +BUG | Settings > Reset breaks marking and tool rendering  uuid:910188b9-1b6c-47e4-a461-15ea8f8afde4
-(B) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.
+(B) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
 (B) 2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
 (B) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
 (B) 2026-08-06 +feature | +SCALE tool.  complexity:2  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023

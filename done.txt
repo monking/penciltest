@@ -34,3 +34,4 @@ x 2026-06-05 2026-07-30 +BUG FIX(preferred other tools when toggling/resetting) 
 x 2026-04-24 2026-04-22 (canvas) Fix render filling areas inappropriately. Currently no appropriate fill, yes?  uuid:d5a66d06-b0e3-42b8-a3de-fe6f8db91799 pri:A
 x 2026-04-22 2026-04-22 Do not let mousewheel control frames while menu is open.  uuid:ec4cb486-929c-41b9-abd0-7008e38a454f
 x 2026-04-22 2026-04-22 Collapse other menu groups when expanding any other.  uuid:7b0e3eb3-1a4b-48b6-b59b-074110e86d4e
+x 2026-08-13 2016-05-25 GIFEncoder.setDelay: This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?  c:1464162099 uuid:6b1b0460-7315-407f-8ef7-8c43633e8b3e  | 2026-08-13 It IS working per frame. The GIF frames are each solid black, but the TIMINGs look great!

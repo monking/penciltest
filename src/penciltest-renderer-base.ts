@@ -78,6 +78,7 @@ class BaseRenderer implements PenciltestRenderer {
 
   subpath(path: Path) {
     if (this.options.debug) { console.log(' subpath'); }
+    if (!Array.isArray(path)) { return; }
     path.forEach((segment, index) => {
       const { x, y } = segment;
       if (index === 0) {

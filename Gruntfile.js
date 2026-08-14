@@ -22,6 +22,9 @@ module.exports = (grunt) => {
 
     concat: {
       dist: {
+        options: {
+          sourceMap: true
+        },
         files: {
           'public/js/penciltest.js':[
             "dist/structure.js",

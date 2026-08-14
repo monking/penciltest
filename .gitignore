@@ -1,4 +1,6 @@
 node_modules/
 .sass-cache/
 dist/
+*.map
 public/css
+public/js

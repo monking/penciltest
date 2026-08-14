@@ -4,6 +4,7 @@
       "es2021",
       "dom"
     ],
+    "sourceMap": true,
     "strict": false,
     "target": "es2018",
     "rootDir": "src",

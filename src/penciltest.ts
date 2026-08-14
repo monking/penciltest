@@ -565,11 +565,16 @@ class Penciltest {
   }
 
   scaleStroke(stroke: Stroke, factor: number): Stroke {
-    return {
+    const scaledStroke = {
       ...stroke,
-      // TODO: scale stroke weight, too?
-      path: stroke.path.map((point: Mark) => PTSpace.scalePoint(point, factor))
-    };
+    }
+    if ("width" in scaledStroke) {
+      scaledStroke.width *= factor
+    }
+    if (Array.isArray(scaledStroke.path)) {
+      scaledStroke.path = scaledStroke.path.map((point: Mark) => PTSpace.scalePoint(point, factor))
+    }
+    return scaledStroke;
   }
 
   useTool(toolName: PenciltestTool) {

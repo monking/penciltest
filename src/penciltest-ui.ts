@@ -758,6 +758,7 @@ class PenciltestUI extends PenciltestUIComponent {
 
           const gifImage = PenciltestUIComponent.restore({
             key: 'gifImage',
+            tagName: 'img',
             attr: {
               src: gifURL
             },

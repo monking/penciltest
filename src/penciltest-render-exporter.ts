@@ -133,7 +133,8 @@ class PenciltestRenderExporter {
     for (let frameNumber = start; frameNumber <= end; frameNumber++) {
       debugger;
       this.controller.goToFrame(frameNumber);
-      gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold()); // FIXME This seems to work once for the whole GIF, and not individually per frame. How to set individual delays for each fram in gifEncoder?
+      gifEncoder.setDelay(baseFrameDelay * this.controller.scene.getFrameHold());
+      // FIXME output image data is fully black, no detail.
       gifEncoder.addFrame((this.controller.sceneRenderer as CanvasRenderer).context);
     }
 

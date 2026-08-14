@@ -429,6 +429,7 @@ class PenciltestMigrator {
       new PTMigration_v0_to_v0_0_4(),
       // TODO rename 'film' localStorage namespace to 'scene'. Which version did that happen in?  2026-07-31 uuid:ee574c36-476a-4a59-86ca-7c9a203b52f8
       new PTMigration_v0_2_0_to_v0_3_0(),
+      new PTMigration_v0_3_0_to_v0_3_1(),
       new PTMigration_debug()
     ];
   }
@@ -464,16 +465,24 @@ class PenciltestMigrator {
     return sceneData.instrument?.version || sceneData.version;
   }
 
-  getMigrationsByVersion(fromVersion:string, toVersion:string): Array<PenciltestMigrationInterface> {
+  getMigrationsByVersion(srcVersion:string, targetVersion:string): Array<PenciltestMigrationInterface> {
     let start:number = -Infinity, end:number = Infinity;
     this.migrations.forEach((migration, i) => {
-      if (this.compareVersions(fromVersion, migration.fromVersion) != -1) {
+      const srcVsMigrationFrom = this.compareVersions(srcVersion, migration.fromVersion);
+      const targetVsMigrationFrom = this.compareVersions(targetVersion, migration.fromVersion);
+      const srcVsMigrationTo = this.compareVersions(srcVersion, migration.toVersion);
+      const targetVsMigrationTo = this.compareVersions(targetVersion, migration.toVersion);
+
+      if (srcVsMigrationTo > -1) { return; } // migration's output is older than src
+      if (targetVsMigrationTo === -1) { return; } // migration's output is newer than targer
+
+      if (srcVsMigrationFrom != -1) { // migration's input is not newer than src
         start = i;
       }
-      if (start > -Infinity && this.compareVersions(toVersion, migration.toVersion) != 1) {
-        end = i;
-      }
+      end = i;
     });
+    if (start === -Infinity || end === Infinity) { return []; }
+    debugger;
     return this.migrations.slice(start, end + 1); // Include end index in slice.
   }
 
