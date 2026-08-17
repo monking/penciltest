@@ -23,12 +23,12 @@ interface Arc {
 
 interface Circle extends Arc {}; // Identity with Arc, but a distinct name to clarify expectation no gap between start and end (end === start + 1).
 
-class PTSpace {
+class PtSpace {
 
   static zeroPoint:Point = {x:0, y:0};
 
   static defaultArc:Arc = {
-    center: PTSpace.zeroPoint,
+    center: PtSpace.zeroPoint,
     radius: 10,
     start: 0,
     end: 1,
@@ -100,13 +100,13 @@ class PTSpace {
   }
 
   static traceArc(config:Arc): Array<Point> {
-    const arc = { ...PTSpace.defaultArc, ...config };
+    const arc = { ...PtSpace.defaultArc, ...config };
     const points:Array<Point> = [];
     const arcStep = (arc.start < arc.end ? 1 : -1)/arc.resolution;
     let angle = arc.start;
     while (angle <= arc.end) {
       if (angle > arc.end) { angle = arc.end; }
-      points.push(PTSpace.sumPoints(PTSpace.arcPoint(arc, angle), config.center));
+      points.push(PtSpace.sumPoints(PtSpace.arcPoint(arc, angle), config.center));
       if (angle === arc.end) {
         break;
       }
@@ -120,7 +120,7 @@ class PTSpace {
 
   static toPoint(coords:any) {
     if ("width" in coords) {
-      return PTSpace.rectCenter(coords as Rect);
+      return PtSpace.rectCenter(coords as Rect);
     }
     return {
       x: coords.x || 0,
@@ -129,7 +129,7 @@ class PTSpace {
   }
 
   static averagePoints(points: Array<Point>): Point {
-    const sumPoints:Point = PTSpace.zeroPoint;
+    const sumPoints:Point = PtSpace.zeroPoint;
     for (let point of points) {
       sumPoints.x += point.x;
       sumPoints.y += point.y;
@@ -151,7 +151,18 @@ class PTSpace {
   };
 
   static scalePath(path:Path, factor:number): Path {
-    return path.map((p) => PTSpace.scalePoint(p, factor));
+    return path.map((p) => PtSpace.scalePoint(p, factor));
+  }
+
+  static scaleStroke(stroke:Stroke, factor:number): Stroke {
+    const scaledStroke = {
+      ...stroke,
+      path: stroke.path.map((mark) => PtSpace.scalePoint(mark as Point, factor) as Mark),
+    };
+    if ("width" in scaledStroke) {
+      scaledStroke.width *= factor;
+    }
+    return scaledStroke;
   }
 
   static magnitude(point: Point): number {
@@ -177,18 +188,18 @@ class PTSpace {
     let lastPoint, midpoint, midpointStep = 1/2;
     for (let point of path) {
       midpointStep = lastPoint
-        ? subdivisionLength / PTSpace.magnitude(PTSpace.diffPoints(point, lastPoint))
+        ? subdivisionLength / PtSpace.magnitude(PtSpace.diffPoints(point, lastPoint))
         : 1;
       for (let midPosition = 0; midPosition < 1; midPosition += midpointStep) {
         midpoint = midPosition === 0 || !lastPoint
           ? point
-          : PTSpace.lerpPoint(point, lastPoint, midPosition); // Lerping backward*
+          : PtSpace.lerpPoint(point, lastPoint, midPosition); // Lerping backward*
         // * Somewhat counterintuitively, I'm making midpoints BACK from the
         //   current point. This is to serve a simpler intuition that we're
         //   testing THIS point NOW, rather than waiting for the next
         //   iteration.
         if (Math.abs(center.x - midpoint.x) < radiusX && Math.abs(center.y - midpoint.y) < radiusY) {
-          if (isCircle && PTSpace.magnitude(PTSpace.diffPoints(center, midpoint)) > radiusX) {
+          if (isCircle && PtSpace.magnitude(PtSpace.diffPoints(center, midpoint)) > radiusX) {
             continue;
           }
           return true;
@@ -198,6 +209,33 @@ class PTSpace {
     }
 
     return false;
+  }
+
+  static getIntersectingRect(...areas:Array<Rect>): Rect | null {
+    const intersection = areas.reduce((acc, area, i) => {
+      if (i === 0) {
+        return area;
+      } else if (acc === null) {
+        return acc;
+      }
+
+      const right = Math.min(acc.x + acc.width, area.x + area.width);
+      const bottom = Math.min(acc.y + acc.height, area.y + area.height);
+      const top = Math.max(acc.y, area.y);
+      const left = Math.max(acc.x, area.x);
+
+      if (bottom < top || right < left) {
+        return null;
+      }
+
+      return {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      };
+    }, null);
+    return intersection;
   }
 
   static expandRect(rect:Rect, radius:number): Rect {
@@ -223,7 +261,7 @@ class PTSpace {
         x: sum.x + point.x,
         y: sum.y + point.y
       };
-    }, PTSpace.zeroPoint);
+    }, PtSpace.zeroPoint);
   };
 
   static diffPoints(point1:Point, point2:Point): Point {
@@ -239,6 +277,8 @@ class PTSpace {
       y: -point.y
     };
   };
+
+  static chain
 
 }
 

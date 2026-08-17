@@ -55,7 +55,7 @@ class SVGRenderer extends BaseRenderer {
     return super.render();
   }
 
-  clear(redrawBackground:boolean = true) {
+  clear(redrawBackground:boolean = false) {
     this.field.clear();
     return super.clear(redrawBackground);
   }

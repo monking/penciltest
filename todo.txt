@@ -11,6 +11,8 @@
 (B) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
 (B) 2026-08-09 +feature | Proper +UNDO/REDO, storing actions + data to restore. Current undo only removes the latest stroke, and redo puts it back. There is at least a stack buffer of those, but other actions CANNOT currently be un-/redone.  uuid:a7398e21-b0a8-4f27-800a-64981716a822
 (B) 2026-08-10 +maintainability +UX | Ensure that gestures are relative to the viewport, not the drawing field.  uuid:4916793a-1e30-4e3e-b1be-8ee2c1074842
+(B) 2026-08-15 +UX | Rebind most commonly used keys to one-handed key bindings, one for each left and right. | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
+(B) 2026-08-15 +feature | Ctrl click for context menu (Comes for free in Mac? Been a while sinc I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
 (C) 2026-04-22 +UX | Save working draft automatically, in a dedicated LocalStorage key, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)
 (C) 2026-07-30 +feature | +LAYERS  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
 (C) 2026-07-30 v:0.3.1 | More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb  hasPart:0f14c213-3134-49cd-978f-9f9cf385b20c
@@ -26,6 +28,7 @@
 (D) 2026-08-06 +feature | Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gaps between frames on the timeline.
 (D) 2026-08-09 +QUIRK +LATER Range input value must be assigned after min/max attributes are set. Components' attributes are being assigned in definition order, for now. But object param order is not guaranteed, nor expected, right?  uuid:b315c501-ad79-4f92-8bd6-6cbd0f29e852
 (D) 2026-08-09 +storage | Option to Export/Import multiple scenes to/from JSON. Let export format be an array of scenes. Perhaps an object with application state around that. e.g. {instrument,state,content:[scene,…]}  uuid:13d8cfa9-72de-4a29-b9b5-c84993919c1f
+(D) 2026-08-17 `lineJoin` of 'round' would show overlap if path is <100% alpha.  uuid:889abf7a-831e-4b76-ba2f-38a840b7d87c
 (E) 2026-08-08 +FIXME +UX | The frame selection can persist longer than I'm aware, so when I mean to copy from the current frame and paste strokes (shift+v), it pastes frames instead? This report may not be 100% accurate, but something like this is happening.  uuid:bc2987a7-d2da-4759-93ff-19c7a86e79e7
 (E) 2026-08-08 +UX | Modify pointer events with Shift, Control, Alt. Maybe PAN, SCALE?, and SCRUB (flip), respectively.  uuid:f3f7e638-6bd4-40b9-9703-ce1bfc9b493e
 (E) 2026-08-09 +feature | Choose to erase(/select) segments of strokes, rather than whole strokes. If this is implemented, it would become the default. Ideally, it would cut segments where the eraser/selection was, not only removing the intersecting points, which would leave a ragged erasure.  uuid:7e8fd261-704d-4778-a9fc-c3a240375907  |  When detecting intersection of shape and path, return [ boolean, Point, Point ], where the two points are the first and last intersection with the path, in stroke order. This would enable splitting this path with these two capping the gap.
@@ -38,3 +41,4 @@
 (R) 2026-08-10 +reconsider | Should my Arc interface use 2*Math.PI for a circle, as Canvas2DContext.arc does? I like the implicit tau in my implementation, so it'll stay for now. Food for thought.  uuid:8de1bdf1-9449-4813-933a-0c41260dc079
 2026-07-10 penciltest stops responding to input; stuck in playback mode? v:0.2.13  +NEEDS_REPLICATION_STEPS  uuid:7e903c6f-2226-4e4e-bf2c-fd42503bf2f7
 2026-08-13 +UX key re-binding mode: capture all keyboard input, show current binding, and allow rebinding to anything else.
+2026-08-17 Let user choose a +localization language.  uuid:28fa073e-553f-4942-9f8f-26fcee173a44

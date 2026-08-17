@@ -44,7 +44,7 @@ module.exports = (grunt) => {
             "dist/penciltest.js",
           ],
           'public/js/app.js':[
-            "dist/locale/en-US.locale.js",
+            "src/locale/*.locale.js",
             "dist/penciltest-localization.js",
             'dist/app.js'
           ]

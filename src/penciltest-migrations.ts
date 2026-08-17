@@ -181,7 +181,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return {x:coords[0], y:coords[1]};
   }
 
-  packStroke(stroke:Stroke, scene:PenciltestScene): string {
+  packStroke(stroke:Stroke, scene:PenciltestSceneData): string {
     const packedStrokeObject = { ...stroke };
     delete packedStrokeObject.path;
     let packedStrokeString = stroke.path
@@ -209,7 +209,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return stroke;
   }
 
-  packFrame(frame:PenciltestFrame, scene:PenciltestScene): PenciltestFrame {
+  packFrame(frame:PenciltestFrame, scene:PenciltestSceneData): PenciltestFrame {
     const packedFrame:PenciltestFrame = {
       ...frame,
     };
@@ -239,7 +239,7 @@ class PTMunger_V0_3_0 implements PenciltestSceneMunger {
     return unpackedFrame;
   }
 
-  packScene(scene:PenciltestScene): PenciltestSceneData {
+  packScene(scene:PenciltestSceneData): PenciltestSceneData {
     const packedScene:PenciltestSceneData = {
       ...scene,
       frames: scene.frames.map((frame) => this.packFrame(frame, scene))
@@ -260,28 +260,52 @@ interface SceneAnalysis {
   colors?:Array<ColorHex | string>;
   widthCount?:{[key:string]:number};
   widths?:Array<string>;
+  sceneStrokeColor?:ColorHex;
 };
 class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
-  packedScale:number;
-  analysis:SceneAnalysis
+  static defaultPackedScale = 1024;
+  static defaultPackedParams = {
+    // NOTE: Shortened keys should be later in the alphabet than 'f', to avoid
+    // confusion with hexadecimal values.
+    x: 'x',
+    y: 'y',
+    w: 'weight',
+    W: 'width',
+    //p: 'path',
+    k: 'strokeColor',
+    K: 'background',
+  };
+
+  pack: PackProperties;
+  analysis: SceneAnalysis;
+  paramsShort: Dictionary;
 
   constructor() {
     super();
     this.version = '0.3.1';
-    this.packedScale = 100;
+    this.pack = {
+      scale: PTMunger_V0_3_1.defaultPackedScale,
+      params: PTMunger_V0_3_1.defaultPackedParams,
+    };
+    this.paramsShort = Object.entries(PTMunger_V0_3_1.defaultPackedParams)
+      .reduce((acc,[key,value]) => { acc[value] = key; return acc; }, {});
   }
 
-  analyzeScene(scene:PenciltestScene): SceneAnalysis {
+  analyzeScene(scene:PenciltestSceneData): SceneAnalysis {
     const analysis:SceneAnalysis = {
       colorCount: {},
       widthCount:{},
     };
 
+    const packAnalysisColorStringOptions: ColorStringOptions = { omitFullAlpha: true };
+
     const sceneStrokeWidth = scene.strokeWidth || 1;
     const sceneStrokeColor = Utils.getColorString(
       scene.strokeColor || ColorHexNames.black,
-      scene.strokeOpacity || -1
+      scene.strokeOpacity || -1,
+      packAnalysisColorStringOptions
     );
+    Object.assign(analysis, { sceneStrokeColor, sceneStrokeWidth });
     if (!(sceneStrokeColor in analysis.colorCount)) {
       analysis.colorCount[sceneStrokeColor] = 0;
     }
@@ -298,7 +322,7 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
         }
         analysis.widthCount[widthString]++;
 
-        const colorString = Utils.getColorString(stroke.strokeColor) || sceneStrokeColor;
+        const colorString = Utils.getColorString(stroke.strokeColor, -1, packAnalysisColorStringOptions) || sceneStrokeColor;
         // Sounds redundant, but a stroke COULD also have a fill color.
         if (!(colorString in analysis.colorCount)) {
           analysis.colorCount[colorString] = 0;
@@ -318,90 +342,132 @@ class PTMunger_V0_3_1 extends PTMunger_V0_3_0 {
     return analysis;
   }
 
-  packScene(scene:PenciltestScene): PenciltestSceneData {
+  packScene(scene:PenciltestSceneData): PenciltestSceneData {
     this.analysis = this.analyzeScene(scene);
+    scene.strokeColor = this.analysis.sceneStrokeColor; // Use processed/simplified color; e.g. omit full opacity.
+    scene.pack = {
+      ...scene.pack,
+      ...this.pack,
+    };
     const packedScene:any = super.packScene(scene);
-    packedScene.pack = {
-      scale: this.packedScale,
-    }
-    packedScene.strokeWidth = Number(this.analysis.widths[0]);
-    packedScene.strokeColor = this.analysis.colors[0];
     return packedScene;
   }
 
   unpackScene(packedScene:PenciltestSceneData): PenciltestSceneData {
     if ("pack" in packedScene) {
-      this.packedScale = packedScene.pack.scale;
+      Object.assign(this.pack, packedScene.pack);
       this.analysis = {
         colors: packedScene.pack.colors || [],
       }
     }
     const sceneData = super.unpackScene(packedScene);
+    delete sceneData.pack;
     return sceneData;
   }
 
-  packStroke(stroke:Stroke, scene:PenciltestScene): string {
-    const packedStrokeObject = { ...stroke };
+  packStroke(stroke:Stroke, scene:PenciltestSceneData): string {
+    const packedStrokeObject:any = { ...stroke };
 
     if (!("width" in packedStrokeObject)) {
       packedStrokeObject.width = scene.strokeWidth;
     }
-    if (String(packedStrokeObject.width) === this.analysis.widths[0]) {
+    if (packedStrokeObject.width === scene.strokeWidth) {
       delete packedStrokeObject.width
     }
 
     if (!("strokeColor" in packedStrokeObject)) {
       packedStrokeObject.strokeColor = scene.strokeColor || ColorHexNames.black;
     }
-    if (packedStrokeObject.strokeColor === this.analysis.colors[0]) {
+    if (packedStrokeObject.strokeColor === scene.strokeColor) {
       delete packedStrokeObject.strokeColor
     }
 
-    return super.packStroke(packedStrokeObject, scene);
+    packedStrokeObject.path = packedStrokeObject.path
+      .map(this.packPoint.bind(this))
+      .join(this.packSeparators.point);
+    return this.packParams(packedStrokeObject);
   }
 
   unpackStroke(packedStroke:string): Stroke {
-    const jsonIndex = packedStroke.indexOf('{');
-    const stroke:Stroke = {} as Stroke;
+    const stroke:any = this.unpackParams(packedStroke);
+    stroke.path = stroke.path
+      .split(this.packSeparators.point)
+      .map(this.unpackPoint.bind(this));
+    return stroke as Stroke;
+  }
+
+  static patternHexadecimal = /[0-9a-f]/i;
+  packParams(data:any, appendUnknownKeys:boolean = true): string {
+    const remainder:any = {};
+    const shortenedParamString: string = Object.entries(data)
+      .reduce((acc, [key,value]) => {
+        const shortKey = this.paramsShort[key]
+        if (!shortKey) {
+          remainder[key] = value;
+          return acc;
+        }
+
+        if (typeof value === 'number') {
+          acc += shortKey + this.packNumber(value);
+        } else if (typeof value === 'string' && PTMunger_V0_3_1.patternHexadecimal.test(value)) {
+          acc += shortKey + value;
+        } else {
+          remainder[key] = value;
+        }
+
+        return acc;
+      }, '');
+    if (appendUnknownKeys && Object.keys(remainder).length > 0) {
+      return shortenedParamString + JSON.stringify(remainder);
+    }
+    return shortenedParamString;
+  }
+
+  static patternBeforeExtraHexadecimal = /(?=[g-z])/i
+  unpackParams(packedParams:string): any {
+    const data: any = {};
+
+    const jsonIndex = packedParams.indexOf('{');
     if (jsonIndex !== -1) {
       try {
-        Object.assign(stroke, JSON.parse(packedStroke.slice(jsonIndex)))
+        Object.assign(data, JSON.parse(packedParams.substr(jsonIndex)));
+        packedParams = packedParams.substr(0, jsonIndex);
       } catch(e) {
         console.error(e);
       }
     }
-    stroke.path = (jsonIndex > -1 ? packedStroke.substr(0, jsonIndex) : packedStroke)
-      .split(this.packSeparators.point)
-      .map(this.unpackPoint.bind(this));
-    return stroke;
+
+    packedParams
+      .split(PTMunger_V0_3_1.patternBeforeExtraHexadecimal)
+      .forEach((packedParam) => {
+        const shortKey = packedParam[0];
+        const key = this.pack.params[shortKey] || shortKey;
+        const packedString = packedParam.substr(1);
+        const packedNumber = Number(packedString);
+        if (!isNaN(packedNumber)) {
+          data[key] = this.unpackNumber(packedString);
+        } else {
+          data[key] = packedString;
+        }
+      });
+
+    return data;
   }
 
   packPoint(point:Mark): string {
-    const coords = [point.x, point.y].map(this.packNumber.bind(this));
-    if ("weight" in point && point.weight !== 1) {
-      coords.push('w' + this.packNumber(point.weight));
-    }
-    return coords.join(this.packSeparators.coord);
+    return this.packParams(point, true);
   }
 
   unpackPoint(packedPoint) {
-    const coords = packedPoint.split(this.packSeparators.coord)
-    const mark:Mark = {
-      x: this.unpackNumber(coords[0]),
-      y: this.unpackNumber(coords[1]),
-    };
-    if (coords[2] && coords[2][0] === 'w') {
-      mark.weight = this.unpackNumber(coords[2].substr(1))
-    }
-    return mark;
+    return this.unpackParams(packedPoint) as Mark;
   }
 
   packNumber(value:number): string {
-    return String(Math.floor(value * this.packedScale));
+    return String(Math.floor(value * this.pack.scale));
   }
 
   unpackNumber(value:string): number {
-    return Number(value) / this.packedScale;
+    return Number(value) / this.pack.scale;
   }
 };
 
@@ -497,7 +563,7 @@ class PenciltestMigrator {
     return null;
   }
 
-  async packScene(scene:PenciltestScene): Promise<PenciltestScene> {
+  async packScene(scene:PenciltestSceneData): Promise<PenciltestSceneData> {
     return new Promise((resolve, reject) => {
       try {
         const munger = this.getMunger(scene);

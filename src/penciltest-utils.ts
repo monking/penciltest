@@ -16,11 +16,15 @@ interface FilePromptOptions extends PromptSingleInputOptions {
   loadAs?: "text" | "uri" | "files";
 }
 
+interface ColorStringOptions {
+  omitFullAlpha?: boolean;
+}
+
 enum GlobalPromiseGroup {
   MODAL = "modal",
 };
 
-var PTUtilsUID: number = 0;
+var PtUtilsUID: number = 0;
 
 class Utils {
 
@@ -39,7 +43,7 @@ class Utils {
     return added;
   };
 
-  static getColorString(color: Color | string | null, opacity:number = -1): string {
+  static getColorString(color: Color | string | null, opacity:number = -1, options:ColorStringOptions = {}): string {
     // TODO: I suppose I'm permitting `null` values for `color` so that this
     // method can be called in a `.map()` without modification. Is that
     // necessary?
@@ -62,6 +66,9 @@ class Utils {
     channels[3] *= 255;
     if (opacity !== -1) {
       channels[3] *= opacity
+    }
+    if (options.omitFullAlpha && Math.round(channels[3]) === 255) {
+      channels.pop();
     }
     return '#'+channels
       .map((n) => {
@@ -276,7 +283,7 @@ class Utils {
         inputDef.attr.type = givenPromptInput;
       }
     } else if (typeof givenPromptInput === 'object') {
-      if ((givenPromptInput as PenciltestUIComponent).isPTComponent) {
+      if ((givenPromptInput as PenciltestUIComponent).isPtComponent) {
         inputDef.is = givenPromptInput as PenciltestUIComponent;
       } else if ("nodeName" in givenPromptInput) {
         inputDef.el = givenPromptInput as HTMLInputElement;
@@ -491,13 +498,13 @@ class Utils {
     if (touchLimit === 1) {
       return points[0];
     } else {
-      return PTSpace.averagePoints(points);
+      return PtSpace.averagePoints(points);
     }
   };
 
   static eventPoint(event: AnyPointerEvent, scope: AnyPointerScope = "client", touchLimit: number = 1): Point {
     if (event.type.substr(5) === 'touch') {
-      return Utils.touchPoint(event as TouchEvent);
+      return Utils.touchPoint(event as TouchEvent, touchLimit, scope);
     }
     return {
       x: event[`${scope}X`],
@@ -617,7 +624,7 @@ class Utils {
   }
 
   static uid(): number {
-    return ++PTUtilsUID;
+    return ++PtUtilsUID;
   }
 
 };

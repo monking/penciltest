@@ -8,7 +8,7 @@ class PenciltestUIComponent {
   parentElement: HTMLElement;
   children: Array<PenciltestUIComponent>;
   protected isAttached: boolean;
-  isPTComponent: boolean;
+  isPtComponent: boolean;
 
   static restore(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict, forceReattach:boolean = false): PenciltestUIComponent {
     const component = options.is
@@ -24,6 +24,13 @@ class PenciltestUIComponent {
     return new PenciltestUIComponent(options, components);
   }
 
+  static getElement(component: PenciltestUIComponent | any): HTMLElement | null {
+    if (component && component.isPtComponent) {
+      return component.getElement();
+    }
+    return null;
+  }
+
   static find(element:HTMLElement, components:PenciltestUIComponentDict): PenciltestUIComponent | null {
     const key = element.getAttribute('x-key');
     if (key) {
@@ -33,7 +40,7 @@ class PenciltestUIComponent {
   }
 
   constructor(options:PenciltestUIComponentOptions, components:PenciltestUIComponentDict = {}) {
-    this.isPTComponent = true;
+    this.isPtComponent = true;
 
     this.options = {
       tagName: 'div',
@@ -261,7 +268,7 @@ class PenciltestUIComponent {
     return labelFirst ? configs : configs.reverse();
   }
 
-  getElement() { return this.el.container; }
+  getElement() { return this.el?.container; }
 
   setElement(element:HTMLElement) { return this.el.container = element; }
 

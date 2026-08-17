@@ -98,7 +98,6 @@ class Penciltest {
       controller: this,
       el: globalThis.document.querySelector(this.options.container),
     }, this.components);
-    console.log(this.ui.components === this.components) ; // FIXME
 
     this.newScene();
 
@@ -148,16 +147,22 @@ class Penciltest {
       debug: this.options.debug,
     };
 
+    const sceneRendererOptions = {
+      ...rendererOptions,
+      name: 'scene',
+    };
     if (this.options.renderer === Renderers.SVG) {
-      this.sceneRenderer = new SVGRenderer(rendererOptions);
+      this.sceneRenderer = new SVGRenderer(sceneRendererOptions);
     } else {
-      this.sceneRenderer = new CanvasRenderer(rendererOptions);
+      this.sceneRenderer = new CanvasRenderer(sceneRendererOptions);
     }
 
     this.toolRenderer = new CanvasRenderer({
       ...rendererOptions,
       background: 'transparent',
+      strokeWidth: 1,
       alpha: true,
+      name: 'tool',
     });
   }
 
@@ -211,7 +216,7 @@ class Penciltest {
       if (!frame.strokes) { return; }
       frame.strokes.forEach((stroke) => {
         if (stroke.path) {
-          PTSpace.unionBounds(stroke.path, frameBounds);
+          PtSpace.unionBounds(stroke.path, frameBounds);
         }
       });
     });
@@ -229,22 +234,17 @@ class Penciltest {
       stroke.width = this.options.strokeWidth;
       stroke.strokeColor = this.options.strokeColor;
     }
-    stroke.path.push(PTSpace.scalePoint(mark, 1 / this.zoomFactor));
-
-    if (this.options.debug) { console.log(`  mark ${this.previousMark?.x || '_'},${this.previousMark?.y || '_'}-->${mark.x},${mark.y}`); }
+    const sceneMark = PtSpace.scalePoint(mark, 1 / this.zoomFactor) as Mark;
+    stroke.path.push(sceneMark);
 
     if (this.state.mode === PenciltestMode.DRAWING) {
       // Rendering new line in toolRenderer layer.
       // It gets drawn in the sceneRenderer upon lift().
       this.toolRenderer.requestRender((renderer, timestamp) => {
-        if (this.options.debug) { console.log(`stroke width: ${stroke.width}, @ canvas: ${(this.sceneRenderer as CanvasRenderer).context.lineWidth}`); }
-        renderer.composeOptions({
+        renderer.composeStyles({
           strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
-          strokeWidth: stroke.width * this.zoomFactor
-        });
-        renderer.beginPath();
-        renderer.subpath(PTSpace.scalePath(stroke.path, this.zoomFactor));
-        renderer.endPath();
+        }, true);
+        renderer.quadraticStroke(PtSpace.scaleStroke(stroke, this.zoomFactor));
       });
     }
 
@@ -261,7 +261,6 @@ class Penciltest {
       this.trackBuffer.pop();
     }
 
-    const scenePoint = PTSpace.scalePoint(trackMark, 1 / this.zoomFactor);
     this.drawTool({trackPoint: trackMark, down:isDown});
 
     if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
@@ -273,6 +272,7 @@ class Penciltest {
         const currentFrame = this.scene.getCurrentFrame();
         let erasures = 0;
         if (currentFrame.strokes?.length > 0) {
+          const scenePoint = PtSpace.scalePoint(trackMark, 1 / this.zoomFactor);
           const erasingStrokeIndexes = this.findIntersectingStrokes(currentFrame.strokes, scenePoint, this.options.eraserWidth / 2);
           if (erasingStrokeIndexes.length > 0) {
             erasingStrokeIndexes.reverse().forEach((strokeIndex) => {
@@ -293,8 +293,8 @@ class Penciltest {
     for (let strokeIndex = 0; strokeIndex < Number(strokes.length); strokeIndex++) {
       const area:Circle | Rect = checkCircle
         ? {center: scenePoint, radius}
-        : PTSpace.boundsAroundPoint(scenePoint, radius);
-      if (PTSpace.doesPathIntersect(strokes[strokeIndex].path, area)) {
+        : PtSpace.boundsAroundPoint(scenePoint, radius);
+      if (PtSpace.doesPathIntersect(strokes[strokeIndex].path, area)) {
         matches.push(strokeIndex);
         if (!findAll) { return matches; }
       }
@@ -374,7 +374,7 @@ class Penciltest {
   }
 
   stop() {
-    if (this.components.audio.getElement()) { this.pauseAudio(); }
+    this.pauseAudio();
     clearInterval(this.playback.stepId);
     if (this.state.mode === PenciltestMode.PLAYING) {
       this.setPreviousMode();
@@ -395,10 +395,8 @@ class Penciltest {
     // NOTE: This draws the background, while drawFrame() does not.
     // NOTE: This also calls drawFrame.
     if (!this.sceneRenderer || !this.scene.frames.length) { return; }
-    if (this.options.debug) { console.log('    drawCurrentFrame: REQ'); }
 
     this.sceneRenderer.requestRender((renderer:PenciltestRenderer, timestamp) => {
-      if (this.options.debug) { console.log('    drawCurrentFrame:     HAP'); }
       renderer.clear(true);
 
       if (this.options.onionSkin) {
@@ -427,31 +425,25 @@ class Penciltest {
           }
         }
       }
-      renderer.composeOptions();
+      renderer.composeStyles();
       this.drawFrame(this.scene.current.frameNumber, renderer, overrides);
-      if (this.options.debug) { console.log('    drawCurrentFrame:         END'); }
     });
   }
 
   drawFrame(frameNumber: number, renderer:PenciltestRenderer, overrides: PenciltestRendererOptions = {}): PenciltestFrame {
     if (!this.width || !this.height) { return; }
-    if (this.options.debug) { console.log('   drawFrame: BEGIN'); }
 
     const frame = this.scene.frames[frameNumber]
     if (frame?.strokes?.length > 0) {
       frame.strokes.forEach((stroke: Stroke) => {
-        renderer.beginPath();
-        renderer.composeOptions({
+        const scaledStroke = this.scaleStroke(stroke, this.zoomFactor)
+        renderer.quadraticStroke(scaledStroke, {
+          strokeWidth: ("strokeWidth" in stroke ? stroke.strokeWidth : this.scene.strokeWidth),
           strokeColor: ("strokeColor" in stroke ? stroke.strokeColor : this.scene.strokeColor),
           ...overrides,
-          strokeWidth: (stroke.width || this.scene.strokeWidth || 1) * this.zoomFactor
-        });
-        const scaledStroke = this.scaleStroke(stroke, this.zoomFactor)
-        renderer.subpath(scaledStroke.path)
-        renderer.endPath();
+        })
       });
     }
-    if (this.options.debug) { console.log('   drawFrame:       END'); }
     return frame;
   }
 
@@ -466,10 +458,10 @@ class Penciltest {
     let toolDiameterSceneSpace,
       outerWidth = 1,
       innerWidth = 2,
-      crosshairOuterRadius = 12,
-      crosshairInnerRadius = 6,
       innerColor = 'white',
       outerColor = 'black';
+    const crosshairOuterRadius = 12,
+      crosshairInnerRadius = 6;
     if (this.state.toolStack[0] === PenciltestTool.PENCIL) {
       toolDiameterSceneSpace = this.options.strokeWidth;
       innerWidth = 2;
@@ -483,9 +475,6 @@ class Penciltest {
     }
     const toolScreenRadius = Math.max(0.5, toolDiameterSceneSpace / 2 * this.zoomFactor);
     const innerScreenRadius = Math.max(0.5, toolScreenRadius - innerWidth / 2);
-    if (this.options.debug) {
-      console.log(`  track:${this.state.toolStack[0]} ⊙ ${toolDiameterSceneSpace}`, {toolScreenRadius, innerScreenRadius, innerWidth, innerColor, outerColor});
-    }
 
     if (metadataTimeout > 0) {
       if (this.toolMetaTimeoutId) {
@@ -497,48 +486,53 @@ class Penciltest {
       }, metadataTimeout);
     }
 
+    const toolBoundsInField = PtSpace.getIntersectingRect(
+      PtSpace.boundsAroundPoint(trackPoint, Math.max(toolScreenRadius, crosshairOuterRadius)),
+      this.toolRenderer.getFieldRect()
+    );
     this.toolRenderer.requestRender((renderer, timestamp) => {
       renderer.clear();
-
-      // ID
-      if (innerScreenRadius !== toolScreenRadius) {
+      if (toolBoundsInField) {
+        // ID
+        if (innerScreenRadius !== toolScreenRadius) {
+          renderer.beginPath();
+          renderer.circle({center:trackPoint, radius:innerScreenRadius}, {strokeColor: innerColor, strokeWidth: innerWidth});
+          renderer.endPath();
+        }
+        
+        // OD
         renderer.beginPath();
-        renderer.circle({center:trackPoint, radius:innerScreenRadius}, {strokeColor: innerColor, strokeWidth: innerWidth});
+        renderer.circle({center:trackPoint, radius:toolScreenRadius}, {strokeColor: outerColor, strokeWidth: outerWidth});
         renderer.endPath();
-      }
-      
-      // OD
-      renderer.beginPath();
-      renderer.circle({center:trackPoint, radius:toolScreenRadius}, {strokeColor: outerColor, strokeWidth: outerWidth});
-      renderer.endPath();
 
-      // crosshair
-      renderer.beginPath({
-        lineWidth: 1,
-        strokeColor: 'black'
-      });
-      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:-crosshairOuterRadius}));
-      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:-crosshairInnerRadius}));
-      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:crosshairOuterRadius}));
-      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:0,y:crosshairInnerRadius}));
-      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:-crosshairOuterRadius,y:0}));
-      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:-crosshairInnerRadius,y:0}));
-      renderer.moveToPoint(PTSpace.sumPoints(trackPoint, {x:crosshairOuterRadius,y:0}));
-      renderer.lineToPoint(PTSpace.sumPoints(trackPoint, {x:crosshairInnerRadius,y:0}));
-      renderer.endPath();
+        // crosshair
+        renderer.beginPath({
+          lineWidth: 1,
+          strokeColor: 'black'
+        });
+        renderer.moveToPoint(PtSpace.sumPoints(trackPoint, {x:0,y:-crosshairOuterRadius}));
+        renderer.lineToPoint(PtSpace.sumPoints(trackPoint, {x:0,y:-crosshairInnerRadius}));
+        renderer.moveToPoint(PtSpace.sumPoints(trackPoint, {x:0,y:crosshairOuterRadius}));
+        renderer.lineToPoint(PtSpace.sumPoints(trackPoint, {x:0,y:crosshairInnerRadius}));
+        renderer.moveToPoint(PtSpace.sumPoints(trackPoint, {x:-crosshairOuterRadius,y:0}));
+        renderer.lineToPoint(PtSpace.sumPoints(trackPoint, {x:-crosshairInnerRadius,y:0}));
+        renderer.moveToPoint(PtSpace.sumPoints(trackPoint, {x:crosshairOuterRadius,y:0}));
+        renderer.lineToPoint(PtSpace.sumPoints(trackPoint, {x:crosshairInnerRadius,y:0}));
+        renderer.endPath();
 
-      // metadata text
-      if (this.toolMetaTimeoutId > 0) {
-        const metadataOutput = `${toolDiameterSceneSpace}px`;
-        const metaTextOptions = {
-          anchor: PTSpace.sumPoints(trackPoint, {x:Math.max(toolScreenRadius, crosshairOuterRadius) + 8, y:0}),
-          fillColor: 'black',
-          font: 'bold 14px monospace',
-          strokeColor: 'white',
-          strokeFirst: true,
-          strokeWidth: 3,
-        };
-        this.toolRenderer.text(metadataOutput, metaTextOptions);
+        // metadata text
+        if (this.toolMetaTimeoutId > 0) {
+          const metadataOutput = `${toolDiameterSceneSpace}px`;
+          const metaTextOptions = {
+            anchor: PtSpace.sumPoints(trackPoint, {x:Math.max(toolScreenRadius, crosshairOuterRadius) + 8, y:0}),
+            fillColor: 'black',
+            font: 'bold 14px monospace',
+            strokeColor: 'white',
+            strokeFirst: true,
+            strokeWidth: 3,
+          };
+          this.toolRenderer.text(metadataOutput, metaTextOptions);
+        }
       }
     });
   }
@@ -551,7 +545,7 @@ class Penciltest {
       scaledStroke.width *= factor
     }
     if (Array.isArray(scaledStroke.path)) {
-      scaledStroke.path = scaledStroke.path.map((point: Mark) => PTSpace.scalePoint(point, factor))
+      scaledStroke.path = scaledStroke.path.map((point: Mark) => PtSpace.scalePoint(point, factor))
     }
     return scaledStroke;
   }
@@ -559,7 +553,6 @@ class Penciltest {
   useTool(toolName: PenciltestTool) {
     const index = this.state.toolStack.indexOf(toolName);
     const isChanging = index !== 0;
-    if (this.options.debug) { console.log(`   useTool:${toolName} ${isChanging ? 'CHANGE' : 'SAME'}`); }
     if (isChanging) {
       if (index > -1) {
         this.state.toolStack.splice(index, 1);
@@ -600,8 +593,8 @@ class Penciltest {
         const lastStroke = this.scene.getCurrentStroke();
         const frame = this.scene.getCurrentFrame();
         if (lastStroke.provisional) {
-          const fieldPlusStrokeRadius = PTSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
-          if (PTSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
+          const fieldPlusStrokeRadius = PtSpace.expandRect(this.scene.getDimensions(), this.options.strokeWidth / 2);
+          if (PtSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
             delete lastStroke.provisional;
           } else {
             // Don't record mark if it (TODO including its width) are off the
@@ -714,7 +707,7 @@ class Penciltest {
       const result = [];
       for (let stroke of oldStrokes) {
         for (let segment of stroke.path) {
-          const fieldScalePoint = PTSpace.scalePoint(segment, this.zoomFactor);
+          const fieldScalePoint = PtSpace.scalePoint(segment, this.zoomFactor);
           this.track(fieldScalePoint);
         }
         result.push(this.lift());
@@ -837,9 +830,9 @@ class Penciltest {
 
   async saveScene(update: boolean = true): Promise<boolean> {
     const sceneName = this.scene.name || lc('untitled');
-    let sceneToStore = this.scene;
+    let sceneToStore = this.scene as PenciltestSceneData;
     try {
-      sceneToStore = await this.migrator.packScene(this.scene);
+      sceneToStore = await this.migrator.packScene(this.scene as PenciltestSceneData);
     } catch(e) {
       console.error(e);
     }
@@ -924,7 +917,7 @@ class Penciltest {
     this.components.audio.getElement().addEventListener('error', (e: any) => {
       console.error('audio file error', e);
       const message = `The audio URL is no longer available. Please load the file again: ${this.scene.audio.info}`;
-      return self.ui.triggerAppAction('linkAudio', [e, message]);
+      return self.ui.triggerAppAction('linkAudio', e, message);
     });
     return this.components.audio.getElement().setAttribute('src', audioURL);
   }
@@ -934,10 +927,13 @@ class Penciltest {
       delete this.scene.audio;
     }
     this.pauseAudio();
-    this.components.audio.removeElement();
+    if (this.components.audio) {
+      this.components.audio.removeElement();
+    }
   }
 
   pauseAudio() {
+    if (!this.components.audio) { return; }
     const audioElement = this.components.audio.getElement() as HTMLMediaElement;
     if (audioElement && !audioElement.paused) {
       audioElement.pause();
@@ -948,7 +944,7 @@ class Penciltest {
   }
 
   playAudio() {
-    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    const audioElement = PenciltestUIComponent.getElement(this.components.audio) as HTMLMediaElement;
     if (audioElement && audioElement.paused) {
       audioElement.play();
     }
@@ -962,7 +958,7 @@ class Penciltest {
   scrubAudio(exposureOffset:number = 0) {
     // If negative, plays that many exposures at the end of the current frame hold.
     // This is useful for quickly previewing frame hold changes relative to audio.
-    const audioElement = this.components.audio.getElement() as HTMLMediaElement;
+    const audioElement = this.components.audio && this.components.audio.getElement() as HTMLMediaElement;
     if (!this.options.scrubAudio || !audioElement) { return; }
     const frameExposures = this.scene.getFrameHold();
     if (exposureOffset < 0) {
@@ -1052,6 +1048,14 @@ class Penciltest {
       }
     });
     return job;
+  }
+
+  renormalizePressure(pressure:number): number {
+    const { minimumPressure } = this.options;
+    if (typeof minimumPressure === 'number') {
+      return minimumPressure + (1 - minimumPressure) * pressure;
+    }
+    return pressure;
   }
 
 }

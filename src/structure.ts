@@ -39,10 +39,12 @@ interface Dictionary {[key:string]:string};
 interface PenciltestLineOptions {
   strokeColor?: Color | string;
   strokeCorner?: CanvasLineJoin;
+  strokeCap?: CanvasLineCap;
   strokeOpacity?: number;
   strokeWidth?: number;
   fillColor?: Color | string;
   fillOpacity?: number;
+  variableStyle?: boolean;
 }
 
 interface PenciltestSceneOptions extends PenciltestLineOptions, Rect {
@@ -66,6 +68,7 @@ interface PenciltestOptions extends PenciltestSceneOptions {
   showStatus?: boolean;
   smoothing?: number;
   strokeWidth?: number;
+  minimumPressure?: number;
 };
 
 interface PenciltestGesture {
@@ -128,6 +131,12 @@ interface PenciltestSceneState {
   singleFrameDuration?: number; // milliseconds
 }
 
+interface PackProperties {
+  scale?:number;
+  params?:Dictionary;
+  colors?:Array<string>;
+}
+
 interface PenciltestSceneData extends PenciltestSceneOptions {
   audio?: PenciltestSceneAudio;
   current?: PenciltestSceneState;
@@ -138,10 +147,7 @@ interface PenciltestSceneData extends PenciltestSceneOptions {
   name?: string;
   uuid?: string;
   getDimensions?(): Rect;
-  pack?: {
-    scale?: number;
-    colors?: Array<ColorHex>;
-  }
+  pack?: PackProperties;
 };
 
 interface PlaybackState {
@@ -168,10 +174,12 @@ interface PenciltestRendererOptions extends PenciltestLineOptions, PenciltestSce
   width?: number;
   height?: number;
   alpha?: boolean;
+  name?: string; // for logging
 }
 
 interface PenciltestRenderer {
   options: PenciltestRendererOptions;
+  name?: string;
   container: HTMLElement;
   width: number;
   height: number;
@@ -184,13 +192,15 @@ interface PenciltestRenderer {
 
   rect(config:Rect, options:PenciltestLineOptions): void
 
-  composeOptions(overrides?: PenciltestRendererOptions, persist?: boolean | null): void;
+  composeStyles(options?: PenciltestRendererOptions, persist?: boolean | null): PenciltestRendererOptions
 
-  beginPath(): void;
+  beginPath(options?:PenciltestLineOptions | null): void
 
   endPath(): void;
 
   subpath(path: Path): void;
+
+  quadraticStroke(stroke: Stroke, overrides: PenciltestLineOptions): void
 
   render(): void
 
@@ -222,6 +232,7 @@ interface PenciltestAppAction {
   label?: string;
   listener?: Function;
   repeat?: boolean;
+  hotkeyUp?: boolean;
   text?: string;
   title?: string;
   triggerOnMove?: boolean;

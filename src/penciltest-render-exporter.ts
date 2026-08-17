@@ -94,7 +94,7 @@ class PenciltestRenderExporter {
       ]
     };
     const gifConfig: Dictionary = await Utils.promptForm(`<h3>Render settings</h3>`, gifConfigInputDefs, gifConfigPromptOptions);
-    console.log({gifConfig}); // XXX
+    console.debug({gifConfig}); // XXX
     if (!gifConfig) {
       return null;
     }

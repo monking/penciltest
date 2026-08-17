@@ -4,7 +4,8 @@ class CanvasRenderer extends BaseRenderer {
   currentCanvasStyle: {
     fillStyle:string;
     strokeStyle:string;
-    lineJoin:string;
+    lineCap:CanvasLineCap;
+    lineJoin:CanvasLineJoin;
     lineWidth:number;
   };
   //container: HTMLElement;
@@ -20,11 +21,11 @@ class CanvasRenderer extends BaseRenderer {
 
     this.container.appendChild(this.field);
 
-    this.applyStyle(); // Was skipped over in super's composeOptions, because this.context can't be set before super() is called.
+    this.applyStyle(); // Was skipped over in super's composeStyles, because this.context can't be set before super() is called.
   }
 
-  beginPath(): void {
-    super.beginPath();
+  beginPath(options:PenciltestLineOptions | null = null): void {
+    super.beginPath(options);
     this.context.beginPath();
   }
 
@@ -47,7 +48,7 @@ class CanvasRenderer extends BaseRenderer {
   rect(rect:Rect, options: PenciltestLineOptions): void {
     const { x, y, width, height } = rect;
     //this.beginPath();
-    this.composeOptions(options);
+    this.composeStyles(options);
     if (options.fillColor && !options.strokeColor) {
       this.context.fillStyle = this.currentCanvasStyle.fillStyle;
       this.context.fillRect(x, y, width, height);
@@ -67,8 +68,8 @@ class CanvasRenderer extends BaseRenderer {
     }
   }
 
-  composeOptions(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null) {
-    super.composeOptions(overrides);
+  composeStyles(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null): PenciltestRendererOptions {
+    super.composeStyles(overrides, persist);
     this.currentCanvasStyle = {
       fillStyle: Utils.getColorString(
         this.currentStyle.fillColor,
@@ -79,12 +80,16 @@ class CanvasRenderer extends BaseRenderer {
         "strokeOpacity" in this.currentStyle ? this.currentStyle.strokeOpacity : -1
       ),
       lineJoin: this.currentStyle.strokeCorner,
+      lineCap: this.currentStyle.strokeCap,
       lineWidth: this.currentStyle.strokeWidth,
     };
+
     this.applyStyle();
+
+    return this.currentStyle;
   }
 
-  clear(redrawBackground:boolean = true) {
+  clear(redrawBackground:boolean = false) {
     const { x, y, width, height } = this.getFieldRect();
     this.context.clearRect(x, y, width, height);
     return super.clear(redrawBackground);
@@ -102,8 +107,7 @@ class CanvasRenderer extends BaseRenderer {
   }
 
   arc(arc:Arc, options:PenciltestLineOptions = {}): void {
-    if (this.options.debug) { console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor} (${this.currentCanvasStyle.strokeStyle})`); }
-    this.composeOptions(options);
+    this.composeStyles(options);
     this.applyStyle();
     this.context.arc(
       arc.center.x,
@@ -152,5 +156,10 @@ class CanvasRenderer extends BaseRenderer {
     }
 
     renderOperations.forEach((o) => o());
+  }
+
+  quadraticCurveTo(x1: number, y1: number, x2: number, y2: number): void {
+    super.quadraticCurveTo(x1, y1, x2, y2);
+    this.context.quadraticCurveTo(x1, y1, x2, y2);
   }
 }

@@ -8,6 +8,27 @@ interface TextOptions {
   strokeWidth?:number;
 }
 
+enum RenderOp {
+  arc = '⌒',
+  clearBG = '▮',
+  clear = '⌧',
+  circle = '°',
+  destroy = '☠',
+  lineTo = '_',
+  moveTo = '-',
+  setOptions = '✔',
+  beginPath = '<',
+  endPath = '>',
+  quadraticCurve = '⩪',
+  bezierCurve = '⩫',
+  requestRender = '…',
+  rect = '▯',
+  render = '⌅',
+  subpath = '⸾',
+  text = 't',
+  resize = '⤡',
+};
+
 class BaseRenderer implements PenciltestRenderer {
 
   options: PenciltestRendererOptions;
@@ -18,6 +39,8 @@ class BaseRenderer implements PenciltestRenderer {
   container: HTMLElement;
   renderWaitId: number;
   renderOperationQueue: Array<Function>;
+  renderLog: Array<[string,number]>
+  name: string;
 
   static defaultOptions: PenciltestRendererOptions = {
     container: 'body',
@@ -26,16 +49,21 @@ class BaseRenderer implements PenciltestRenderer {
     strokeWidth: 1,
     strokeOpacity: 1,
     strokeCorner: 'round',
+    strokeCap: 'round',
+    variableStyle: true,
     width: 1920,
     height: 1080,
-    debug: false
+    debug: false,
+    name: '',
   };
 
   constructor(options: PenciltestRendererOptions) {
+    this.renderLog = [];
     this.options = {
       ...BaseRenderer.defaultOptions,
       ...options
     };
+    this.name = this.options.name;
 
     this.renderOperationQueue = [];
     this.renderWaitId = NaN;
@@ -48,36 +76,57 @@ class BaseRenderer implements PenciltestRenderer {
 
     this.overrides = {}
 
-    this.composeOptions();
+    this.composeStyles();
 
     //this.resize(this.options.width, this.options.height); // Let descendants do this. It might not be ready yet.
   }
 
+  queueLog(verb:RenderOp): void {
+    const lastLog = this.renderLog[this.renderLog.length - 1];
+    if (lastLog && lastLog[0] === verb) {
+      lastLog[1]++;
+    } else {
+      this.renderLog.push([verb, 1]);
+    }
+  }
+
+  flushLog(): string {
+    const output = this.renderLog
+      .map((entry) => {
+        const [ verb, count ] = entry;
+        return `${verb}${count > 1 ? `×${count}` : ''}`;
+      })
+      .join('');
+    this.renderLog = [];
+    return `${this.name}:${output}`;
+  }
+
   setOptions(options:PenciltestRendererOptions) {
-    if (this.options.debug) { console.log('   setOptions'); }
+    this.queueLog(RenderOp.setOptions);
     Object.assign(this.options, options);
   }
 
   resize(width: number, height: number): void {
-    if (this.options.debug) { console.log('  resize'); }
+    this.queueLog(RenderOp.resize)
     this.width = width;
     this.height = height;
   }
 
-  composeOptions(options: PenciltestRendererOptions = {}, persist: boolean | null = null) {
+  composeStyles(overrides: PenciltestRendererOptions = {}, persist: boolean | null = null): PenciltestRendererOptions {
     this.currentStyle = {
       ...this.options
     };
 
-    if (persist === true) { Object.assign(this.overrides, options); }
+    if (persist === true) { Object.assign(this.overrides, overrides); }
 
     if (persist !== false) { Object.assign(this.currentStyle, this.overrides); }
 
-    if (persist !== true) { Object.assign(this.currentStyle, options); }
+    if (persist !== true) { Object.assign(this.currentStyle, overrides); }
+
+    return this.currentStyle;
   }
 
   subpath(path: Path) {
-    if (this.options.debug) { console.log(' subpath'); }
     if (!Array.isArray(path)) { return; }
     path.forEach((segment, index) => {
       const { x, y } = segment;
@@ -89,8 +138,63 @@ class BaseRenderer implements PenciltestRenderer {
     });
   }
 
+  quadraticStroke(stroke: Stroke, overrides: PenciltestLineOptions = {}) {
+    if (!Array.isArray(stroke.path) || stroke.path.length < 3) { return; } // FIXME short paths/marks
+    const {
+      variableStyle,
+      strokeWidth,
+      strokeColor,
+    } = this.composeStyles({
+      strokeWidth: stroke.width,
+      ...overrides,
+    }, false);
+
+    if (!variableStyle) {
+      this.beginPath();
+    }
+    for (let i = -1; i < stroke.path.length; i++) {
+      const segment = stroke.path.slice(Math.max(i, 0), i+3)
+      if (segment.length < 2) { continue; }
+      if (segment.length === 2) {
+        if (i === -1) {
+          segment.unshift(segment[0]);
+        } else {
+          segment.push(segment[1]);
+        }
+      }
+      const [ p0, p1, p2 ] = segment;
+      const c1 = PtSpace.lerpPoint(p0, p1);
+      const c2 = PtSpace.lerpPoint(p1, p2);
+      // LATER: lineJoin of 'round' would show overlap if path is <100% alpha.
+      // #889abf7a-831e-4b76-ba2f-38a840b7d87c
+      if (variableStyle) {
+        const segmentOverrides: PenciltestRendererOptions = {strokeColor};
+        if ("weight" in p1) {
+          // NOTE: this.overrides is only set if this.composeStyles was called
+          // with persist = true (2nd param).
+          segmentOverrides.strokeWidth = strokeWidth * (p1.weight as number);
+        }
+        this.beginPath(segmentOverrides);
+      }
+      this.moveToPoint(c1);
+      this.quadraticCurveToPoint(p1, c2);
+      if (variableStyle) { this.endPath(); }
+    }
+    if (!variableStyle) {
+      this.endPath();
+    }
+  }
+
+  quadraticCurveToPoint(p1:Point, p2:Point): void {
+    this.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
+  }
+
+  quadraticCurveTo(x1: number, y1: number, x2: number, y2: number): void {
+    this.queueLog(RenderOp.quadraticCurve);
+  }
+
   moveTo(x: number, y: number): void {
-    if (this.options.debug) { console.log('moveTo: %s, %s', x, y); }
+    this.queueLog(RenderOp.moveTo);
   }
 
   moveToPoint(point:Point): void {
@@ -98,7 +202,7 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   lineTo(x: number, y: number): void {
-    if (this.options.debug) { console.log('lineTo: %s, %s', x, y); }
+    this.queueLog(RenderOp.lineTo);
   }
 
   lineToPoint(point:Point): void {
@@ -106,11 +210,11 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   rect(rect:Rect, options: PenciltestLineOptions): void {
-    if (this.options.debug) { console.log('rect'); }
+    this.queueLog(RenderOp.rect)
   }
 
   requestRender(...enqueueWork:Array<Function>): void {
-    if (this.options.debug) { console.log('   render: REQ'); }
+    this.queueLog(RenderOp.requestRender)
     if (enqueueWork.length > 0) {
       Array.prototype.push.apply(this.renderOperationQueue, enqueueWork);
     }
@@ -122,35 +226,33 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   render(timestamp:number = 0): void {
-    if (this.options.debug) { console.log('   render:     BEGIN'); }
+    this.queueLog(RenderOp.render);
     const queueLength = this.renderOperationQueue.length;
     if (queueLength === 0) { return; }
     const renderStart = performance.now();
     this.renderOperationQueue.forEach((o) => o(this, timestamp));
     const renderElapsed = performance.now() - renderStart;
-    if (this.options.debug) { console.log(`   render:           DONE (${renderElapsed} ms, ${queueLength} operations)`); }
     this.renderOperationQueue = [];
+    console.log(this.flushLog());
   }
 
-
   getFieldRect(): Rect {
-    if (this.options.debug) { console.log('  getFieldRect'); }
     return {x:0, y:0, width:this.width, height:this.height};
   }
 
   beginPath(options:PenciltestLineOptions | null = null): void {
-    if (this.options.debug) { console.log('beginPath'); }
+    this.queueLog(RenderOp.beginPath);
     if (options !== null) {
-      this.composeOptions(options);
+      this.composeStyles(options, false);
     }
   }
 
   endPath(): void {
-    if (this.options.debug) { console.log('endPath'); }
+    this.queueLog(RenderOp.endPath);
   }
 
-  clear(redrawBackground:boolean = true): void {
-    if (this.options.debug) { console.log(` clear${redrawBackground ? ' BACK' : ''}`); }
+  clear(redrawBackground:boolean = false): void {
+    this.queueLog(redrawBackground ? RenderOp.clearBG : RenderOp.clear);
     if (redrawBackground && this.options.background !== 'transparent') {
       const fieldRect = this.getFieldRect();
       this.rect(fieldRect, { fillColor: this.options.background });
@@ -158,19 +260,20 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   destroy(): void {
-    if (this.options.debug) { console.log('   destroy'); }
+    this.queueLog(RenderOp.destroy);
+    if (this.options.debug) { console.log(this.flushLog()); }
   }
 
   arc(arc:Arc, options:PenciltestLineOptions = {}): void {
-    Object.assign(arc, PTSpace.defaultArc, arc);
-    const arcPoints = PTSpace.traceArc(arc)
-    this.composeOptions(options);
-    if (this.options.debug) { console.log(` arc ⊙ ${arc.radius} ⊾ ${arc.end - arc.start} ▷ ${arc.resolution} ▦ ${arc.center.x},${arc.center.y} ⾊ ${this.currentStyle.strokeColor}`); }
+    Object.assign(arc, PtSpace.defaultArc, arc);
+    const arcPoints = PtSpace.traceArc(arc)
+    this.composeStyles(options, false);
+    this.queueLog(RenderOp.arc)
     this.subpath(arcPoints);
   }
 
   circle(arc:Arc, options:PenciltestLineOptions): void {
-    if (this.options.debug) { console.log({'fn':'circle',arc,options}); }
+    this.queueLog(RenderOp.circle)
     const circle:Arc = { start: 0, ...arc }
     circle.end = circle.start + 1;
     this.arc(circle, options);
@@ -180,6 +283,6 @@ class BaseRenderer implements PenciltestRenderer {
   }
 
   text(text:string, options: TextOptions) {
-    if (this.options.debug) { console.log({'fn':'text',text,options}); }
+    this.queueLog(RenderOp.text)
   }
 }

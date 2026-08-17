@@ -1,4 +1,3 @@
-/// <reference path="locale/en-US.locale.js">
 type LocaleDict = {[key:string]: string};
 type LocaleData = {content:LocaleDict};
 type LocaleDb = {[key:string]: LocaleData};
@@ -16,7 +15,7 @@ class Locale {
 
   static recursionLimit = 3;
   static defaultOptions: LocaleOptions = {
-    subPattern: /%%([^%]{1,128})%%/g,
+    subPattern: /%([uUlLp]*){([^}]{1,128})}/g,
   }
 
   options: LocaleOptions;
@@ -46,20 +45,16 @@ class Locale {
       this.pluralOperation = (message:string, engine:Function) => Number(message) === 1 ? engine('_singular') : engine('_plural');
     }
 
-    const engine = (key:string, innerDict:LocaleDict = {}, recursionLimit:number = Locale.recursionLimit): string => {
+    const engine = (key:string, innerDict:LocaleDict = {}, filterIds:string = '', recursionLimit:number = Locale.recursionLimit): string => {
       if (!key) { return ''; }
       const filters: Array<Function> = [];
-      // NOTE: Filters are run inside out.
-      // e.g. "\\U\\p5" will first run the 'p' (plural) filter, then 'U' (uppercase) on the output of 'p'.
-      while (key[0] === "\\") {
-        const filterMatch = this.getFilter(key[1]);
+      Array.from(filterIds).forEach((filterId) => {
+        const filterMatch = this.getFilter(filterId);
         if (typeof filterMatch === 'function') {
-          key = key.substr(2);
+          // NOTE: Filters are run inside out (closest to `{` first)
           filters.unshift(filterMatch);
-        } else {
-          break;
         }
-      }
+      });
 
       let message = key;
       if (key in innerDict) {
@@ -69,7 +64,7 @@ class Locale {
       }
 
       if (recursionLimit > 0) {
-        message = message.replaceAll(this.options.subPattern, (match, key) => engine(key, innerDict, recursionLimit - 1));
+        message = message.replaceAll(this.options.subPattern, (match, filterIds, key) => engine(key, innerDict, filterIds, recursionLimit - 1));
       }
 
       if (filters.length > 0) {
@@ -101,4 +96,5 @@ class Locale {
 }
 
 const thisLocale = new Locale();
-const lc = thisLocale.makeEngine('en-US');
+var lc = thisLocale.makeEngine('en-US');
+// LATER Make user-configurable  #28fa073e-553f-4942-9f8f-26fcee173a44
