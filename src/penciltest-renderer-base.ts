@@ -123,6 +123,8 @@ class BaseRenderer implements PenciltestRenderer {
 
     if (persist !== true) { Object.assign(this.currentStyle, overrides); }
 
+    if (this.options.debug) { console.debug(`strokeWidth, curr:${this.currentStyle.strokeWidth}, ovrd:${overrides.strokeWidth}`); }
+
     return this.currentStyle;
   }
 

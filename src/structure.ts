@@ -260,6 +260,8 @@ interface PenciltestUIComponentOptions {
   text?: string;
 };
 
+type PenciltestFrameRenderState = [ number, number, number ];
+
 type PenciltestUIComponentDict = { [key: string]: PenciltestUIComponent; };
 
 interface PenciltestStatusMessageOptions {

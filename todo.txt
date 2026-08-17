@@ -1,16 +1,16 @@
+(A) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
 (A) 2026-08-06 +feature | +TIMELINE  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
 (A) 2026-08-11 +BUG | Settings > Reset breaks marking and tool rendering  uuid:910188b9-1b6c-47e4-a461-15ea8f8afde4
-(A) 2026-08-14 +BUG +UX | Now that I've centered the field, a changing toolbar height moves the field. Make the toolbar a fixed height, or less directly, make sure its contents have a constant width so that they don't reflow without window resizing.  uuid:7866f36b-5620-4c1f-a979-f8579286c216
-(B) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
+(A) 2026-08-17 +BUG  scene.strokeWidth is overridden by controller.options.strokeWidth. Scene's value should take precedence when rendering stored strokes, and controller's when marking new strokes.  uuid:add22273-3f34-4bb8-a94f-7e9b31aa5c18
 (B) 2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
 (B) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
 (B) 2026-08-06 +feature | +SCALE tool.  complexity:2  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023
-(B) 2026-08-08 +BUG | Alt+Tabbing back to the app, the 'Tab' shortcut is triggered. Less so if I disregard while `altKey` is pressed, but it still happens, since I'm listening for keyup. Maybe I should be listening for keydown for this one, at least. But my listeners for that event currently don't have a good way of avoiding repetition.  uuid:faa42646-1b8c-407d-a97b-3e9d0290e013
 (B) 2026-08-08 +BUG | The status bar is not always (ever?) updated after pasting frames.   uuid:2cf96860-75fb-4730-b58b-c7cee5049334
 (B) 2026-08-08 +UX | Middle click should pan the view by default, rather than move content. Perhaps restrict middle click to view manipulation.  uuid:b893c73a-fcf1-4f7a-8c08-bd8df156cdf4  +UX
 (B) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
 (B) 2026-08-09 +feature | Proper +UNDO/REDO, storing actions + data to restore. Current undo only removes the latest stroke, and redo puts it back. There is at least a stack buffer of those, but other actions CANNOT currently be un-/redone.  uuid:a7398e21-b0a8-4f27-800a-64981716a822
 (B) 2026-08-10 +maintainability +UX | Ensure that gestures are relative to the viewport, not the drawing field.  uuid:4916793a-1e30-4e3e-b1be-8ee2c1074842
+(B) 2026-08-14 +BUG +UX | Now that I've centered the field, a changing toolbar height moves the field. Make the toolbar a fixed height, or less directly, make sure its contents have a constant width so that they don't reflow without window resizing.  uuid:7866f36b-5620-4c1f-a979-f8579286c216
 (B) 2026-08-15 +UX | Rebind most commonly used keys to one-handed key bindings, one for each left and right. | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
 (B) 2026-08-15 +feature | Ctrl click for context menu (Comes for free in Mac? Been a while sinc I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
 (C) 2026-04-22 +UX | Save working draft automatically, in a dedicated LocalStorage key, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)

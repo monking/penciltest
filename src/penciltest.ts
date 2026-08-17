@@ -24,6 +24,7 @@ class Penciltest {
   state: PenciltestState;
   width: number;
   zoomFactor: number;
+  //STUB@1787002210//currentFrameRenderedState: PenciltestFrameRenderState;
 
   // elements
   //container: HTMLElement;
@@ -112,7 +113,11 @@ class Penciltest {
 
   async setOptions(newOptions: PenciltestOptions) {
     Object.assign(this.options, newOptions);
-    if (newOptions.debug && Penciltest.debugVersion && Penciltest.debugVersion !== Penciltest.version) {
+    if (
+      newOptions.debug
+      && Penciltest.debugVersion
+      && Penciltest.debugVersion !== Penciltest.version
+    ) {
       this.state.version = Penciltest.debugVersion;
     }
     const reactions = [];
@@ -123,7 +128,6 @@ class Penciltest {
     }
     await Promise.all(reactions);
   }
-
 
   async resetOptionsAndState() {
     this.state = { ...Penciltest.defaultState };
@@ -392,6 +396,19 @@ class Penciltest {
   }
 
   drawCurrentFrame(overrides: PenciltestRendererOptions = {}) {
+    /*STUB@1787002210
+    const currentFrameState: PenciltestFrameRenderState = [
+      this.scene?.current?.frameNumber || -1, 
+      this.scene?.getCurrentFrame()?.strokes?.length || -1, 
+      this.scene?.getCurrentStroke()?.path?.length || -1, 
+    ];
+    if (this.currentFrameRenderedState && this.currentFrameRenderedState.join(',') === currentFrameState.join(',')) {
+      // Avoid re-rendering the same frame.
+      return;
+    }
+    this.currentFrameRenderedState = currentFrameState;
+    */
+
     // NOTE: This draws the background, while drawFrame() does not.
     // NOTE: This also calls drawFrame.
     if (!this.sceneRenderer || !this.scene.frames.length) { return; }
@@ -866,7 +883,10 @@ class Penciltest {
     }
 
     if (this.sceneRenderer && this.scene.background) {
-      this.sceneRenderer.options.background = this.scene.background;
+      this.sceneRenderer.setOptions({
+        background: this.scene.background,
+        strokeWidth: this.scene.strokeWidth,
+      });
     }
     this.scene.updateState();
     this.goToFrame(this.scene.current.frameNumber || 0);

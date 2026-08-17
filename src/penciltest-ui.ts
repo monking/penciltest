@@ -124,13 +124,12 @@ class PenciltestUI extends PenciltestUIComponent {
         label: "Set Renderer",
         async listener(this: Penciltest) {
           let renderer: any;
-          const self = this;
           const selectedRenderer = await Utils.promptSelect(
             'Set renderer',
             [Renderers.CANVAS, Renderers.SVG],
             this.options.renderer
           );
-          self.setOptions({renderer: selectedRenderer as Renderers.CANVAS | Renderers.SVG})
+          this.setOptions({renderer: selectedRenderer as Renderers.CANVAS | Renderers.SVG})
         },
         action(this: Penciltest) {
           if (this.sceneRenderer != null) {
@@ -1809,7 +1808,6 @@ class PenciltestUI extends PenciltestUIComponent {
   }
 
   addKeyboardListeners() {
-    const self = this;
 
     this.keyBindings = {
       keydown: {},
@@ -1857,7 +1855,7 @@ class PenciltestUI extends PenciltestUIComponent {
       } else if (!htmlTarget.matches('input')) {
         const combo = Utils.describeKeyCombo(event);
         if (event.keyCode !== 0 && this.controller.options.debug) { console.log(`${event.type}-${combo} (${event.keyCode})`); }
-        const actionName = self.keyBindings[event.type][combo];
+        const actionName = this.keyBindings[event.type][combo];
 
         if (actionName || (actionName === null)) {
           event.preventDefault();
@@ -1865,7 +1863,7 @@ class PenciltestUI extends PenciltestUIComponent {
           if (actionName) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            self.triggerAppAction(actionName, event);
+            this.triggerAppAction(actionName, event);
           }
         }
       }
