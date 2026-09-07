@@ -1,6 +1,6 @@
 {
   "name": "Penciltest",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "repository": "git@github.com:monking/penciltest.git",
   "scripts": {
     "start": "tsc && node node_modules/grunt-cli/bin/grunt",

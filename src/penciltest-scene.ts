@@ -91,9 +91,7 @@ class PenciltestScene implements PenciltestSceneData {
     }
 
     if (!this.uuid) {
-      if (typeof crypto !== 'undefined' && crypto !== null) {
-        crypto.randomUUID();
-      }
+      this.uuid = Utils.uuid();
     }
 
     this.updateState();

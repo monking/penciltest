@@ -627,4 +627,18 @@ class Utils {
     return ++PtUtilsUID;
   }
 
+  static uuid(): string {
+    if (typeof crypto !== 'undefined' && crypto !== null && "randomUUID" in globalThis.crypto) {
+      return globalThis.crypto.randomUUID();
+    } else {
+      // Fallback if running without HTTPS, where randomUUID is not suplied on
+      // the Crypto interface. Not cryptographically secure, but passable as a
+      // unique ID.
+			[0,0,0]
+				.map(() => (Math.random()*Math.pow(10,16)).toString(16))
+        .join('')
+        .replace(/(.{8})(.{4})(.{4})(.{4})(.{12}).*/, '$1-$2-$3-$4-$5');
+    }
+  }
+
 };

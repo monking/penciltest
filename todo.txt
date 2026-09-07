@@ -1,44 +1,50 @@
-(A) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
-(A) 2026-08-06 +feature | +TIMELINE  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
-(A) 2026-08-11 +BUG | Settings > Reset breaks marking and tool rendering  uuid:910188b9-1b6c-47e4-a461-15ea8f8afde4
-(A) 2026-08-17 +BUG  scene.strokeWidth is overridden by controller.options.strokeWidth. Scene's value should take precedence when rendering stored strokes, and controller's when marking new strokes.  uuid:add22273-3f34-4bb8-a94f-7e9b31aa5c18
-(B) 2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
-(B) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
-(B) 2026-08-06 +feature | +SCALE tool.  complexity:2  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023
-(B) 2026-08-08 +BUG | The status bar is not always (ever?) updated after pasting frames.   uuid:2cf96860-75fb-4730-b58b-c7cee5049334
-(B) 2026-08-08 +UX | Middle click should pan the view by default, rather than move content. Perhaps restrict middle click to view manipulation.  uuid:b893c73a-fcf1-4f7a-8c08-bd8df156cdf4  +UX
-(B) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
+(A) 2026-09-06 +BUG | Reload is blocked by unload event handler. (on Chrome? on Galaxy Tab? versions? +NEEDS_REPLICATION_STEPS)  uuid:4231ada4-17ff-47f9-aa56-1c176b493ea8  -- Since changing handler to `preventDefault`.
+(A) 2026-09-07 +UX | Categorize vital actions. Make bare-bones user stories to aid testing & mapping inputs.  uuid:f1fb0261-e00b-4bd0-bdd4-81eb718a6120
+(B) 2026-08-04 +BUG | GIF export is in pieces. Was functional at v:0.2.12.  uuid:cfb1d2df-e87b-4133-aaf8-8c14e434c66c  | 2026-08-13 Dupe canvases... Not the culprit? Output GIF is pure black; correct # of frames.  | 
 (B) 2026-08-09 +feature | Proper +UNDO/REDO, storing actions + data to restore. Current undo only removes the latest stroke, and redo puts it back. There is at least a stack buffer of those, but other actions CANNOT currently be un-/redone.  uuid:a7398e21-b0a8-4f27-800a-64981716a822
 (B) 2026-08-10 +maintainability +UX | Ensure that gestures are relative to the viewport, not the drawing field.  uuid:4916793a-1e30-4e3e-b1be-8ee2c1074842
-(B) 2026-08-14 +BUG +UX | Now that I've centered the field, a changing toolbar height moves the field. Make the toolbar a fixed height, or less directly, make sure its contents have a constant width so that they don't reflow without window resizing.  uuid:7866f36b-5620-4c1f-a979-f8579286c216
-(B) 2026-08-15 +UX | Rebind most commonly used keys to one-handed key bindings, one for each left and right. | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
-(B) 2026-08-15 +feature | Ctrl click for context menu (Comes for free in Mac? Been a while sinc I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
+(B) 2026-08-11 +BUG | Settings > Reset breaks marking and tool rendering  uuid:910188b9-1b6c-47e4-a461-15ea8f8afde4
+(B) 2026-08-14 +BUG | +UX Now that I've centered the field, a changing toolbar height moves the field. Make the toolbar a fixed height, or less directly, make sure its contents have a constant width so that they don't reflow without window resizing.  uuid:7866f36b-5620-4c1f-a979-f8579286c216
+(B) 2026-08-17 +BUG | scene.strokeWidth is overridden by controller.options.strokeWidth. Scene's value should take precedence when rendering stored strokes, and controller's when marking new strokes.  uuid:add22273-3f34-4bb8-a94f-7e9b31aa5c18
+(B) 2026-09-06 +BUG | Line width is inconsistent between marking and rendering: wider during marking, narrower during rendering.  uuid:4223cd3b-c30f-41b7-9dd7-46360c8a9778
+(B) 2026-09-07 survey inputs by mode / hardware / use styles +UX
 (C) 2026-04-22 +UX | Save working draft automatically, in a dedicated LocalStorage key, and load automatically if it exists at app start. +UX  uuid:480c2b79-a35c-439e-b7ef-eb00fea403f1  |  WORKAROUND('S' key to save)
-(C) 2026-07-30 +feature | +LAYERS  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
-(C) 2026-07-30 v:0.3.1 | More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb  hasPart:0f14c213-3134-49cd-978f-9f9cf385b20c
-(C) 2026-08-05 +feature | Stroke selection tool (for transform, copy, delete).  complexity:2 (rectangle)  uuid:e5850700-c29c-463f-ad46-e22c9420893d  |  Perhaps an eraser-like tool that selects by painting. Maybe not the best implementation, but using components already implemented, as an intermediate measure.
-(C) 2026-08-06 +TIMELINE | Zoom with Ctrl+wheel.  uuid:43d39470-ccb7-4a2b-8e77-b474f72eed78
-(C) 2026-08-06 +WIP | Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb  | This is nearly done 2026-08-07, but I want to finish a variant implementation of the pack/unpack to verify, before I mark this as done.
-(C) 2026-08-06 +feature | +ROTATE tool.  complexity:3  uuid:3f275aee-90de-445d-90c3-d40a72364227
-(C) 2026-08-06 Show +LAYERS in +TIMELINE  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
+(C) 2026-08-06 +UX Use default (scene) frame hold when inserting a new frame. Currently, it uses the same hold as the current frame. Maybe make that configurable? But prefer the former.  uuid:118c1ec4-8b35-40a6-89f8-85d4208668da
+(C) 2026-08-08 +BUG | The status bar is not always (ever?) updated after pasting frames.   uuid:2cf96860-75fb-4730-b58b-c7cee5049334
 (C) 2026-08-08 +UX +clarity | The "Delete Scene" prompt should have the current scene selected by default.  uuid:1ea72d1a-f77f-4849-9a2a-a2f5b3fdd115
+(C) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
 (C) 2026-08-09 +UX +storage | Prompt user for confirmation if RENAMED scene would overwrite existing OTHER scene in LocalStorage. Perhaps note storage name upon loading. If saving as a different name, and if there is a record by that name already, ask for user confirmation.  uuid:9a0b3d29-ae0c-42f7-9728-0a79c2f2c186
 (D) 2026-08-06 +BUG | If a scene is longer than its audio, the audio doesn't begin playing again upon loop.  uuid:262f1925-4ae7-45e9-8c2f-ad622acd5d96
-(D) 2026-08-06 +TIMELINE | Zoom with pinch.  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
-(D) 2026-08-06 +feature | Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gaps between frames on the timeline.
-(D) 2026-08-09 +QUIRK +LATER Range input value must be assigned after min/max attributes are set. Components' attributes are being assigned in definition order, for now. But object param order is not guaranteed, nor expected, right?  uuid:b315c501-ad79-4f92-8bd6-6cbd0f29e852
-(D) 2026-08-09 +storage | Option to Export/Import multiple scenes to/from JSON. Let export format be an array of scenes. Perhaps an object with application state around that. e.g. {instrument,state,content:[scene,…]}  uuid:13d8cfa9-72de-4a29-b9b5-c84993919c1f
-(D) 2026-08-17 `lineJoin` of 'round' would show overlap if path is <100% alpha.  uuid:889abf7a-831e-4b76-ba2f-38a840b7d87c
+(D) 2026-08-17 `lineJoin` of 'round' shows overlap if path is <100% alpha.  uuid:889abf7a-831e-4b76-ba2f-38a840b7d87c  | solution: redraw whole path while marking (less expensive now it's happening in the tool layer).
+(E) 2026-08-06 +WIP | Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb  | This is nearly done 2026-08-07, but I want to finish a variant implementation of the pack/unpack to verify, before I mark this as done.
 (E) 2026-08-08 +FIXME +UX | The frame selection can persist longer than I'm aware, so when I mean to copy from the current frame and paste strokes (shift+v), it pastes frames instead? This report may not be 100% accurate, but something like this is happening.  uuid:bc2987a7-d2da-4759-93ff-19c7a86e79e7
-(E) 2026-08-08 +UX | Modify pointer events with Shift, Control, Alt. Maybe PAN, SCALE?, and SCRUB (flip), respectively.  uuid:f3f7e638-6bd4-40b9-9703-ce1bfc9b493e
-(E) 2026-08-09 +feature | Choose to erase(/select) segments of strokes, rather than whole strokes. If this is implemented, it would become the default. Ideally, it would cut segments where the eraser/selection was, not only removing the intersecting points, which would leave a ragged erasure.  uuid:7e8fd261-704d-4778-a9fc-c3a240375907  |  When detecting intersection of shape and path, return [ boolean, Point, Point ], where the two points are the first and last intersection with the path, in stroke order. This would enable splitting this path with these two capping the gap.
-(E) 2026-08-10 Improve performance of testing path/area intersection.  uuid:343fb0fa-6271-4049-a0ee-9fa27ae3e5ce isPartOf:77af0b21-5b34-4831-b6e9-946de3146597
-(F) 2026-08-03 +maintainability | Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>  |  2026-08-05 Instead of making it more standard, I've hacked filters into its string substitution. That'll lock me in down the line. But it was fun.
-(F) 2026-08-08 +feature | User-controllable zoom. (Ctrl+middle_drag, Ctrl+wheel, Ctrl+=, Ctrl+-)  uuid:43f4e755-c09c-4c68-9074-82506dfea69e  +UX
-(R) 2026-08-01 +reconsider | SVG render engine? This copy of Raphael is porting badly.  |  Being able to export a series of SVGs may be a good means of integrating Penciltest into a production pipeline... Maybe a different (version of the) library.
-(R) 2026-08-06 +reconsider | +UX +feature | Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
-(R) 2026-08-06 +reconsider | +UX | Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
-(R) 2026-08-10 +reconsider | Should my Arc interface use 2*Math.PI for a circle, as Canvas2DContext.arc does? I like the implicit tau in my implementation, so it'll stay for now. Food for thought.  uuid:8de1bdf1-9449-4813-933a-0c41260dc079
 2026-07-10 penciltest stops responding to input; stuck in playback mode? v:0.2.13  +NEEDS_REPLICATION_STEPS  uuid:7e903c6f-2226-4e4e-bf2c-fd42503bf2f7
+2026-07-30 +feature | +LAYERS  uuid:d1ec85b8-6be8-4ead-b328-db050d7a337c
+2026-07-30 v:0.3.1 | More compact frame+stroke encoding. IDEA:{Integer with precision divisor; string per stroke; perhaps per LAYER#d1ec85b8.}  uuid:3e7cf345-add1-4ad5-9062-d242f8ec14cb  hasPart:0f14c213-3134-49cd-978f-9f9cf385b20c
+2026-08-01 +reconsider | SVG render engine? This copy of Raphael is porting badly.  |  Being able to export a series of SVGs may be a good means of integrating Penciltest into a production pipeline... Maybe a different (version of the) library.
+2026-08-03 +maintainability | Migrate <src/penciltest-localization.ts> to a more standard locale format.  uuid:f3312c6e-2f26-42a5-95e8-29c20ddb5c71  <src/locale/en-US.locale.js>  |  2026-08-05 Instead of making it more standard, I've hacked filters into its string substitution. That'll lock me in down the line. But it was fun.
+2026-08-05 +feature | Stroke selection tool (for transform, copy, delete).  complexity:2 (rectangle)  uuid:e5850700-c29c-463f-ad46-e22c9420893d  |  Perhaps an eraser-like tool that selects by painting. Maybe not the best implementation, but using components already implemented, as an intermediate measure.
+2026-08-06 +TIMELINE | Show frame selection.  uuid:b6c3635c-32f7-4a8d-9bad-009bec4daa30
+2026-08-06 +TIMELINE | Zoom with Ctrl+wheel.  uuid:43d39470-ccb7-4a2b-8e77-b474f72eed78
+2026-08-06 +TIMELINE | Zoom with pinch.  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
+2026-08-06 +feature | +ROTATE tool.  complexity:3  uuid:3f275aee-90de-445d-90c3-d40a72364227
+2026-08-06 +feature | +SCALE tool.  complexity:2  uuid:b76fbc84-e24e-431d-a4c4-0c7582cda023
+2026-08-06 +feature | +TIMELINE  complexity: 5  uuid:60f22517-d65e-407d-ac84-b8a0af91f30c
+2026-08-06 +feature | Frame explicit start exposure number.  uuid:231dfbcd-b16d-4a9b-9429-a7b0f2a49737  |  To enable gaps between frames on the timeline.
+2026-08-06 +reconsider | +UX +feature | Shortcut to jump to next boundary between frames and empty timeline.  uuid:0af20b32-a5d1-4bc6-8a1d-f30944d1d865 +feature  dependsOn:231dfbcd-b16d-4a9b-9429-a7b0f2a49737
+2026-08-06 +reconsider | +UX | Shortcut to adjust scene default frame hold (Shift+{Up,Down}?)  uuid:4a708666-a2ee-4515-a3eb-012fae2595ef
+2026-08-06 Show +LAYERS in +TIMELINE  uuid:793fb2fb-9444-4a12-9ecd-2feaa69ca19e
+2026-08-08 +UX | Middle click should pan the view by default, rather than move content. Perhaps restrict middle click to view manipulation.  uuid:b893c73a-fcf1-4f7a-8c08-bd8df156cdf4  +UX
+2026-08-08 +UX | Modify pointer events with Shift, Control, Alt. Maybe PAN, SCALE?, and SCRUB (flip), respectively.  uuid:f3f7e638-6bd4-40b9-9703-ce1bfc9b493e
+2026-08-08 +feature | User-controllable zoom. (Ctrl+middle_drag, Ctrl+wheel, Ctrl+=, Ctrl+-)  uuid:43f4e755-c09c-4c68-9074-82506dfea69e  +UX
+2026-08-09 +QUIRK +LATER Range input value must be assigned after min/max attributes are set. Components' attributes are being assigned in definition order, for now. But object param order is not guaranteed, nor expected, right?  uuid:b315c501-ad79-4f92-8bd6-6cbd0f29e852
+2026-08-09 +feature | Choose to erase(/select) segments of strokes, rather than whole strokes. If this is implemented, it would become the default. Ideally, it would cut segments where the eraser/selection was, not only removing the intersecting points, which would leave a ragged erasure.  uuid:7e8fd261-704d-4778-a9fc-c3a240375907  |  When detecting intersection of shape and path, return [ boolean, Point, Point ], where the two points are the first and last intersection with the path, in stroke order. This would enable splitting this path with these two capping the gap.
+2026-08-09 +storage | Option to Export/Import multiple scenes to/from JSON. Let export format be an array of scenes. Perhaps an object with application state around that. e.g. {instrument,state,content:[scene,…]}  uuid:13d8cfa9-72de-4a29-b9b5-c84993919c1f
+2026-08-10 +reconsider | Should my Arc interface use 2*Math.PI for a circle, as Canvas2DContext.arc does? I like the implicit tau in my implementation, so it'll stay for now. Food for thought.  uuid:8de1bdf1-9449-4813-933a-0c41260dc079
+2026-08-10 Improve performance of testing path/area intersection.  uuid:343fb0fa-6271-4049-a0ee-9fa27ae3e5ce isPartOf:77af0b21-5b34-4831-b6e9-946de3146597
 2026-08-13 +UX key re-binding mode: capture all keyboard input, show current binding, and allow rebinding to anything else.
+2026-08-15 +UX | Rebind most commonly used keys to one-handed key bindings, one for each left and right. | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus depends:f1fb0261
+2026-08-15 +feature | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus
 2026-08-17 Let user choose a +localization language.  uuid:28fa073e-553f-4942-9f8f-26fcee173a44
+2026-09-07 +UX | Enable drag+drop JSON file onto browser to import.  uuid:f34e1193-de9b-4bf9-87e2-cf7231cf54b5
+2026-09-07 +art | Impcrease granularity of line weight in render. The steps between line weights are visible at the joints of segments, thought the quadratic curve hides those boundaries otherwise.  uuid:7da48026-f458-4997-ba85-b6fd32b4fd59

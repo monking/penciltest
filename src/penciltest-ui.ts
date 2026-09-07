@@ -1537,6 +1537,7 @@ class PenciltestUI extends PenciltestUIComponent {
           this.hideMenu();
         }
 
+        this.controller.state.toolButton = -1;
         if (pointerEvent.button === 1) { // middle click
           if (event.shiftKey) {
             this.controller.useTool(PenciltestTool.ERASER);
@@ -1544,6 +1545,9 @@ class PenciltestUI extends PenciltestUIComponent {
             this.interactivePan([], event);
             return;
           }
+        } else if (pointerEvent.button === 5) { // eraser on stylus
+          this.controller.useTool(PenciltestTool.ERASER);
+          this.controller.state.toolButton = pointerEvent.button;
         }
 
         this.controller.state.pointerMode = PointerMode.PRESS;
@@ -1585,7 +1589,12 @@ class PenciltestUI extends PenciltestUIComponent {
       this.controller.state.pointerMode = PointerMode.HOVER;
 
       const mouseEvent = event as MouseEvent;
+      const pointerEvent = event as PointerEvent;
       this.previousEvent = event;
+      if (this.controller.state.toolButton === pointerEvent.button) {
+        this.controller.usePreviousTool();
+        this.controller.state.toolButton = -1;
+      }
       if ((event.type === 'mouseup') && ((mouseEvent).button === 2)) {
         return true; // allow context menu
       } else {

@@ -1,7 +1,7 @@
 class Penciltest {
 
-  static version = '0.3.1';
-  static debugVersion = '0.3.2';
+  static version = '0.3.2';
+  static debugVersion = '0.3.3';
   static instrumentIdentifier = 'io.lovejoy.penciltest';
 
   // components
@@ -33,8 +33,9 @@ class Penciltest {
 
   // operation buffers
   copyBuffer: Array<PenciltestFrame>;
-  trackBuffer: Array<Mark>;
+  previousMark:Mark;
   redoQueue: Array<Stroke>;
+  trackBuffer: Array<Mark>;
   workingOn: Array<Promise<any>>;
 
 
@@ -68,6 +69,7 @@ class Penciltest {
     version: Penciltest.version,
     mode: PenciltestMode.DRAWING,
     toolStack: [],
+    toolButton: -1,
     pointerMode: PointerMode.AWAY,
     previousMode: null
   };
@@ -228,14 +230,13 @@ class Penciltest {
     return frameBounds;
   }
 
-  previousMark:Mark;
   mark(mark: Mark) {
     const stroke = this.scene.getCurrentStroke(true);
     const isNewStroke = stroke.path.length === 0;
     if (isNewStroke) {
       delete this.previousMark;
       stroke.provisional = true;
-      stroke.width = this.options.strokeWidth;
+      stroke.strokeWidth = this.options.strokeWidth;
       stroke.strokeColor = this.options.strokeColor;
     }
     const sceneMark = PtSpace.scalePoint(mark, 1 / this.zoomFactor) as Mark;
@@ -558,8 +559,8 @@ class Penciltest {
     const scaledStroke = {
       ...stroke,
     }
-    if ("width" in scaledStroke) {
-      scaledStroke.width *= factor
+    if ("strokeWidth" in scaledStroke) {
+      scaledStroke.strokeWidth *= factor
     }
     if (Array.isArray(scaledStroke.path)) {
       scaledStroke.path = scaledStroke.path.map((point: Mark) => PtSpace.scalePoint(point, factor))
@@ -614,10 +615,10 @@ class Penciltest {
           if (PtSpace.doesPathIntersect(lastStroke.path, fieldPlusStrokeRadius)) {
             delete lastStroke.provisional;
           } else {
-            // Don't record mark if it (TODO including its width) are off the
-            // field. This enables both beginning a mark from outside the
-            // field, but also clicking outside the field to blur/cancel other
-            // elements.  uuid:0051f2f1-ec80-4377-9dee-a32d47ecf185
+            // Don't record mark if it are off the field. This enables both
+            // beginning a mark from outside the field, but also clicking
+            // outside the field to blur/cancel other elements.
+            // uuid:0051f2f1-ec80-4377-9dee-a32d47ecf185
             frame.strokes.splice(this.scene.current.strokeNumber, 1);
           }
         }

@@ -135,11 +135,14 @@ class PTMigration_v0_3_0_to_v0_3_1 extends PenciltestMigrationBase {
   }
   migrateScene(scene:any) {
     // BEGIN: `line-` prefix changed to `stroke-`
+    if (!("options" in scene)) {
+      scene.options = {};
+    }
     Object.assign(scene.options, {
-      strokeColor: scene.options.lineColor,
-      strokeWeight: scene.options.lineWeight,
-      strokeOpacity: scene.options.lineOpacity,
-      strokeCorner: scene.options.lineCorner,
+      strokeColor: scene.options?.lineColor || 'black',
+      strokeWeight: scene.options?.lineWeight || 1,
+      strokeOpacity: scene.options?.lineOpacity || 1,
+      strokeCorner: scene.options?.lineCorner || 'round',
     });
     delete scene.options.lineColor;
     delete scene.options.lineWeight;
