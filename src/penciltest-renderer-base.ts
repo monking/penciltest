@@ -147,7 +147,7 @@ class BaseRenderer implements PenciltestRenderer {
       strokeWidth,
       strokeColor,
     } = this.composeStyles({
-      strokeWidth: stroke.width,
+      strokeWidth: stroke.strokeWidth,
       ...overrides,
     }, false);
 

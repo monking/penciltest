@@ -159,8 +159,8 @@ class PtSpace {
       ...stroke,
       path: stroke.path.map((mark) => PtSpace.scalePoint(mark as Point, factor) as Mark),
     };
-    if ("width" in scaledStroke) {
-      scaledStroke.width *= factor;
+    if ("strokeWidth" in scaledStroke) {
+      scaledStroke.strokeWidth *= factor;
     }
     return scaledStroke;
   }

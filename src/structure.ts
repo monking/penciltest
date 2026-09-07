@@ -166,6 +166,7 @@ interface PenciltestState {
   pointerMode: PointerMode;
   previousMode?: PenciltestMode;
   toolStack: Array<PenciltestTool>;
+  toolButton: Number;
   version: string;
 };
 
@@ -216,7 +217,7 @@ interface Mark extends Vector {
 }
 
 interface Stroke extends PenciltestLineOptions {
-  width?: number; // any number, multiplied by path[].mark weight
+  strokeWidth?: number; // any number, multiplied by path[].mark weight
   path: Path;
   provisional?: boolean;
 };
