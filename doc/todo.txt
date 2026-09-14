@@ -14,6 +14,7 @@
 (C) 2026-08-08 +UX +clarity | The "Delete Scene" prompt should have the current scene selected by default.  uuid:1ea72d1a-f77f-4849-9a2a-a2f5b3fdd115
 (C) 2026-08-09 +BUG | Onion skin opacity is not matching frame radius. On the order of 2 or 3 frames it's okay, but more than that, and opacity seems to fluctuate.  uuid:d8bbf559-6d90-47de-beda-3c0c8873f746
 (C) 2026-08-09 +UX +storage | Prompt user for confirmation if RENAMED scene would overwrite existing OTHER scene in LocalStorage. Perhaps note storage name upon loading. If saving as a different name, and if there is a record by that name already, ask for user confirmation.  uuid:9a0b3d29-ae0c-42f7-9728-0a79c2f2c186
+(C) 2026-09-14 +BUG | Packed JSON stroke `path` is supposed to be extracted, with `{…}` JSON **suffix**. Packed path remains `path` member of stringified JSON, i.e. every stroke begins `{`.  uuid:b5029e37-2790-46ab-9b00-2a502886ed98
 (D) 2026-08-06 +BUG | If a scene is longer than its audio, the audio doesn't begin playing again upon loop.  uuid:262f1925-4ae7-45e9-8c2f-ad622acd5d96
 (D) 2026-08-17 `lineJoin` of 'round' shows overlap if path is <100% alpha.  uuid:889abf7a-831e-4b76-ba2f-38a840b7d87c  | solution: redraw whole path while marking (less expensive now it's happening in the tool layer).
 (E) 2026-08-06 +WIP | Enable hooks for pack/unpack types, to decouple logic and format to enable partial inheritence, expansion, +maintainability.  uuid:0f14c213-3134-49cd-978f-9f9cf385b20c isPartOf:3e7cf345-add1-4ad5-9062-d242f8ec14cb  | This is nearly done 2026-08-07, but I want to finish a variant implementation of the pack/unpack to verify, before I mark this as done.
@@ -46,4 +47,4 @@
 2026-08-15 +UX | Rebind most commonly used keys to one-handed key bindings, one for each left and right. | Ctrl click for context menu (Comes for free in Mac? Been a while since I used one.)  uuid:d7043f2f-afca-4077-a95b-c8a44a688599 +UX +stylus depends:f1fb0261
 2026-08-17 Let user choose a +localization language.  uuid:28fa073e-553f-4942-9f8f-26fcee173a44
 2026-09-07 +UX | Enable drag+drop JSON file onto browser to import.  uuid:f34e1193-de9b-4bf9-87e2-cf7231cf54b5
-2026-09-07 +art | Impcrease granularity of line weight in render. The steps between line weights are visible at the joints of segments, thought the quadratic curve hides those boundaries otherwise.  uuid:7da48026-f458-4997-ba85-b6fd32b4fd59
+2026-09-07 +art | Increase granularity of line weight in render. The steps between line weights are visible at the joints of segments, thought the quadratic curve hides those boundaries otherwise.  uuid:7da48026-f458-4997-ba85-b6fd32b4fd59
