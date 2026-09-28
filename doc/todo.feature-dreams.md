@@ -14,7 +14,6 @@ Dreaming of features, fleshing them out, making them real.
 [polls]: https://github.com/monking/penciltest/discussions/categories/polls "'polls' category of discussions at GitHub"
 [ideas]: https://github.com/monking/penciltest/discussions/categories/ideas "'ideas' category of discussions at GitHub"
 
-
 ## priority
 Pretty sure I'll do these. Once they're fleshed out, move them to `todo.txt`, or [issues][].
 
@@ -42,12 +41,13 @@ When they're well defined, [seek feedback][ideas] and [priority][polls] in [disc
 ### timeline UI
 
 * show frames, holds
-* show [layers][]
 * navigate to a frame
 * *select*
-  * `<>` a range of frames by dragging (from no selection `|` from outside current selection)
-  * `..` any set of frames (by ctrl+click `|` long-press beside existing selection)
-* *shift* (move to another exposure) a selected `<>` range of frames by dragging
+  * `<>` a range of frames  
+    by dragging (from no selection `|` from outside current selection)
+  * `..` any set of frames  
+    by `^+m1|t1sL` beside existing selection (`Ctrl`+primary-click, or long-press)
+* *shift* (move frame in timeline) a selected `<>` range of frames by dragging
 
 ### layers
 `v0.6?`
@@ -56,19 +56,22 @@ Integrates closely with: [timeline UI][]
 
 * `?` fade inactive layers
 * `?` hide a layer
-* `?` set *guide* (or *note*?) layer (omitted from render)
+  - omit hidden layers from *onion skin*
+  - `?` omit hidden layers from *render* `|` **included in *render* by default**
+* `?` set layer as *guide* (or *note*?)
+  - omit *guide* layers from *render* and *onion skin*
 
 ### transform
 selection, object
 
 * translate `px`(x,y) 
-  * [x] implemented destructively on *selection*, *frames*, *scene*, since v0.2.x
+  * [x] implemented destructively on *selection*, *frames*, *scene*, since `v0.2.x`
 * scale `N`(x,y)
 * rotate `%`τ(z)
 
 ### select partial paths
 
-Thru v0.3.x, only whole paths may be selected.
+Thru `v0.3.x`, whole paths may be selected.
 
 Partial paths could be selected
 * in a **rough way**, by selecting nodes within a *region*
@@ -80,18 +83,17 @@ selection *region*:
 * remove from a selection
 
 ### <span id="a5fc64ce-9755-4b37-8bd1-3f92944c529f">objects (re-usable)</span>
+a.k.a. *symbols*, *elements*, *clips*, …
 
-* origin `N`,`N` defaults to center of contents
-  * convert selection to object `|` make new empty object
+* convert selection to object
+  * *origin* `px`(x,y) defaults to center of contents
+* make new empty object
+  * *origin* defaults to *cursor*, if in *field*, or else center of *field*
 
 * object library
-  * select object abstract
-  * highlight frames (in [timeline UI][]) containing selected object
-  * [*edit object*](#edit-object) from library
-* [*edit object*](#edit-object) in place
 * non-destructive object [transformations][transform]
 * swap object
-  * `?` **only selected (in frame)** `|` all instances `|` all on frame `|` all on contiguous frames
+  * `?` **only selected (in current frame)** `|` all instances `|` all on frame `|` all on contiguous frames
 * object metadata: `T` name
 * object timeline
   * `N` instance start frame
@@ -99,17 +101,28 @@ selection *region*:
 
 reference by unique name
 * `?` **uuid** (render as "object `N`") `|` name (with suffix `N` as needed for unique-ness)
-* pack as alpha counter (`a`, `b`, …`z`, `aa`, `ab`, …) with lookup in scene metadata
+* *pack* as alpha counter (`a`, `b`, …`z`, `aa`, `ab`, …) with lookup in scene metadata
+
+#### selecting objects
+
+* select object *abstract* in library list `m1` `|` select object `m1` in *field*
+* highlight frames (in [timeline UI][]) containing selected object
 
 #### edit object
 
-* initiate by double-clicking, or from context menu, on object (in field or library)
-* modal style emphasizing **not global timeline** (hatched overlay in background around *field*?)
-* object origin at center of field
+* initiate edit `m1x2|m2` on object, in field or *library*
+  * `m1x2` on object in *field* to edit object in place
+  * `m1x2` on object in *libary* to edit *detached*
+* modal style emphasizing **not global timeline** (e.g. hatched overlay in background around *field*?)
+* object *origin*
+  * at center of *field* when editing *detached*
+  * 
 
 #### placing objects
-* stamp: place object(s) while maintaining library selection
-  * `?` spray
+
+* drag `m1d` from library onto *field*
+* stamp `m1`: place object(s) while maintaining library selection
+  * `?` spray `m1d` within field
     * `px` interval
     * `px` jitter
   * `?` random start frame

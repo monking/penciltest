@@ -13,6 +13,20 @@ Actions are outlined with parameters and implementation versions.
 
 Actions **not yet implemented** are ~~struck through~~ with an estimated version to be implemented.
 
+## modes
+Behaviors will change depending on the mode.
+
+* drawing
+* playing
+* working
+
+## tools
+
+* pencil
+* eraser
+* ~~transform~~ `v0.5?`
+* ~~select~~ `v0.5?`
+
 ## drawing
 
 * move cursor `px`(x,y) `v0.1.x`
